@@ -1,3 +1,5 @@
+// asset contoller file
+
 const Asset = require("../model/Asset");
 const ConfirmedAsset = require("../model/ConfirmedAsset");
 const UpdatesAsset = require("../model/UpdatesAsset");

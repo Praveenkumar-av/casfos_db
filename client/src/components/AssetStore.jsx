@@ -144,10 +144,10 @@ const AssetStore = () => {
         try {
           const response = await axios.get(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
           const rejectedAsset = response.data.data;
-  
+
           setAssetType(rejectedAsset.assetType || "Permanent");
           setAssetCategory(rejectedAsset.assetCategory || "");
-  
+
           if (rejectedAsset.serviceNo || rejectedAsset.serviceDate || rejectedAsset.serviceAmount) {
             setRejectedAction("service");
             setActiveTab("serviced");
@@ -268,7 +268,7 @@ const AssetStore = () => {
             setBillNo(rejectedAsset.billNo || "");
             setReceivedBy(rejectedAsset.receivedBy || "");
             setBillPhotoUrl(rejectedAsset.billPhotoUrl || "");
-  
+
             if (rejectedAsset.assetCategory === "Building") {
               setBuildingData({
                 subCategory: rejectedAsset.subCategory || "",
@@ -329,7 +329,7 @@ const AssetStore = () => {
               setAmcPhotoUrls(newAmcPhotoUrls);
             }
           }
-  
+
           setIsEditingRejected(true);
           Swal.fire({
             icon: "info",
@@ -348,6 +348,16 @@ const AssetStore = () => {
       fetchRejectedAsset();
     }
   }, [rejectedId]);
+
+  const isFutureDate = (dateStr) => {
+    if (!dateStr) return false; // No date provided, so no error (handled separately if required)
+    const inputDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of today
+    inputDate.setHours(0, 0, 0, 0); // Normalize input date
+    return inputDate > today; // True if date is after today
+  };
+
   const validateStoreForm = () => {
     const today = new Date().setHours(0, 0, 0, 0);
     let errors = [];
@@ -356,7 +366,7 @@ const AssetStore = () => {
     if (!assetType) errors.push("Asset Type is required.");
     if (!assetCategory) errors.push("Asset Category is required.");
     if (!entryDate) errors.push("Entry Date is required.");
-    if (new Date(entryDate) > today) errors.push("Entry Date cannot be in the future.");
+    if (isFutureDate(entryDate)) errors.push("Entry Date cannot be in the future.");
 
     if (assetCategory === "Building") {
       if (!buildingData.subCategory) errors.push("Building Sub Category is required.");
@@ -366,15 +376,16 @@ const AssetStore = () => {
       if (!buildingData.buildingNo) errors.push("Building No is required.");
       if (!buildingData.approvedEstimate) errors.push("Approved Estimate is required.");
       if (!buildingData.status) errors.push("Building Status is required.");
+      if (buildingData.dateOfConstruction && isFutureDate(buildingData.dateOfConstruction)) errors.push("Date of Construction cannot be in the future.");
     } else if (assetCategory === "Land") {
       if (!landData.subCategory) errors.push("Land Sub Category is required.");
       if (landData.subCategory === "Others" && !landData.customSubCategory) errors.push("Custom Sub Category is required for 'Others'.");
       if (!landData.location) errors.push("Land Location is required.");
       if (!landData.status) errors.push("Land Status is required.");
+      if (landData.dateOfPossession && isFutureDate(landData.dateOfPossession)) errors.push("Date of Possession cannot be in the future.");
     } else {
       if (!purchaseDate) errors.push("Purchase Date is required.");
-      if (new Date(purchaseDate) > today) errors.push("Purchase Date cannot be in the future.");
-
+      if (isFutureDate(purchaseDate)) errors.push("Purchase Date cannot be in the future.");
 
       if (items.length === 0) errors.push("At least one item is required.");
       items.forEach((item, index) => {
@@ -384,15 +395,19 @@ const AssetStore = () => {
         if (item.unitPrice <= 0) errors.push(`Item ${index + 1}: Unit Price must be greater than 0.`);
         if (assetType === "Permanent" && item.showIdInputs && item.itemIds.some(id => !id)) errors.push(`Item ${index + 1}: All Item IDs must be filled.`);
 
-        // AMC Date Validation
+        // AMC and Warranty Date Validation
+        if (item.amcFromDate && isFutureDate(item.amcFromDate)) errors.push(`Item ${index + 1}: AMC From Date cannot be in the future.`);
+        if (item.amcToDate && isFutureDate(item.amcToDate)) errors.push(`Item ${index + 1}: AMC To Date cannot be in the future.`);
         if (item.amcFromDate && item.amcToDate && new Date(item.amcFromDate) > new Date(item.amcToDate)) {
           errors.push(`Item ${index + 1}: AMC From Date cannot be later than AMC To Date.`);
         }
+        if (item.warrantyValidUpto && isFutureDate(item.warrantyValidUpto)) errors.push(`Item ${index + 1}: Warranty Valid Upto cannot be in the future for entry date.`);
       });
     }
 
     return errors;
   };
+
   const serverBaseUrl = "http://localhost:3001"; // Define server base URL
   // Fetch servicable items
   useEffect(() => {
@@ -591,7 +606,6 @@ const AssetStore = () => {
       return;
     }
 
-    // Validate all forms
     const invalidForms = upgradeForms.filter(form =>
       !form.year ||
       !form.estimate ||
@@ -610,6 +624,16 @@ const AssetStore = () => {
       return;
     }
 
+    const futureDates = upgradeForms.some(form => isFutureDate(form.dateOfCompletion));
+    if (futureDates) {
+      Swal.fire({
+        icon: "warning",
+        title: "Warning",
+        text: "Date of Completion cannot be in the future!",
+      });
+      return;
+    }
+
     const subCategoryToSend = selectedSubCategory === "Others" ? buildingData.customSubCategory : selectedSubCategory;
 
     if (!subCategoryToSend) {
@@ -622,10 +646,9 @@ const AssetStore = () => {
     }
 
     try {
-      // Send all upgrades as a list in a single request
       await axios.post("http://localhost:3001/api/assets/addBuildingUpgrades", {
         subCategory: subCategoryToSend,
-        upgrades: upgradeForms, // Send the entire array of upgrades
+        upgrades: upgradeForms,
       });
       if (isEditingRejected && rejectedId && rejectedAction === "buildingupgrade") {
         await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
@@ -635,8 +658,7 @@ const AssetStore = () => {
         title: "Success",
         text: "All upgrades added successfully!",
       });
-      
-      // Refresh upgrades list
+
       const response = await axios.post("http://localhost:3001/api/assets/getBuildingUpgrades", {
         subCategory: subCategoryToSend,
       });
@@ -644,12 +666,12 @@ const AssetStore = () => {
       const upgrades = buildings.reduce((acc, building) => [...acc, ...building.upgrades], []);
       setBuildingUpgrades(upgrades);
 
-      // Clear all forms after submission
       setUpgradeForms([]);
       setSelectedSubCategory("");
       setIsEditingRejected(false);
       setRejectedAction("");
-      window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=buildingupgrade`);    } catch (error) {
+      window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=buildingupgrade`);
+    } catch (error) {
       console.error("Failed to add upgrades:", error);
       Swal.fire({
         icon: "error",
@@ -701,18 +723,41 @@ const AssetStore = () => {
   const handleItemIdChange = (itemIndex, idIndex, value) => {
     setItems((prevItems) => prevItems.map((item, i) => i === itemIndex ? { ...item, itemIds: item.itemIds.map((id, j) => (j === idIndex ? value : id)) } : item));
   };
+
   const handleItemChange = (index, field, value) => {
     const updatedItems = items.map((item, i) => {
       if (i === index) {
         let updatedItem = { ...item };
+
         if (field === "subCategory" && assetType === "Permanent") {
-          updatedItem = { ...updatedItem, [field]: value, itemName: "", customSubCategory: value === "Others" ? item.customSubCategory : "" };
-        } else if (field === "itemName") {
           updatedItem = {
             ...updatedItem,
             [field]: value,
-            ...(assetType === "Permanent" ? { customItemName: value === "Others" ? item.customItemName : "" } : {}),
+            itemName: "",
+            customSubCategory: value === "Others" ? item.customSubCategory : "",
           };
+        } else if (field === "itemName") {
+          // Transform itemName: trim leading/trailing spaces, normalize inner spaces, capitalize first char, lowercase rest
+          const trimmedValue = value.trim(); // Remove leading/trailing spaces
+          const normalizedValue = trimmedValue.replace(/\s+/g, " "); // Replace multiple spaces with single space
+          const formattedValue = normalizedValue
+            ? normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1).toLowerCase()
+            : "";
+          updatedItem = {
+            ...updatedItem,
+            [field]: formattedValue,
+            ...(assetType === "Permanent"
+              ? { customItemName: formattedValue === "Others" ? item.customItemName : "" }
+              : {}),
+          };
+        } else if (field === "customItemName") {
+          // Transform customItemName: trim leading/trailing spaces, normalize inner spaces, capitalize first char, lowercase rest
+          const trimmedValue = value.trim(); // Remove leading/trailing spaces
+          const normalizedValue = trimmedValue.replace(/\s+/g, " "); // Replace multiple spaces with single space
+          const formattedValue = normalizedValue
+            ? normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1).toLowerCase()
+            : "";
+          updatedItem = { ...updatedItem, [field]: formattedValue };
         } else if (field === "amcFromDate" || field === "amcToDate") {
           updatedItem[field] = value;
         } else if (field === "amcCost") {
@@ -726,6 +771,7 @@ const AssetStore = () => {
     });
     setItems(updatedItems);
   };
+
   const handleBuildingChange = (field, value) => {
     setBuildingData(prev => ({
       ...prev,
@@ -1143,7 +1189,11 @@ const AssetStore = () => {
       Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields!" });
       return;
     }
-  
+    if (isFutureDate(maintenanceData.yearOfMaintenance)) {
+      Swal.fire({ icon: "warning", title: "Warning", text: "Year of Maintenance cannot be in the future!" });
+      return;
+    }
+
     try {
       await axios.post("http://localhost:3001/api/assets/saveMaintenanceTemp", {
         assetType,
@@ -1156,12 +1206,11 @@ const AssetStore = () => {
         agency: maintenanceData.agency,
         enteredBy: username,
       });
-  
-      // If editing a rejected maintenance entry, delete it from RejectedAsset
+
       if (isEditingRejected && rejectedId && rejectedAction === "maintenance") {
         await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
       }
-  
+
       Swal.fire({ icon: "success", title: "Success!", text: "Maintenance submitted for approval!" });
       setMaintenanceData({
         buildingNo: "",
@@ -1171,10 +1220,10 @@ const AssetStore = () => {
         custody: "",
         agency: "",
       });
-      setIsEditingRejected(false); // Reset editing state
-      setRejectedAction(""); // Reset rejected action
-      window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=serviced`); // Update URL
-      setActiveTab("serviced"); // Ensure tab remains on serviced
+      setIsEditingRejected(false);
+      setRejectedAction("");
+      window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=serviced`);
+      setActiveTab("serviced");
     } catch (error) {
       Swal.fire({ icon: "error", title: "Oops...", text: "Failed to submit maintenance for approval!" });
       console.error(error);
@@ -1206,6 +1255,10 @@ const AssetStore = () => {
       Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields and select at least one ID!" });
       return;
     }
+    if (isFutureDate(servicedData.serviceDate)) {
+      Swal.fire({ icon: "warning", title: "Warning", text: "Service Date cannot be in the future!" });
+      return;
+    }
 
     try {
       await axios.post("http://localhost:3001/api/assets/saveServiced", {
@@ -1233,6 +1286,7 @@ const AssetStore = () => {
       console.error(error);
     }
   };
+
   const removeItem = (index) => {
     setItems((prevItems) => prevItems.filter((_, i) => i !== index));
     setItemPhotoUrls((prev) => {
@@ -1257,7 +1311,7 @@ const AssetStore = () => {
         !disposableData.date ||
         !disposableData.demolitionPeriod ||
         !disposableData.demolitionEstimate ||
-        !disposableData.methodOfDisposal // Add this condition
+        !disposableData.methodOfDisposal
       ) {
         Swal.fire({
           icon: "warning",
@@ -1266,7 +1320,11 @@ const AssetStore = () => {
         });
         return;
       }
-  
+      if (isFutureDate(disposableData.date)) {
+        Swal.fire({ icon: "warning", title: "Warning", text: "Date cannot be in the future!" });
+        return;
+      }
+
       try {
         await axios.post("http://localhost:3001/api/assets/requestForDisposal", {
           assetType,
@@ -1281,7 +1339,7 @@ const AssetStore = () => {
           date: disposableData.date,
           demolitionPeriod: disposableData.demolitionPeriod,
           demolitionEstimate: disposableData.demolitionEstimate,
-          methodOfDisposal: disposableData.methodOfDisposal, // Add this line
+          methodOfDisposal: disposableData.methodOfDisposal,
         });
         if (isEditingRejected && rejectedId && rejectedAction === "disposal") {
           await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
@@ -1306,9 +1364,9 @@ const AssetStore = () => {
           agency: "",
           agencyReferenceNumberUrl: "",
           date: "",
-          methodOfDisposal: "", // Add this line
           demolitionPeriod: "",
           demolitionEstimate: "",
+          methodOfDisposal: "",
         });
         setIsEditingRejected(false);
         setRejectedAction("");
@@ -1319,7 +1377,6 @@ const AssetStore = () => {
         console.error(error);
       }
     } else {
-      // Non-building disposal logic (unchanged)
       if (
         !disposableData.itemName ||
         !disposableData.itemDescription ||
@@ -1330,7 +1387,7 @@ const AssetStore = () => {
         !disposableData.condemnationDate ||
         !disposableData.remark ||
         disposableData.disposalValue < 0 ||
-        !disposableData.methodOfDisposal // Add this condition
+        !disposableData.methodOfDisposal
       ) {
         Swal.fire({
           icon: "warning",
@@ -1339,7 +1396,15 @@ const AssetStore = () => {
         });
         return;
       }
-  
+      if (isFutureDate(disposableData.inspectionDate)) {
+        Swal.fire({ icon: "warning", title: "Warning", text: "Inspection Date cannot be in the future!" });
+        return;
+      }
+      if (isFutureDate(disposableData.condemnationDate)) {
+        Swal.fire({ icon: "warning", title: "Warning", text: "Condemnation Date cannot be in the future!" });
+        return;
+      }
+
       try {
         await axios.post("http://localhost:3001/api/assets/requestForDisposal", {
           assetType,
@@ -1355,7 +1420,7 @@ const AssetStore = () => {
           condemnationDate: disposableData.condemnationDate,
           remark: disposableData.remark,
           disposalValue: disposableData.disposalValue,
-          methodOfDisposal: disposableData.methodOfDisposal, // Add this line
+          methodOfDisposal: disposableData.methodOfDisposal,
         });
         if (isEditingRejected && rejectedId && rejectedAction === "disposal") {
           await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
@@ -1377,12 +1442,12 @@ const AssetStore = () => {
           certificateObtained: "",
           authority: "",
           dateOfReferenceUrl: "",
-          methodOfDisposal: "", // Add this line
           agency: "",
           agencyReferenceNumberUrl: "",
           date: "",
           demolitionPeriod: "",
           demolitionEstimate: "",
+          methodOfDisposal: "",
         });
         setDisposableItems([]);
         setPurchaseValues({});
@@ -2087,7 +2152,7 @@ const AssetStore = () => {
 
             {activeTab === "serviced" && (
               <div style={styles.formContainer}>
-               
+
                 <div style={styles.formRow}>
                   <div style={styles.inputGroup}><label>Asset Type:</label><select value={assetType} onChange={(e) => setAssetType(e.target.value)} style={styles.input}><option value="Permanent">Permanent</option><option value="Consumable">Consumable</option></select></div>
                   <div style={styles.inputGroup}><label>Asset Category:</label><select value={assetCategory} onChange={(e) => setAssetCategory(e.target.value)} style={styles.input}><option value="">Select Category</option>{(assetType === "Permanent" ? permanentAssetOptions : consumableAssetOptions).map((option) => (<option key={option} value={option}>{option}</option>))}</select></div>
@@ -2096,7 +2161,7 @@ const AssetStore = () => {
                   <>
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Building No:</label><input type="text" value={maintenanceData.buildingNo} onChange={(e) => handleMaintenanceChange("buildingNo", e.target.value)} style={styles.input} /></div>
-                      <div style={styles.inputGroup}><label>Year of Maintenance:</label><input type="date" value={maintenanceData.yearOfMaintenance} onChange={(e) => handleMaintenanceChange("yearOfMaintenance", e.target.value)} style={styles.input} /></div>
+                      <div style={styles.inputGroup}><label>Year of Maintenance:</label><input type="date" value={maintenanceData.yearOfMaintenance} onChange={(e) => handleMaintenanceChange("yearOfMaintenance", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
                       <div style={styles.inputGroup}><label>Cost:</label><input type="number" value={maintenanceData.cost} onChange={(e) => handleMaintenanceChange("cost", parseFloat(e.target.value) || 0)} style={styles.input} /></div>
                     </div>
                     <div style={styles.formRow}>
@@ -2126,7 +2191,7 @@ const AssetStore = () => {
                     </div>
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Service No:</label><input type="text" value={servicedData.serviceNo} onChange={(e) => handleServicedChange("serviceNo", e.target.value)} style={styles.input} /></div>
-                      <div style={styles.inputGroup}><label>Service Date:</label><input type="date" value={servicedData.serviceDate} onChange={(e) => handleServicedChange("serviceDate", e.target.value)} style={styles.input} /></div>
+                      <div style={styles.inputGroup}><label>Service Date:</label><input type="date" value={servicedData.serviceDate} onChange={(e) => handleServicedChange("serviceDate", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
                       <div style={styles.inputGroup}><label>Service Amount:</label><input type="number" value={servicedData.serviceAmount} onChange={(e) => handleServicedChange("serviceAmount", parseFloat(e.target.value) || 0)} style={styles.input} /></div>
                     </div>
                     <div style={styles.inputGroup}>
@@ -2309,28 +2374,28 @@ const AssetStore = () => {
                           />
                         </div>
                         <div style={styles.inputGroup}>
-    <label>Method of Disposal:</label>
-    <select
-      value={["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal) ? disposableData.methodOfDisposal : "Select Method"}
-      onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-      style={styles.input}
-    >
-      <option value="Select Method" disabled>Select Method</option>
-      <option value="Sold">Sold</option>
-      <option value="Auctioned">Auctioned</option>
-      <option value="Destroyed">Destroyed</option>
-      <option value="Other">Other</option>
-    </select>
-    {disposableData.methodOfDisposal === "Other" && (
-      <input
-        type="text"
-        value={disposableData.methodOfDisposal === "Other" ? "" : disposableData.methodOfDisposal}
-        onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-        placeholder="Enter custom method"
-        style={{ ...styles.input, marginTop: "5px" }}
-      />
-    )}
-  </div>
+                          <label>Method of Disposal:</label>
+                          <select
+                            value={["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal) ? disposableData.methodOfDisposal : "Select Method"}
+                            onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
+                            style={styles.input}
+                          >
+                            <option value="Select Method" disabled>Select Method</option>
+                            <option value="Sold">Sold</option>
+                            <option value="Auctioned">Auctioned</option>
+                            <option value="Destroyed">Destroyed</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          {disposableData.methodOfDisposal === "Other" && (
+                            <input
+                              type="text"
+                              value={disposableData.methodOfDisposal === "Other" ? "" : disposableData.methodOfDisposal}
+                              onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
+                              placeholder="Enter custom method"
+                              style={{ ...styles.input, marginTop: "5px" }}
+                            />
+                          )}
+                        </div>
                       </div>
 
                       <div style={styles.buttonContainer}>
@@ -2370,28 +2435,28 @@ const AssetStore = () => {
                           </select>
                         </div>
                         <div style={styles.inputGroup}>
-    <label>Method of Disposal:</label>
-    <select
-      value={["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal) ? disposableData.methodOfDisposal : "Select Method"}
-      onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-      style={styles.input}
-    >
-      <option value="Select Method" disabled>Select Method</option>
-      <option value="Sold">Sold</option>
-      <option value="Auctioned">Auctioned</option>
-      <option value="Destroyed">Destroyed</option>
-      <option value="Other">Other</option>
-    </select>
-    {disposableData.methodOfDisposal === "Other" && (
-      <input
-        type="text"
-        value={disposableData.methodOfDisposal === "Other" ? "" : disposableData.methodOfDisposal}
-        onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-        placeholder="Enter custom method"
-        style={{ ...styles.input, marginTop: "5px" }}
-      />
-    )}
-  </div>
+                          <label>Method of Disposal:</label>
+                          <select
+                            value={["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal) ? disposableData.methodOfDisposal : "Select Method"}
+                            onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
+                            style={styles.input}
+                          >
+                            <option value="Select Method" disabled>Select Method</option>
+                            <option value="Sold">Sold</option>
+                            <option value="Auctioned">Auctioned</option>
+                            <option value="Destroyed">Destroyed</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          {disposableData.methodOfDisposal === "Other" && (
+                            <input
+                              type="text"
+                              value={disposableData.methodOfDisposal === "Other" ? "" : disposableData.methodOfDisposal}
+                              onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
+                              placeholder="Enter custom method"
+                              style={{ ...styles.input, marginTop: "5px" }}
+                            />
+                          )}
+                        </div>
                       </div>
                       <div style={styles.formRow}>
                         <div style={styles.inputGroup}>
@@ -2436,21 +2501,17 @@ const AssetStore = () => {
                         </div>
                         <div style={styles.inputGroup}>
                           <label>Inspection Date:</label>
-                          <input
-                            type="date"
-                            value={disposableData.inspectionDate}
-                            onChange={(e) => handleDisposableChange("inspectionDate", e.target.value)}
-                            style={styles.input}
-                          />
+                            <input 
+                            type="date" 
+                            value={disposableData.inspectionDate} 
+                            onChange={(e) => handleDisposableChange("inspectionDate", e.target.value)} 
+                            style={styles.input} 
+                            max={new Date().toISOString().split("T")[0]} 
+                            />
                         </div>
                         <div style={styles.inputGroup}>
                           <label>Condemnation Date:</label>
-                          <input
-                            type="date"
-                            value={disposableData.condemnationDate}
-                            onChange={(e) => handleDisposableChange("condemnationDate", e.target.value)}
-                            style={styles.input}
-                          />
+                            <input type="date" value={disposableData.condemnationDate} onChange={(e) => handleDisposableChange("condemnationDate", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} />
                         </div>
                       </div>
                       <div style={styles.formRow}>
@@ -2579,12 +2640,7 @@ const AssetStore = () => {
                         <div style={styles.formRow}>
                           <div style={styles.inputGroup}>
                             <label>Date of Completion:</label>
-                            <input
-                              type="date"
-                              value={form.dateOfCompletion}
-                              onChange={(e) => handleUpgradeFormChange(index, "dateOfCompletion", e.target.value)}
-                              style={styles.input}
-                            />
+                            <input type="date" value={form.dateOfCompletion} onChange={(e) => handleUpgradeFormChange(index, "dateOfCompletion", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} />
                           </div>
                           <div style={styles.inputGroup}>
                             <label>Warranty Period:</label>

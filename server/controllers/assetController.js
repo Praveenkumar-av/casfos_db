@@ -1,0 +1,4761 @@
+const Asset = require("../model/Asset");
+const ConfirmedAsset = require("../model/ConfirmedAsset");
+const UpdatesAsset = require("../model/UpdatesAsset");
+const RejectedAsset = require("../model/RejectedAsset");
+const PurchasedPermanent = require("../model/PermanentAsset");
+const PurchasedConsumable = require("../model/ConsumableAsset");
+const DeadStockRegister = require("../model/DeadStockRegister"); // Adjust path
+const StorePermanent = require("../model/StorePermanent");
+const StoreConsumable = require("../model/StoreConsumable");
+const ReturnedPermanent = require("../model/ReturnedPermanent");
+const ReturnedConsumable = require("../model/ReturnedConsumable");
+const TempAsset = require("../model/TempAsset");
+const Permanent = require("../model/PermanentAsset");
+const Consumable = require("../model/ConsumableAsset");
+const IssuedPermanent = require("../model/IssuedPermanent");
+const IssuedConsumable = require("../model/IssuedConsumable");
+const ServicableAsset = require("../model/ServicableAsset");
+const TempDispose = require("../model/tempDispose");
+const DisposableAsset = require("../model/DisposableAsset");
+const ServicedAsset = require("../model/ServicedAsset");
+const TempServiced = require("../model/TempServiced")
+const DisposedAsset = require("../model/DisposedAsset");
+const Building = require("../model/Building");
+const ExchangedConsumable = require("../model/ExchangedConsumables");
+const Land = require("../model/Land");
+const BuildingMaintenance = require("../model/BuildingMaintenance");
+const TempIssue = require("../model/TempIssue");
+const AssetNotification = require("../model/AssetNotification");
+const TempBuildingMaintenance = require("../model/TempBuildingMaintenance");
+const PendingAssetUpdate = require("../model/PendingAssetUpdate");
+const TempBuildingUpgrade = require("../model/TempBuildingUpgrade");
+const fs = require("fs").promises;
+const path = require("path");
+
+
+exports.saveMaintenanceTemp = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      buildingNo,
+      yearOfMaintenance,
+      cost,
+      description,
+      custody,
+      agency,
+      enteredBy, // Added from frontend
+    } = req.body;
+
+    const newTempMaintenance = new TempBuildingMaintenance({
+      assetType,
+      assetCategory,
+      buildingNo,
+      yearOfMaintenance,
+      cost,
+      description,
+      custody,
+      agency,
+      enteredBy,
+    });
+
+    await newTempMaintenance.save();
+    res.status(201).json({ message: "Building maintenance submitted for approval" });
+  } catch (error) {
+    console.error("Failed to save temporary maintenance:", error);
+    res.status(500).json({ message: "Failed to submit maintenance for approval" });
+  }
+};
+
+// Fetch all pending maintenance entries for admin approval
+exports.getPendingMaintenance = async (req, res) => {
+  try {
+    const pendingMaintenance = await TempBuildingMaintenance.find({ status: "pending" });
+    res.status(200).json({ data: pendingMaintenance });
+  } catch (error) {
+    console.error("Failed to fetch pending maintenance:", error);
+    res.status(500).json({ message: "Failed to fetch pending maintenance" });
+  }
+};
+exports.approveOrRejectMaintenance = async (req, res) => {
+  try {
+    const { id, action, rejectionRemarks } = req.body; // Include rejectionRemarks for rejection case
+    const tempMaintenance = await TempBuildingMaintenance.findById(id);
+
+    if (!tempMaintenance) {
+      return res.status(404).json({ message: "Maintenance entry not found" });
+    }
+
+    const actionTime = new Date();
+
+    if (action === "approve") {
+      const newMaintenance = new BuildingMaintenance({
+        assetType: tempMaintenance.assetType,
+        assetCategory: tempMaintenance.assetCategory,
+        buildingNo: tempMaintenance.buildingNo,
+        yearOfMaintenance: tempMaintenance.yearOfMaintenance,
+        cost: tempMaintenance.cost,
+        description: tempMaintenance.description,
+        custody: tempMaintenance.custody,
+        agency: tempMaintenance.agency,
+      });
+      await newMaintenance.save();
+      await TempBuildingMaintenance.findByIdAndDelete(id);
+
+      // Store approval notification
+      await storeAssetNotification(
+        {
+          assetType: tempMaintenance.assetType,
+          assetCategory: tempMaintenance.assetCategory,
+          subCategory: tempMaintenance.buildingNo,
+          location: tempMaintenance.custody,
+        },
+        "building maintenance approved",
+        actionTime
+      );
+
+      res.status(200).json({ message: "Maintenance approved and saved" });
+    } else if (action === "reject") {
+      // Store rejected maintenance in RejectedAsset
+      const rejectedMaintenance = new RejectedAsset({
+        assetType: tempMaintenance.assetType,
+        assetCategory: tempMaintenance.assetCategory,
+        subCategory: tempMaintenance.buildingNo,
+        location: tempMaintenance.custody,
+        entryDate: tempMaintenance.createdAt,
+        rejectionRemarks: rejectionRemarks || "No remarks provided",
+        yearOfMaintenance: tempMaintenance.yearOfMaintenance,
+        cost: tempMaintenance.cost,
+        description: tempMaintenance.description,
+        custody: tempMaintenance.custody,
+        agency: tempMaintenance.agency,
+      });
+      const savedRejected = await rejectedMaintenance.save();
+
+      // Update tempMaintenance status and delete it
+      tempMaintenance.status = "rejected";
+      await tempMaintenance.save();
+      await TempBuildingMaintenance.findByIdAndDelete(id);
+
+      // Store rejection notification
+      await storeAssetNotification(
+        {
+          assetType: tempMaintenance.assetType,
+          assetCategory: tempMaintenance.assetCategory,
+          subCategory: tempMaintenance.buildingNo,
+          location: tempMaintenance.custody,
+          rejectionRemarks,
+          rejectedAssetId: savedRejected._id,
+        },
+        "building maintenance rejected",
+        actionTime
+      );
+
+      res.status(200).json({
+        message: "Maintenance rejected",
+        rejectedId: savedRejected._id,
+      });
+    } else {
+      res.status(400).json({ message: "Invalid action" });
+    }
+  } catch (error) {
+    console.error("Failed to approve/reject maintenance:", error);
+    res.status(500).json({ message: "Failed to process approval/rejection" });
+  }
+};
+exports.updateDeadStockQuantities = async (req, res) => {
+  try {
+    const deadStockItems = await DeadStockRegister.find();
+
+    for (const item of deadStockItems) {
+      let servicableQuantity = 0;
+
+      if (item.assetType === "Permanent") {
+        // Count total itemIds from ReturnedPermanent
+     
+
+        // Count serviceable items (e.g., approved and not disposed)
+        const serviceablePermanent = await ReturnedPermanent.find({
+          itemName: item.itemName,
+          itemDescription: item.itemDescription,
+          approved: "yes",
+          status:"service",
+        });
+        console.log("hi",serviceablePermanent);
+        servicableQuantity = serviceablePermanent.length; // Number of serviceable documents
+      } else if (item.assetType === "Consumable") {
+        // Sum returnQuantity from ReturnedConsumable
+
+
+        // Sum serviceable quantity (e.g., approved and not disposed)
+        const serviceableConsumable = await ReturnedConsumable.find({
+          itemName: item.itemName,
+          itemDescription: item.itemDescription,
+          approved: "yes",
+          status:"service",
+        });
+        servicableQuantity = serviceableConsumable.reduce((sum, doc) => sum + (doc.returnQuantity || 0), 0);
+      }
+
+      // Update the DeadStockRegister document
+      await DeadStockRegister.updateOne(
+        { _id: item._id },
+        {
+          $set: {
+            servicableQuantity,
+          },
+        }
+      );
+    }
+
+    res.status(200).json({ message: "Dead stock quantities updated successfully" });
+  } catch (error) {
+    console.error("Error updating dead stock quantities:", error);
+    res.status(500).json({ message: "Failed to update dead stock quantities", error: error.message });
+  }
+};
+exports.getAssetNotification = async (req, res) => {
+  try {
+    const data = await AssetNotification.find();
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Failed to fetch temp issues:", error);
+    res.status(500).json({ message: "Failed to fetch temp issues" });
+  }
+};
+exports.getTempBuildingUpgrades = async (req, res) => {
+  try {
+    const upgrades = await TempBuildingUpgrade.find();
+    res.status(200).json(upgrades);
+  } catch (error) {
+    console.error("Failed to fetch temporary building upgrades:", error);
+    res.status(500).json({ message: "Failed to fetch temporary building upgrades" });
+  }
+};
+
+exports.approveBuildingUpgrade = async (req, res) => {
+  try {
+    const tempUpgrade = await TempBuildingUpgrade.findById(req.params.id);
+    if (!tempUpgrade) {
+      return res.status(404).json({ success: false, message: 'Upgrade not found' });
+    }
+
+    // Find the building with matching subCategory
+    const building = await Building.findOne({ subCategory: tempUpgrade.subCategory });
+    if (!building) {
+      return res.status(404).json({ success: false, message: 'No matching building found' });
+    }
+
+    // Add the upgrade to the building's upgrades array
+    building.upgrades.push(...tempUpgrade.upgrades);
+    await building.save();
+
+    // Notify about the approval
+    await storeAssetNotification({
+      assetType: "Permanent",
+      assetCategory: "Building",
+      subCategory: tempUpgrade.subCategory,
+      location: building.location,
+      upgrades: tempUpgrade.upgrades, // Optional: include upgrades for reference
+    }, "building upgrade approved", new Date());
+
+    // Delete the temporary upgrade record
+    await TempBuildingUpgrade.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ success: true, message: 'Upgrade approved and added to building' });
+  } catch (error) {
+    console.error("Failed to approve building upgrade:", error);
+    res.status(500).json({ success: false, message: 'Error approving building upgrade' });
+  }
+};
+
+// Reject building upgrade
+exports.rejectBuildingUpgrade = async (req, res) => {
+  try {
+    const { rejectionRemarks } = req.body;
+    const tempUpgrade = await TempBuildingUpgrade.findById(req.params.id);
+    if (!tempUpgrade) {
+      return res.status(404).json({ success: false, message: 'Upgrade not found' });
+    }
+
+    // Find the building with matching subCategory (for reference, not modification)
+    const building = await Building.findOne({ subCategory: tempUpgrade.subCategory });
+    if (!building) {
+      return res.status(404).json({ success: false, message: 'No matching building found' });
+    }
+
+    // Store the rejected upgrade in RejectedAsset
+    const rejectedAsset = new RejectedAsset({
+      assetType: "Permanent",
+      assetCategory: "Building",
+      subCategory: tempUpgrade.subCategory,
+      location: building.location,
+      upgrades: tempUpgrade.upgrades, // Store the rejected upgrade details
+      rejectionRemarks: rejectionRemarks || "Rejected by Asset Manager",
+      buildingNo: building.buildingNo,
+      plinthArea: building.plinthArea,
+      dateOfConstruction: building.dateOfConstruction,
+      costOfConstruction: building.costOfConstruction,
+    });
+    await rejectedAsset.save();
+
+    // Notify about the rejection
+    const notificationData = {
+      assetType: "Permanent",
+      assetCategory: "Building",
+      subCategory: tempUpgrade.subCategory,
+      location: building.location,
+      rejectionRemarks,
+      rejectedAssetId: rejectedAsset._id,
+      upgrades: tempUpgrade.upgrades, // Optional: include upgrades for reference
+    };
+    await storeAssetNotification(notificationData, "building upgrade rejected", new Date());
+
+    // Delete the temporary upgrade record
+    await TempBuildingUpgrade.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ success: true, message: 'Building upgrade rejected successfully' });
+  } catch (error) {
+    console.error("Failed to reject building upgrade:", error);
+    res.status(500).json({ success: false, message: 'Error rejecting building upgrade' });
+  }
+};
+exports.submitForApproval = async (req, res) => {
+  const { assetId, assetType, originalData, updatedData } = req.body;
+  try {
+    const pendingUpdate = new PendingAssetUpdate({
+      assetId,
+      assetType,
+      originalData,
+      updatedData,
+    });
+    await pendingUpdate.save();
+    res.status(200).json({ success: true, message: "Update submitted for approval" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+exports.getPendingUpdates = async (req, res) => {
+  try {
+    const updates = await PendingAssetUpdate.find({ status: "pending" });
+    res.status(200).json(updates);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+exports.getRejectedUpdates = async (req, res) => {
+  try {
+    const updates = await PendingAssetUpdate.find({ status: "rejected" });
+    res.status(200).json(updates);
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+exports.approveUpdate = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const update = await PendingAssetUpdate.findById(id);
+    if (!update) return res.status(404).json({ success: false, message: "Update not found" });
+
+    const Model = update.assetType === "Permanent" ? Permanent : Consumable;
+    await Model.findByIdAndUpdate(update.assetId, update.updatedData);
+    await PendingAssetUpdate.findByIdAndUpdate(id, { status: "approved" });
+
+    // Store notification
+    await storeAssetNotification(
+      {
+        assetType: update.assetType,
+        assetCategory: update.updatedData.assetCategory,
+        items: update.updatedData.items,
+        subCategory: update.updatedData.items?.[0]?.subCategory,
+      },
+      "asset updation approved",
+      new Date()
+    );
+
+    res.status(200).json({ success: true, message: "Update approved and applied" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.rejectUpdate = async (req, res) => {
+  const { id } = req.params;
+  const { rejectionRemarks } = req.body;
+  try {
+    const update = await PendingAssetUpdate.findById(id);
+    if (!update) return res.status(404).json({ success: false, message: "Update not found" });
+
+    await PendingAssetUpdate.findByIdAndUpdate(
+      id,
+      { status: "rejected", rejectionRemarks },
+      { new: true }
+    );
+
+    // Store notification
+    await storeAssetNotification(
+      {
+        assetType: update.assetType,
+        assetCategory: update.updatedData.assetCategory,
+        items: update.updatedData.items,
+        subCategory: update.updatedData.items?.[0]?.subCategory,
+        rejectionRemarks,
+        assetId: update.assetId, // For redirection
+      },
+      "asset updation rejected",
+      new Date()
+    );
+
+    res.status(200).json({ success: true, message: "Update rejected" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+// delete single asset notification by id
+exports.deleteAssetNotificationbyId = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedNotification = await AssetNotification.findByIdAndDelete(id);
+
+    if (!deletedNotification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification deleted successfully"
+    });
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete notification",
+      error: error.message
+    });
+  }
+}
+
+// delete all notifications
+exports.deleteAllAssetNotifications = async (req, res) => {
+  try {
+    // Option 1: Delete all notifications
+    const deleteResult = await AssetNotification.deleteMany({});
+
+    if (deleteResult.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No notifications found to delete'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${deleteResult.deletedCount} notifications`,
+      data: deleteResult
+    });
+
+  } catch (error) {
+    console.error('Error deleting all notifications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting notifications',
+      error: error.message
+    });
+  }
+};
+
+exports.storeTempAsset = async (req, res) => {
+  try {
+    const {
+      assetType, assetCategory, entryDate, purchaseDate, supplierName,
+      supplierAddress, source, modeOfPurchase, billNo, receivedBy, items,
+      billPhotoUrl, subCategory, location, type, buildingNo, approvedEstimate, plinthArea,
+      status, dateOfConstruction, costOfConstruction, remarks,
+      dateOfPossession, controllerOrCustody, details, approvedBuildingPlanUrl,
+      kmzOrkmlFileUrl
+    } = req.body;
+
+    const today = new Date().setHours(0, 0, 0, 0);
+
+    // Required field validation
+    if (!assetType) throw new Error("Asset Type is required");
+    if (!assetCategory) throw new Error("Asset Category is required");
+    if (!entryDate) throw new Error("Entry Date is required");
+    if (new Date(entryDate) > today) throw new Error("Entry Date cannot be in the future");
+
+    let assetData = {};
+
+    // Building-specific validation
+    if (assetCategory === "Building") {
+      if (!subCategory) throw new Error("Building Sub Category is required");
+      if (!location) throw new Error("Building Location is required");
+      if (!buildingNo) throw new Error("Building No is required");
+      if (!status) throw new Error("Building Status is required");
+      if (dateOfConstruction && new Date(dateOfConstruction) > today) throw new Error("Date of Construction cannot be in the future");
+
+      assetData = {
+        assetType,
+        assetCategory,
+        entryDate,
+        subCategory,
+        location,
+        type: type || undefined,
+        buildingNo,
+        approvedEstimate: approvedEstimate ? Number(approvedEstimate) : undefined,
+        plinthArea: plinthArea ? Number(plinthArea) : undefined,
+        status,
+        dateOfConstruction: dateOfConstruction || undefined,
+        costOfConstruction: costOfConstruction ? Number(costOfConstruction) : undefined,
+        remarks: remarks || undefined,
+        approvedBuildingPlanUrl: approvedBuildingPlanUrl || undefined,
+        kmzOrkmlFileUrl: kmzOrkmlFileUrl || undefined
+      };
+    }
+    // Land-specific validation
+    else if (assetCategory === "Land") {
+      if (!subCategory) throw new Error("Land Sub Category is required");
+      if (!location) throw new Error("Land Location is required");
+      if (!status) throw new Error("Land Status is required");
+      if (dateOfPossession && new Date(dateOfPossession) > today) throw new Error("Date of Possession cannot be in the future");
+
+      assetData = {
+        assetType,
+        assetCategory,
+        entryDate,
+        subCategory,
+        location,
+        status,
+        dateOfPossession: dateOfPossession || undefined,
+        controllerOrCustody: controllerOrCustody || undefined,
+        details: details || undefined,
+      };
+    }
+    // Other asset categories (Permanent/Consumable items)
+    else {
+      if (!purchaseDate) throw new Error("Purchase Date is required");
+      if (new Date(purchaseDate) > today) throw new Error("Purchase Date cannot be in the future");
+      if (!supplierName) throw new Error("Supplier Name is required");
+      if (!source) throw new Error("Source is required");
+      if (!modeOfPurchase) throw new Error("Mode of Purchase is required");
+      if (!receivedBy) throw new Error("Received By is required");
+
+      const parsedItems = items ? JSON.parse(items) : [];
+      if (parsedItems.length === 0) throw new Error("At least one item is required");
+
+      // Item-specific validation
+      for (const item of parsedItems) {
+        if (assetType === "Permanent" && !item.subCategory) throw new Error(`Item ${item.itemName || "unknown"}: Sub Category is required`);
+        if (!item.itemName) throw new Error("Item Name is required in one or more items");
+        if (!item.itemDescription) throw new Error(`Item ${item.itemName}: Item Description is required`);
+        
+        const quantityReceived = Number(item.quantityReceived);
+        const unitPrice = Number(item.unitPrice);
+
+        if (!quantityReceived || quantityReceived <= 0) throw new Error(`Item ${item.itemName}: Quantity Received must be greater than 0`);
+        if (!unitPrice || unitPrice <= 0) throw new Error(`Item ${item.itemName}: Unit Price must be greater than 0`);
+        
+        if (assetType === "Permanent" && item.itemIds && item.itemIds.length !== quantityReceived) throw new Error(`Item ${item.itemName}: Number of Item IDs must match Quantity Received`);
+        if (assetType === "Permanent" && item.itemIds && item.itemIds.some(id => !id)) throw new Error(`Item ${item.itemName}: All Item IDs must be provided`);
+
+        // AMC date validation
+        if (item.amcFromDate && item.amcToDate) {
+          const fromDate = new Date(item.amcFromDate);
+          const toDate = new Date(item.amcToDate);
+          if (fromDate > toDate) {
+            throw new Error(`AMC From Date (${item.amcFromDate}) cannot be later than AMC To Date (${item.amcToDate}) for item: ${item.itemName}`);
+          }
+        }
+
+        // Check for duplicate itemIds
+        if (assetType === "Permanent" && item.itemIds && item.itemIds.length > 0) {
+          const tempExistingItems = await TempAsset.find({
+            assetCategory,
+            "items.itemName": item.itemName,
+            "items.itemIds": { $in: item.itemIds },
+          });
+
+          const duplicateIds = [];
+          tempExistingItems.forEach((doc) => {
+            doc.items.forEach((existingItem) => {
+              if (existingItem.itemName === item.itemName) {
+                const overlaps = existingItem.itemIds.filter((id) => item.itemIds.includes(id));
+                duplicateIds.push(...overlaps);
+              }
+            });
+          });
+
+          if (duplicateIds.length > 0) {
+            return res.status(400).json({
+              success: false,
+              message: `Duplicate item IDs found for item: ${item.itemName} in TempAsset`,
+              duplicateIds: [...new Set(duplicateIds)],
+            });
+          }
+
+          const permExistingItems = await Permanent.find({
+            assetCategory,
+            "items.itemName": item.itemName,
+            "items.itemIds": { $in: item.itemIds },
+          });
+
+          permExistingItems.forEach((doc) => {
+            doc.items.forEach((existingItem) => {
+              if (existingItem.itemName === item.itemName) {
+                const overlaps = existingItem.itemIds.filter((id) => item.itemIds.includes(id));
+                duplicateIds.push(...overlaps);
+              }
+            });
+          });
+
+          if (duplicateIds.length > 0) {
+            return res.status(400).json({
+              success: false,
+              message: `Duplicate item IDs found for item: ${item.itemName} in Permanent`,
+              duplicateIds: [...new Set(duplicateIds)],
+            });
+          }
+        }
+      }
+
+      assetData = {
+        assetType,
+        assetCategory,
+        entryDate,
+        purchaseDate,
+        supplierName,
+        supplierAddress: supplierAddress || undefined,
+        source,
+        modeOfPurchase,
+        billNo: billNo || undefined,
+        receivedBy,
+        billPhotoUrl: billPhotoUrl || undefined,
+        items: parsedItems,
+      };
+    }
+
+    const filteredAssetData = Object.fromEntries(
+      Object.entries(assetData).filter(([_, value]) => value !== undefined)
+    );
+
+    const newAsset = new TempAsset(filteredAssetData);
+    const savedAsset = await newAsset.save();
+
+    res.status(201).json({
+      success: true,
+      message: `${assetCategory || "Asset"} saved successfully`,
+      data: savedAsset,
+    });
+  } catch (error) {
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((err) => err.message).join(", ");
+      res.status(400).json({
+        success: false,
+        message: messages,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+};
+
+
+exports.getAllPermanentAssets = async (req, res) => {
+  try {
+    const assets = await Permanent.find();
+    res.status(200).json(assets);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching permanent assets", error });
+  }
+};
+
+// Get all consumable assets
+exports.getAllConsumableAssets = async (req, res) => {
+  try {
+    const assets = await Consumable.find();
+    res.status(200).json(assets);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching consumable assets", error });
+  }
+};
+
+// Update permanent asset
+exports.updatePermanentAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedAsset = await Permanent.findByIdAndUpdate(id, req.body, {
+      new: true,
+    });
+    if (!updatedAsset) {
+      return res.status(404).json({ message: "Permanent asset not found" });
+    }
+    res.status(200).json(updatedAsset);
+  } catch (error) {
+    res.status(500).json({ message: "Error updating permanent asset", error });
+  }
+};
+
+// Update consumable asset
+exports.updateConsumableAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedAsset = await Consumable.findByIdAndUpdate(id, req.body, {
+      new: true,
+    });
+    if (!updatedAsset) {
+      return res.status(404).json({ message: "Consumable asset not found" });
+    }
+    res.status(200).json(updatedAsset);
+  } catch (error) {
+    res.status(500).json({ message: "Error updating consumable asset", error });
+  }
+};
+
+// Get single permanent asset
+exports.getPermanentAssetById = async (req, res) => {
+  try {
+    const asset = await Permanent.findById(req.params.id);
+    if (!asset) {
+      return res.status(404).json({ message: "Permanent asset not found" });
+    }
+    res.status(200).json(asset);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching permanent asset", error });
+  }
+};
+
+// Get single consumable asset
+exports.getConsumableAssetById = async (req, res) => {
+  try {
+    const asset = await Consumable.findById(req.params.id);
+    if (!asset) {
+      return res.status(404).json({ message: "Consumable asset not found" });
+    }
+    res.status(200).json(asset);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching consumable asset", error });
+  }
+};
+exports.store = async (req, res) => {
+  try {
+    const {
+      assetType, assetCategory, entryDate, purchaseDate, supplierName, supplierAddress,
+      source, modeOfPurchase, billNo, receivedBy, items, billPhotoUrl, subCategory,
+      location, type, buildingNo, plinthArea, status, dateOfConstruction,
+      costOfConstruction, remarks, dateOfPossession, controllerOrCustody, details,
+    } = req.body;
+
+    if (assetCategory === "Building") {
+      const newBuilding = new Building({
+        assetType,
+        assetCategory,
+        entryDate,
+        subCategory,
+        location,
+        type,
+        buildingNo,
+        plinthArea,
+        status,
+        dateOfConstruction,
+        costOfConstruction,
+        remarks,
+      });
+      await newBuilding.save();
+      res.status(201).json({ message: "Building saved successfully" });
+    } else if (assetCategory === "Land") {
+      const newLand = new Land({
+        assetType,
+        assetCategory,
+        entryDate,
+        subCategory,
+        location,
+        status,
+        dateOfPossession,
+        controllerOrCustody,
+        details,
+      });
+      await newLand.save();
+      res.status(201).json({ message: "Land saved successfully" });
+    } else {
+      const parsedItems = JSON.parse(items);
+      const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+      const PurchaseModel = assetType === "Permanent" ? Permanent : Consumable;
+
+      const newPurchase = new PurchaseModel({
+        assetType,
+        assetCategory,
+        entryDate,
+        purchaseDate,
+        supplierName,
+        supplierAddress,
+        source,
+        modeOfPurchase,
+        billNo,
+        receivedBy,
+        billPhotoUrl,
+        items: parsedItems,
+      });
+      await newPurchase.save();
+
+      for (const item of parsedItems) {
+        const storeItem = await StoreModel.findOne({
+          assetCategory,
+          itemName: item.itemName,
+          subCategory: item.subCategory,
+          itemDescription: item.itemDescription,
+        });
+        if (storeItem) {
+          storeItem.inStock += item.quantityReceived;
+          if (assetType === "Permanent") {
+            storeItem.itemIds = [...new Set([...storeItem.itemIds, ...item.itemIds])];
+          }
+          await storeItem.save();
+        } else {
+          const newStoreItem = new StoreModel({
+            assetCategory,
+            itemName: item.itemName,
+            subCategory: item.subCategory,
+            itemDescription: item.itemDescription,
+            inStock: item.quantityReceived,
+            itemIds: assetType === "Permanent" ? item.itemIds : undefined,
+          });
+          await newStoreItem.save();
+        }
+      }
+      res.status(201).json({ message: "Inventory saved successfully" });
+    }
+  } catch (error) {
+    console.error("Failed to save inventory:", error);
+    res.status(500).json({ message: "Failed to save inventory", error: error.message });
+  }
+};
+
+// Alternative store function from second file (renamed to avoid conflict)
+exports.storeBasic = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      entryDate,
+      purchaseDate,
+      purchaserName,
+      purchaserAddress,
+      billNo,
+      receivedBy,
+      items,
+      billPhotoUrl,
+    } = req.body;
+
+    const parsedItems = JSON.parse(items);
+
+    for (const item of parsedItems) {
+      const { itemName, itemDescription, quantityReceived, unitPrice, overallPrice, itemPhotoUrl } = item;
+      const quantityReceivedNum = parseInt(quantityReceived, 10);
+
+      const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+      const PurchaseModel = assetType === "Permanent" ? Permanent : Consumable;
+
+      let storeItem = await StoreModel.findOne({ assetCategory, itemName, itemDescription });
+
+      if (storeItem) {
+        storeItem.inStock = parseInt(storeItem.inStock, 10) + quantityReceivedNum;
+        await storeItem.save();
+      } else {
+        storeItem = new StoreModel({
+          assetCategory,
+          itemName,
+          itemDescription,
+          inStock: quantityReceivedNum,
+        });
+        await storeItem.save();
+      }
+
+      const purchaseData = {
+        assetType,
+        assetCategory,
+        entryDate,
+        purchaseDate,
+        purchaserName,
+        purchaserAddress,
+        billNo,
+        receivedBy,
+        billPhotoUrl,
+        itemName,
+        itemDescription,
+        quantityReceived: quantityReceivedNum,
+        unitPrice,
+        overallPrice,
+        itemPhotoUrl,
+      };
+      const newPurchase = new PurchaseModel(purchaseData);
+      await newPurchase.save();
+    }
+
+    res.status(201).json({ message: "Inventory saved successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to save inventory" });
+  }
+};
+
+// Add purchased permanent/consumable assets
+exports.addPurchasedData = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      entryDate,
+      purchaseDate,
+      purchaserName,
+      purchaserAddress,
+      billNo,
+      receivedBy,
+      billPhotoUrl,
+      items,
+    } = req.body;
+
+
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const PurchaseModel = assetType === "Permanent" ? PurchasedPermanent : PurchasedConsumable;
+
+    if (
+      !assetType || !assetCategory || !entryDate || !purchaseDate || !purchaserName ||
+      !purchaserAddress || !billNo || !receivedBy || !items
+    ) {
+      console.error("Missing required fields or invalid items format");
+      return res.status(400).json({ message: "Missing required fields or invalid items format" });
+    }
+
+    let parsedItems;
+    try {
+      parsedItems = JSON.parse(items);
+    } catch (error) {
+      console.error("Error parsing items:", error);
+      return res.status(400).json({ message: "Invalid items format" });
+    }
+
+    const isValidItems = parsedItems.every(item =>
+      item.itemName && item.itemDescription && item.quantityReceived && item.unitPrice && item.overallPrice
+    );
+
+    if (!isValidItems) {
+      console.error("Invalid items format");
+      return res.status(400).json({ message: "Invalid items format" });
+    }
+
+    const purchasedItems = parsedItems.map(item => ({
+      itemName: item.itemName,
+      itemDescription: item.itemDescription,
+      quantityReceived: Number(item.quantityReceived),
+      unitPrice: Number(item.unitPrice),
+      overallPrice: Number(item.overallPrice),
+      itemPhotoUrl: item.itemPhoto || null,
+      itemsSNo: item.itemsSNo || [],
+    }));
+
+
+    const newPurchase = new PurchaseModel({
+      assetType,
+      assetCategory,
+      entryDate,
+      purchaseDate,
+      purchaserName,
+      purchaserAddress,
+      billNo,
+      receivedBy,
+      billPhotoUrl,
+      items: purchasedItems,
+    });
+
+    await newPurchase.save();
+
+    if (assetType === "Permanent") {
+      let lastItemGroupSno = await StorePermanent.findOne().sort({ assetGroupSNo: -1 });
+      lastItemGroupSno = lastItemGroupSno ? parseInt(lastItemGroupSno.assetGroupSNo.replace("AG-", ""), 10) : 1000;
+
+      const storePromises = parsedItems.map(async (item) => {
+        lastItemGroupSno++;
+        const assetGroupSNo = `AG-${lastItemGroupSno}`;
+
+        const storeItem = new StoreModel({
+          assetCategory: assetCategory,
+          itemName: item.itemName,
+          itemDescription: item.itemDescription,
+          inStock: Number(item.quantityReceived),
+          assetGroupSNo: assetGroupSNo,
+          billNo: billNo,
+          stockItemsSNo: item.itemsSNo,
+          issuedItemsSNo: [],
+        });
+
+        return storeItem.save();
+      });
+
+      await Promise.all(storePromises);
+    } else if (assetType === "Consumable") {
+      let lastItemGroupSno = await StoreConsumable.findOne().sort({ assetGroupSNo: -1 });
+      lastItemGroupSno = lastItemGroupSno ? parseInt(lastItemGroupSno.assetGroupSNo.replace("AG-", ""), 10) : 1000;
+
+      const storePromises = parsedItems.map(async (item) => {
+        lastItemGroupSno++;
+        const assetGroupSNo = `AG-${lastItemGroupSno}`;
+
+        const storeItem = new StoreModel({
+          assetCategory: assetCategory,
+          itemName: item.itemName,
+          itemDescription: item.itemDescription,
+          inStock: Number(item.quantityReceived),
+          assetGroupSNo: assetGroupSNo,
+          billNo: billNo,
+          stockItemsSNo: item.itemsSNo,
+          issuedItemsSNo: [],
+        });
+
+        return storeItem.save();
+      });
+
+      await Promise.all(storePromises);
+    }
+
+    res.status(201).json({ message: "Data saved successfully", data: newPurchase });
+  } catch (error) {
+    console.error("Error saving data:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+};
+
+exports.saveMaintenance = async (req, res) => {
+  try {
+    const { assetType, assetCategory, buildingNo, yearOfMaintenance, cost, description, custody, agency } = req.body;
+    const newMaintenance = new BuildingMaintenance({
+      assetType,
+      assetCategory,
+      buildingNo,
+      yearOfMaintenance,
+      cost,
+      description,
+      custody,
+      agency
+    });
+    await newMaintenance.save();
+    res.status(201).json({ message: "Building maintenance saved successfully" });
+  } catch (error) {
+    console.error("Failed to save maintenance:", error);
+    res.statusrealty500.json({ message: "Failed to save maintenance" });
+  }
+};
+
+exports.getStoreItems = async (req, res) => {
+  try {
+    const { assetType, assetCategory } = req.body;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const items = await StoreModel.find({ assetCategory });
+    res.status(200).json({ items });
+  } catch (error) {
+    console.error("Failed to fetch store items:", error);
+    res.status(500).json({ message: "Failed to fetch store items" });
+  }
+};
+// In assetController.js
+const serverBaseUrl = "http://localhost:3001"; // Adjust for production
+exports.issue = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      issuedTo,
+      location, // New field
+      quantity,
+      issuedIds,
+      acknowledged,
+      pdfBase64,
+    } = req.body;
+
+    if (!pdfBase64) {
+      return res.status(400).json({ message: "PDF data is required" });
+    }
+
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const parsedQuantity = parseInt(quantity, 10);
+    let parsedIssuedIds = assetType === "Permanent" && issuedIds ? JSON.parse(issuedIds) : undefined;
+
+    const storeItem = await StoreModel.findOne({ assetCategory, itemName, subCategory, itemDescription });
+    if (!storeItem || storeItem.inStock < parsedQuantity) {
+      return res.status(400).json({ message: "Insufficient stock" });
+    }
+
+    if (assetType === "Permanent") {
+      if (!parsedIssuedIds || !Array.isArray(parsedIssuedIds) || !parsedIssuedIds.every((id) => storeItem.itemIds.includes(id))) {
+        return res.status(400).json({ message: "Some issued IDs are not in stock" });
+      }
+    }
+
+    storeItem.inStock -= parsedQuantity;
+    if (assetType === "Permanent") {
+      storeItem.itemIds = storeItem.itemIds.filter((id) => !parsedIssuedIds.includes(id));
+    }
+    await storeItem.save();
+
+    const filename = `pdf-${Date.now()}-${Math.round(Math.random() * 1e9)}.pdf`;
+    const pdfPath = path.join(__dirname, "../uploads", filename);
+    await fs.writeFile(pdfPath, Buffer.from(pdfBase64, "base64"));
+    const pdfUrl = `${serverBaseUrl}/uploads/${filename}`;
+
+    const tempIssue = new TempIssue({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory: subCategory || "",
+      itemDescription,
+      issuedTo,
+      location, // New field
+      quantity: parsedQuantity,
+      issuedIds: parsedIssuedIds,
+      pdfUrl,
+      acknowledged: acknowledged || "no",
+    });
+
+    await tempIssue.save();
+    res.status(201).json({ message: "Receipt stored successfully", pdfUrl });
+  } catch (error) {
+    console.error("Failed to store temp issue:", error);
+    res.status(500).json({ message: "Failed to store receipt" });
+  }
+};
+
+exports.getTempIssues = async (req, res) => {
+  try {
+    const tempIssues = await TempIssue.find();
+    res.status(200).json(tempIssues);
+  } catch (error) {
+    console.error("Failed to fetch temp issues:", error);
+    res.status(500).json({ message: "Failed to fetch temp issues" });
+  }
+};
+
+exports.getAcknowledgedTempIssues = async (req, res) => {
+  try {
+    const tempIssues = await TempIssue.find({ acknowledged: "yes", rejected: "no" });
+    res.status(200).json(tempIssues);
+  } catch (error) {
+    console.error("Failed to fetch acknowledged temp issues:", error);
+    res.status(500).json({ message: "Failed to fetch acknowledged temp issues" });
+  }
+};
+exports.acknowledgeTempIssue = async (req, res) => {
+  try {
+    const { tempIssueId } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ message: "Signed PDF is required" });
+    }
+
+    const signedPdfUrl = `${serverBaseUrl}/uploads/${req.file.filename}`;
+    const tempIssue = await TempIssue.findById(tempIssueId);
+    if (!tempIssue) {
+      return res.status(404).json({ message: "Temp issue not found" });
+    }
+
+    tempIssue.signedPdfUrl = signedPdfUrl;
+    tempIssue.acknowledged = "yes";
+    await tempIssue.save();
+
+    res.status(200).json({ message: "Receipt acknowledged successfully", signedPdfUrl });
+  } catch (error) {
+    console.error("Failed to acknowledge temp issue:", error);
+    res.status(500).json({ message: "Failed to acknowledge receipt" });
+  }
+};
+
+exports.approveIssue = async (req, res) => {
+  try {
+    const tempIssue = await TempIssue.findById(req.params.id);
+    if (!tempIssue || tempIssue.acknowledged !== "yes") {
+      return res.status(400).json({ message: "Issue not found or not acknowledged" });
+    }
+
+    const IssuedModel = tempIssue.assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
+
+    let issuedItem = await IssuedModel.findOne({
+      assetCategory: tempIssue.assetCategory,
+      itemName: tempIssue.itemName,
+      subCategory: tempIssue.subCategory,
+      itemDescription: tempIssue.itemDescription,
+    });
+    if (issuedItem) {
+      const existingIssueIndex = issuedItem.issues.findIndex((issue) => issue.issuedTo === tempIssue.issuedTo && issue.location === tempIssue.location);
+      if (existingIssueIndex !== -1) {
+        const existingIssue = issuedItem.issues[existingIssueIndex];
+        existingIssue.quantity += tempIssue.quantity;
+        if (tempIssue.assetType === "Permanent") {
+          existingIssue.issuedIds = [...new Set([...existingIssue.issuedIds, ...tempIssue.issuedIds])];
+        }
+        existingIssue.issuedDate = new Date();
+      } else {
+        issuedItem.issues.push({
+          issuedTo: tempIssue.issuedTo,
+          location: tempIssue.location, // New field
+          quantity: tempIssue.quantity,
+          issuedIds: tempIssue.assetType === "Permanent" ? tempIssue.issuedIds : undefined,
+          issuedDate: new Date(),
+        });
+      }
+      await issuedItem.save();
+    } else {
+      const newIssued = new IssuedModel({
+        assetType: tempIssue.assetType,
+        assetCategory: tempIssue.assetCategory,
+        itemName: tempIssue.itemName,
+        subCategory: tempIssue.subCategory,
+        itemDescription: tempIssue.itemDescription,
+        issues: [{
+          issuedTo: tempIssue.issuedTo,
+          location: tempIssue.location, // New field
+          quantity: tempIssue.quantity,
+          issuedIds: tempIssue.assetType === "Permanent" ? tempIssue.issuedIds : undefined,
+          issuedDate: new Date(),
+        }],
+      });
+      await newIssued.save();
+    }
+
+    await TempIssue.findByIdAndDelete(req.params.id);
+
+    // Assuming storeAssetNotification is defined elsewhere
+    storeAssetNotification(tempIssue, 'issue approved', new Date());
+
+    res.status(200).json({ success: true, message: "Issue approved successfully" });
+  } catch (error) {
+    console.error("Failed to approve issue:", error);
+    res.status(500).json({ message: "Failed to approve issue" });
+  }
+};
+exports.rejectIssue = async (req, res) => {
+  try {
+    console.log("enter");
+    const { rejectionRemarks } = req.body;
+    const tempIssue = await TempIssue.findById(req.params.id);
+    if (!tempIssue || tempIssue.acknowledged !== "yes") {
+      return res.status(400).json({ message: "Issue not found or not acknowledged" });
+    }
+    const StoreModel = tempIssue.assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const storeItem = await StoreModel.findOne({
+      assetCategory: tempIssue.assetCategory,
+      itemName: tempIssue.itemName,
+      subCategory: tempIssue.subCategory,
+      itemDescription: tempIssue.itemDescription,
+    });
+    if (storeItem) {
+      storeItem.inStock += tempIssue.quantity;
+      if (tempIssue.assetType === "Permanent" && tempIssue.issuedIds) {
+        storeItem.itemIds = [...new Set([...storeItem.itemIds, ...tempIssue.issuedIds])];
+      }
+      await storeItem.save();
+    }
+
+    tempIssue.rejected = "yes";
+    tempIssue.rejectionRemarks = rejectionRemarks;
+    await tempIssue.save();
+    console.log(tempIssue);
+    const rejectedAsset = new RejectedAsset({
+      assetType: tempIssue.assetType,
+      assetCategory: tempIssue.assetCategory,
+      itemName: tempIssue.itemName,
+      subCategory: tempIssue.subCategory,
+      itemDescription: tempIssue.itemDescription,
+      issuedTo: tempIssue.issuedTo,
+      location: tempIssue.location,
+      quantity: tempIssue.quantity,
+      itemIds: tempIssue.issuedIds,
+      pdfUrl: tempIssue.pdfUrl,
+      signedPdfUrl: tempIssue.signedPdfUrl,
+      rejectionRemarks,
+    });
+    await rejectedAsset.save();
+    console.log(rejectedAsset);
+    await TempIssue.findByIdAndDelete(req.params.id);
+
+    const temp = {
+      ...tempIssue.toObject(),
+      rejectionRemarks,
+      rejectedAssetId: rejectedAsset._id, 
+    };
+    await storeAssetNotification(temp, "issue rejected", new Date());
+    res.status(200).json({ success: true, message: "Issue rejected successfully" });
+  } catch (error) {
+    console.error("Failed to reject issue:", error);
+    res.status(500).json({ message: "Failed to reject issue" });
+  }
+};
+exports.storeReturnedReceipt = async (req, res) => {
+  const { assetId, pdfBase64, assetType } = req.body;
+  try {
+    if (!assetId || !pdfBase64 || !assetType) {
+      return res.status(400).json({ success: false, message: "Asset ID, PDF data, and asset type are required" });
+    }
+
+    const filename = `returned-${Date.now()}-${Math.round(Math.random() * 1e9)}.pdf`;
+    const pdfPath = path.join(__dirname, "../uploads", filename);
+    await fs.mkdir(path.dirname(pdfPath), { recursive: true });
+    await fs.writeFile(pdfPath, Buffer.from(pdfBase64, "base64"));
+
+    const serverBaseUrl = process.env.SERVER_BASE_URL || "http://localhost:3001";
+    const pdfUrl = `${serverBaseUrl}/uploads/${filename}`;
+
+    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const asset = await Model.findByIdAndUpdate(assetId, { pdfUrl }, { new: true });
+
+    if (!asset) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+
+    res.status(201).json({ success: true, pdfUrl });
+  } catch (error) {
+    console.error("Error storing receipt:", error);
+    res.status(500).json({ success: false, message: "Failed to store receipt" });
+  }
+};
+
+exports.uploadSignedReturnedReceipt = async (req, res) => {
+  const { assetId, assetType } = req.body;
+  try {
+    if (!req.file || !assetId || !assetType) {
+      return res.status(400).json({ success: false, message: "Signed PDF, asset ID, and asset type are required" });
+    }
+
+    const serverBaseUrl = process.env.SERVER_BASE_URL || "http://localhost:3001";
+    const signedPdfUrl = `${serverBaseUrl}/uploads/${req.file.filename}`;
+
+    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const asset = await Model.findByIdAndUpdate(assetId, { signedPdfUrl }, { new: true });
+
+    if (!asset) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+
+    res.status(200).json({ success: true, signedPdfUrl });
+  } catch (error) {
+    console.error("Error uploading signed receipt:", error);
+    res.status(500).json({ success: false, message: "Failed to upload signed receipt" });
+  }
+};
+
+exports.saveReturnedStatus = async (req, res) => {
+  const { _id, status, remark, pdfUrl, signedPdfUrl, assetType, returnedQuantity } = req.body;
+
+  try {
+    if (!["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ message: "Invalid asset type" });
+    }
+
+    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+
+    const updatedAsset = await Model.findByIdAndUpdate(
+      _id,
+      {
+        status,
+        remark,
+        pdfUrl,
+        signedPdfUrl,
+        ...(assetType === "Consumable" && { returnQuantity: returnedQuantity }),
+        approved: null, // Keep pending approval
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAsset) {
+      return res.status(404).json({ message: "Returned asset not found" });
+    }
+
+    res.status(200).json({ message: "Returned status submitted for approval", asset: updatedAsset });
+  } catch (error) {
+    console.warn("Failed to save returned status:", error);
+    res.status(500).json({ message: "Failed to save returned status", error: error.message });
+  }
+};
+
+exports.getReturnedForConditionChange = async (req, res) => {
+  const { assetType, approved } = req.query;
+
+  try {
+    // Validate assetType
+    if (!["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ success: false, message: "Invalid asset type. Must be 'Permanent' or 'Consumable'." });
+    }
+
+    // Select the appropriate model
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+
+    // Fetch assets with approved: "yes"
+    const query = approved ? { approved } : {};
+    const assets = await ReturnedModel.find(query);
+
+    res.status(200).json(assets);
+  } catch (error) {
+    console.error("Error fetching returned assets for condition change:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch returned assets", error: error.message });
+  }
+};
+
+exports.updateReturnCondition = async (req, res) => {
+  const { id } = req.params; // Asset ID from URL
+  const { condition, assetType } = req.body;
+
+  console.log("Received ID:", id, "Condition:", condition, "Asset Type:", assetType);
+
+  try {
+    // Validate inputs
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid asset ID" });
+    }
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ success: false, message: "Valid asset type (Permanent or Consumable) is required" });
+    }
+
+    const validConditions = assetType === "Permanent"
+      ? ["Good", "service", "dispose"]
+      : ["Good", "exchange", "dispose"];
+
+    if (!condition || !validConditions.includes(condition)) {
+      return res.status(400).json({
+        success: false,
+        message: `Valid condition (${validConditions.join(", ")}) is required for ${assetType} assets`,
+      });
+    }
+
+    // Start a transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Select the appropriate model
+      const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+      const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+
+      // Find the returned asset
+      const returnedAsset = await ReturnedModel.findById(id).session(session);
+      if (!returnedAsset) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({ success: false, message: `Returned ${assetType} asset not found` });
+      }
+
+      if (condition === "Good") {
+        // For Permanent assets
+        if (assetType === "Permanent") {
+          // Find the item in StorePermanent
+          const storeItem = await StoreModel.findOne({
+            itemName: returnedAsset.itemName,
+            assetCategory: returnedAsset.assetCategory,
+            subCategory: returnedAsset.subCategory
+          }).session(session);
+
+          if (storeItem) {
+            // Add the item ID back to stock
+            storeItem.itemIds.push(returnedAsset.itemId);
+            storeItem.inStock += 1;
+            await storeItem.save();
+          } else {
+            // Create new entry if not found (shouldn't normally happen)
+            await StoreModel.create([{
+              assetCategory: returnedAsset.assetCategory,
+              itemName: returnedAsset.itemName,
+              subCategory: returnedAsset.subCategory,
+              itemDescription: returnedAsset.itemDescription || "No description",
+              inStock: 1,
+              itemIds: [returnedAsset.itemId]
+            }], { session });
+          }
+        }
+        // For Consumable assets
+        else {
+          const storeItem = await StoreModel.findOne({
+            itemName: returnedAsset.itemName,
+            assetCategory: returnedAsset.assetCategory,
+            subCategory: returnedAsset.subCategory
+          }).session(session);
+
+          if (storeItem) {
+            // Increase the stock quantity
+            storeItem.inStock += returnedAsset.returnQuantity || 1;
+            await storeItem.save();
+          } else {
+            // Create new entry if not found
+            await StoreModel.create([{
+              assetCategory: returnedAsset.assetCategory,
+              itemName: returnedAsset.itemName,
+              subCategory: returnedAsset.subCategory,
+              itemDescription: returnedAsset.itemDescription || "No description",
+              inStock: returnedAsset.returnQuantity || 1,
+              itemIds: []
+            }], { session });
+          }
+        }
+
+        // Remove from returned collection
+        await ReturnedModel.findByIdAndDelete(id).session(session);
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(200).json({
+          success: true,
+          message: "Asset condition is Good. Asset has been moved back to stock.",
+        });
+      }
+      else {
+        // For other conditions (service, dispose, exchange)
+        returnedAsset.status = condition;
+        await returnedAsset.save();
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(200).json({
+          success: true,
+          message: "Condition updated successfully",
+          updatedAsset: returnedAsset,
+        });
+      }
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error updating return condition:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update condition",
+      error: error.message,
+    });
+  }
+};
+
+exports.updateReturnConditiontemp = async (req, res) => {
+  const { id } = req.params; // Asset ID from URL
+  const { condition, assetType } = req.body;
+
+  // console.log("Received ID:", id, "Condition:", condition, "Asset Type:", assetType);
+
+  try {
+    // Validate inputs
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid asset ID" });
+    }
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ success: false, message: "Valid asset type (Permanent or Consumable) is required" });
+    }
+
+    const validConditions = assetType === "Permanent"
+      ? ["Good", "service", "dispose"]
+      : ["Good", "exchange", "dispose"];
+
+    if (!condition || !validConditions.includes(condition)) {
+      return res.status(400).json({
+        success: false,
+        message: `Valid condition (${validConditions.join(", ")}) is required for ${assetType} assets`,
+      });
+    }
+
+    // Start a transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Select the appropriate model
+      const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+
+      // Find the returned asset
+      const returnedAsset = await ReturnedModel.findById(id).session(session);
+      if (!returnedAsset) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({ success: false, message: `Returned ${assetType} asset not found` });
+      }
+
+      const oldCondition = returnedAsset.status;
+      // For other conditions (service, dispose, exchange)
+      returnedAsset.status = condition;
+      await returnedAsset.save();
+
+      await session.commitTransaction();
+      session.endSession();
+
+      // notification
+      const temp = {
+        ...returnedAsset.toObject(),
+        oldCondition,
+        condition
+      };
+
+      storeAssetNotification(temp, 'condition changed', new Date());
+
+      return res.status(200).json({
+        success: true,
+        message: "Condition updated successfully",
+        updatedAsset: returnedAsset,
+      });
+
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error updating return condition:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update condition",
+      error: error.message,
+    });
+  }
+};
+exports.getReturnedForApproval = async (req, res) => {
+  const { assetType } = req.query;
+
+  try {
+    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+
+    // Find assets where approved is null and status is not "returned" (case insensitive)
+    const assets = await Model.find({
+      approved: null,
+      status: {
+        $ne: "returned",
+        $not: /^returned$/i // Additional check for case insensitivity or typos
+      }
+    });
+
+    res.status(200).json(assets);
+  } catch (error) {
+    console.error("Error fetching returned assets for approval:", error);
+    res.status(500).json({ message: "Failed to fetch returned assets" });
+  }
+};
+
+exports.approveReturn = async (req, res) => {
+  const { id } = req.params;
+  const { condition, assetType, returnedQuantity } = req.body;
+
+  try {
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ success: false, message: "Valid asset type is required" });
+    }
+    if (!condition || !["Good", "service", "dispose", "exchange"].includes(condition)) {
+      return res.status(400).json({ success: false, message: "Valid condition (Good, service, dispose, or exchange) is required" });
+    }
+
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+
+    const asset = await ReturnedModel.findById(id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+
+    if (condition === "Good") {
+      // Add to stock
+      const storeQuery = {
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        itemDescription: asset.itemDescription,
+      };
+      if (assetType === "Permanent") {
+        storeQuery.subCategory = asset.subCategory;
+      }
+      let storeItem = await StoreModel.findOne(storeQuery);
+      if (!storeItem) {
+        storeItem = new StoreModel({
+          assetCategory: asset.assetCategory,
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          inStock: 0,
+          ...(assetType === "Permanent" ? { subCategory: asset.subCategory, itemIds: [] } : {}),
+        });
+      }
+      storeItem.inStock += assetType === "Permanent" ? 1 : returnedQuantity;
+      if (assetType === "Permanent") {
+        storeItem.itemIds = [...new Set([...storeItem.itemIds, asset.itemId])];
+      }
+      await storeItem.save();
+      await ReturnedModel.deleteOne({ _id: id }); // Remove from Returned after adding to stock
+      return res.status(200).json({ success: true, message: "Return approved and added to stock" });
+    }
+
+    // Handle other conditions (service, dispose, exchange)
+    asset.approved = "yes";
+    asset.status = condition;
+    await asset.save();
+
+    if (assetType === "Consumable" && condition === "exchange") {
+      const exchangedConsumable = new ExchangedConsumable({
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        subCategory: asset.subCategory,
+        itemDescription: asset.itemDescription,
+        returnedQuantity,
+        remark: asset.remark,
+        pdfUrl: asset.pdfUrl,
+        signedPdfUrl: asset.signedPdfUrl,
+        originalReturnedAssetId: asset._id,
+      });
+      await exchangedConsumable.save();
+    }
+
+    storeAssetNotification(asset, "return approved", new Date());
+
+    res.status(200).json({ success: true, message: "Return approved" });
+  } catch (error) {
+    console.error("Error approving return:", error);
+    res.status(500).json({ success: false, message: "Failed to approve return" });
+  }
+};
+
+exports.rejectReturn = async (req, res) => {
+  const { id } = req.params;
+  const { rejectionRemarks, assetType } = req.body;
+
+  try {
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ success: false, message: "Valid asset type is required" });
+    }
+
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const IssuedModel = assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
+
+    const asset = await ReturnedModel.findById(id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+
+    // Move back to Issued collection
+    const issuedQuery = {
+      assetCategory: asset.assetCategory,
+      itemName: asset.itemName,
+      itemDescription: asset.itemDescription,
+    };
+    if (assetType === "Permanent") {
+      issuedQuery.subCategory = asset.subCategory;
+    }
+    let issuedItem = await IssuedModel.findOne(issuedQuery);
+    if (!issuedItem) {
+      issuedItem = new IssuedModel({
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        itemDescription: asset.itemDescription,
+        issues: [],
+        ...(assetType === "Permanent" ? { subCategory: asset.subCategory } : {}),
+      });
+    }
+    const issueIndex = issuedItem.issues.findIndex(issue => issue.issuedTo === asset.location);
+    if (issueIndex === -1) {
+      issuedItem.issues.push({
+        issuedTo: asset.location,
+        quantity: assetType === "Permanent" ? 1 : asset.returnQuantity,
+        ...(assetType === "Permanent" ? { issuedIds: [asset.itemId] } : {}),
+      });
+    } else {
+      issuedItem.issues[issueIndex].quantity += assetType === "Permanent" ? 1 : asset.returnQuantity;
+      if (assetType === "Permanent") {
+        issuedItem.issues[issueIndex].issuedIds.push(asset.itemId);
+      }
+    }
+    await issuedItem.save();
+
+    // Save to RejectedAsset
+    const rejectedAsset = new RejectedAsset({
+      assetType: asset.assetType,
+      assetCategory: asset.assetCategory,
+      itemName: asset.itemName,
+      subCategory: asset.subCategory,
+      itemDescription: asset.itemDescription,
+      location: asset.location,
+      status: asset.status,
+      returnQuantity: asset.returnQuantity, // For Consumable
+      itemId: asset.itemId, // For Permanent (single ID)
+      returnIds: assetType === "Permanent" ? [asset.itemId] : undefined, // Use returnIds for consistency
+      pdfUrl: asset.pdfUrl,
+      signedPdfUrl: asset.signedPdfUrl,
+      rejectionRemarks,
+      approved: "no",
+    });
+    await rejectedAsset.save();
+
+    // Update and remove from Returned
+    asset.approved = "no";
+    asset.rejectionRemarks = rejectionRemarks;
+    await asset.save();
+    await ReturnedModel.deleteOne({ _id: id });
+
+    // Notification with rejectedAssetId
+    const temp = {
+      ...asset.toObject(),
+      rejectionRemarks,
+      rejectedAssetId: rejectedAsset._id,
+    };
+    await storeAssetNotification(temp, "return rejected", new Date());
+
+    res.status(200).json({ success: true, message: "Return rejected and sent back to issued location" });
+  } catch (error) {
+    console.error("Error rejecting return:", error);
+    res.status(500).json({ success: false, message: "Failed to reject return" });
+  }
+};
+exports.return = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, location, returnQuantity, condition, returnIds } = req.body;
+
+    // Validate assetType
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ message: "Valid asset type (Permanent or Consumable) is required" });
+    }
+
+    // Select models based on assetType
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const IssuedModel = assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+
+    // Validate required fields
+    if (!assetCategory || !itemName || !itemDescription || !location || !returnQuantity || !condition) {
+      return res.status(400).json({ message: "All required fields must be provided" });
+    }
+
+    // Find the issued item
+    const query = { assetCategory, itemName, itemDescription };
+    if (assetType === "Permanent") {
+      query.subCategory = subCategory; // Only include subCategory for Permanent
+    }
+    const issuedItem = await IssuedModel.findOne(query);
+    if (!issuedItem) {
+      return res.status(400).json({ message: "Item not found in issued records" });
+    }
+
+    // Find the specific issue record for the location
+    const issue = issuedItem.issues.find(issue => issue.issuedTo === location);
+    if (!issue || issue.quantity < returnQuantity) {
+      return res.status(400).json({ message: "Invalid return quantity" });
+    }
+
+    // Validate returnIds for Permanent assets
+    if (assetType === "Permanent") {
+      if (!returnIds || !Array.isArray(returnIds) || returnIds.length !== returnQuantity) {
+        return res.status(400).json({ message: "returnIds must match returnQuantity for Permanent assets" });
+      }
+      if (!returnIds.every(id => issue.issuedIds.includes(id))) {
+        return res.status(400).json({ message: "Invalid return IDs" });
+      }
+    }
+
+    // Update issued item
+    issue.quantity -= returnQuantity;
+    if (assetType === "Permanent") {
+      issue.issuedIds = issue.issuedIds.filter(id => !returnIds.includes(id));
+    }
+    if (issue.quantity === 0) {
+      issuedItem.issues = issuedItem.issues.filter(i => i.issuedTo !== location);
+    }
+    if (issuedItem.issues.length === 0) {
+      await IssuedModel.deleteOne({ _id: issuedItem._id });
+    } else {
+      await issuedItem.save();
+    }
+    const status = condition === "Good" ? "returned" : "returned"; // "Good" -> "returned", "To Be Serviced" -> "service"
+    // Handle all conditions by adding to Returned collection with approval pending
+    if (assetType === "Permanent") {
+      // Create a separate ReturnedPermanent document for each returnId
+      for (const returnId of returnIds) {
+        const newReturned = new ReturnedModel({
+          assetType,
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          location,
+          status, // "Good" stays "returned", others go to "service"
+          itemId: returnId, // Single ID for Permanent
+          approved: null, // Pending approval
+        });
+        await newReturned.save();
+      }
+    } else {
+      // For Consumable, create a single ReturnedConsumable document with quantity
+      const newReturned = new ReturnedModel({
+        assetType,
+        assetCategory,
+        itemName,
+        itemDescription,
+        location,
+        returnQuantity,
+        status, 
+        approved: null,
+      });
+      await newReturned.save();
+    }
+
+    res.status(201).json({ message: "Items returned successfully, pending approval" });
+  } catch (error) {
+    console.error("Failed to return items:", error);
+    res.status(500).json({ message: "Failed to return items" });
+  }
+};
+exports.getAvailableIds = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription } = req.body;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const storeItem = await StoreModel.findOne({ assetCategory, itemName, subCategory, itemDescription });
+    res.status(200).json({ itemIds: (assetType === "Permanent" && storeItem) ? storeItem.itemIds : [] });
+  } catch (error) {
+    console.error("Failed to fetch available IDs:", error);
+    res.status(500).json({ message: "Failed to fetch available IDs" });
+  }
+};
+
+exports.getIssuedIds = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, location } = req.body;
+    const IssuedModel = assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
+    const issuedItem = await IssuedModel.findOne({ assetCategory, itemName, subCategory, itemDescription });
+    const issue = issuedItem?.issues.find(issue => issue.issuedTo === location);
+    res.status(200).json({
+      issuedIds: (assetType === "Permanent" && issue) ? issue.issuedIds : [],
+      quantity: issue ? issue.quantity : 0
+    });
+  } catch (error) {
+    console.error("Failed to fetch issued IDs:", error);
+    res.status(500).json({ message: "Failed to fetch issued IDs" });
+  }
+};
+
+exports.addBuildingUpgrade = async (req, res) => {
+  try {
+    const { subCategory, upgrades } = req.body;
+
+    // Validate required fields
+    if (!subCategory || !upgrades) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const tempUpgrade = new TempBuildingUpgrade({
+      subCategory,
+      upgrades
+    });
+
+    await tempUpgrade.save();
+    res.json({ message: "Upgrade submitted for approval", tempUpgrade });
+  } catch (error) {
+    console.error("Error adding temporary building upgrade:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+exports.getBuildingUpgrades = async (req, res) => {
+  try {
+    const { subCategory } = req.body;
+    const buildings = await Building.find({ subCategory }).select("upgrades");
+    res.json({ buildings });
+  } catch (error) {
+    console.error("Error fetching building upgrades:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.getReturnedAssets = async (req, res) => {
+  try {
+    const { assetType, assetCategory, status } = req.body;
+
+    if (!["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ message: "Invalid assetType. Must be 'Permanent' or 'Consumable'." });
+    }
+
+    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const returnedAssets = await Model.find({ assetType, assetCategory, status });
+
+    if (!returnedAssets || returnedAssets.length === 0) {
+      return res.status(400).json({ message: "No returned assets found" });
+    }
+
+    res.status(200).json(returnedAssets);
+  } catch (error) {
+    console.error("Failed to fetch returned assets:", error);
+    res.status(500).json({ message: "Failed to fetch returned assets" });
+  }
+};
+
+exports.saveReturnedPermanentStatus = async (req, res) => {
+  try {
+    const { _id, status } = req.body;
+
+    // Validate input
+    if (!_id || !status) {
+      return res.status(400).json({ message: "Missing _id or status in request" });
+    }
+    if (!["service", "dispose"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status value. Must be 'service' or 'dispose'" });
+    }
+
+    // Update the ReturnedPermanent document
+    const updatedAsset = await ReturnedPermanent.updateOne(
+      { _id },
+      { $set: { status } }
+    );
+
+    // Check if the document was found and updated
+    if (updatedAsset.matchedCount === 0) {
+      return res.status(404).json({ message: "Asset not found" });
+    }
+
+    res.status(200).json({ message: `Asset status updated to ${status}` });
+  } catch (error) {
+    console.error("Failed to update asset status:", error);
+    res.status(500).json({ message: "Failed to update asset status" });
+  }
+};
+
+exports.saveServicable = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, itemId } = req.body;
+
+    const existingServicable = await ServicableAsset.findOne({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemId,
+    });
+
+    if (existingServicable) {
+      if (assetType === "Permanent") {
+        await ReturnedPermanent.deleteOne({ assetCategory, itemName, subCategory, itemDescription, returnIds: itemId });
+      }
+      return res.status(200).json({ message: "Servicable asset already exists" });
+    }
+
+    const newServicable = new ServicableAsset({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemId,
+    });
+    await newServicable.save();
+
+    if (assetType === "Permanent") {
+      await ReturnedPermanent.deleteOne({ assetCategory, itemName, subCategory, itemDescription, returnIds: itemId });
+    }
+
+    res.status(201).json({ message: "Servicable asset saved" });
+  } catch (error) {
+    console.error("Failed to save servicable asset:", error);
+    res.status(500).json({ message: "Failed to save servicable asset" });
+  }
+};
+
+exports.saveDisposable = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, itemId } = req.body;
+    const newDisposable = new DisposableAsset({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemId,
+    });
+    await newDisposable.save();
+    if (assetType === "Permanent") {
+      await ReturnedPermanent.deleteOne({ assetCategory, itemName, subCategory, itemDescription, returnIds: itemId });
+    }
+    res.status(201).json({ message: "Disposable asset saved" });
+  } catch (error) {
+    console.error("Failed to save disposable asset:", error);
+    res.status(500).json({ message: "Failed to save disposable asset" });
+  }
+};
+// In your assets controller file
+exports.getTempServiced = async (req, res) => {
+  try {
+    const tempServicedAssets = await TempServiced.find();
+    res.status(200).json(tempServicedAssets);
+  } catch (error) {
+    console.error("Error fetching temp serviced assets:", error);
+    res.status(500).json({ message: "Failed to fetch temp serviced assets" });
+  }
+};
+exports.approveService = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tempAsset = await TempServiced.findById(id);
+    if (!tempAsset) {
+      return res.status(404).json({ message: "Temporary serviced asset not found" });
+    }
+
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, itemIds, serviceNo, serviceDate, serviceAmount } = tempAsset;
+
+    const newServiced = new ServicedAsset({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemIds: assetType === "Permanent" ? itemIds : undefined,
+      serviceNo,
+      serviceDate,
+      serviceAmount,
+    });
+    await newServiced.save();
+
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const storeItem = await StoreModel.findOne({ assetCategory, itemName, subCategory, itemDescription });
+    if (storeItem) {
+      if (assetType === "Permanent") {
+        storeItem.inStock += itemIds.length;
+        storeItem.itemIds = [...new Set([...storeItem.itemIds, ...itemIds])];
+      } else {
+        storeItem.inStock += 1;
+      }
+      await storeItem.save();
+    } else {
+      return res.status(400).json({ message: "Item not found in store" });
+    }
+
+    if (assetType === "Permanent") {
+      await ReturnedPermanent.deleteMany({
+        assetCategory,
+        itemName,
+        subCategory,
+        itemDescription,
+        itemId: { $in: itemIds }
+      });
+    }
+
+    // Remove from TempServiced
+    await TempServiced.findByIdAndDelete(id);
+
+    // notification
+    storeAssetNotification(tempAsset, 'service approved', new Date());
+
+    res.status(200).json({ success: true, message: "Service approved and stock updated" });
+  } catch (error) {
+    console.error("Failed to approve service:", error);
+    res.status(500).json({ message: "Failed to approve service" });
+  }
+};
+
+exports.rejectService = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionRemarks } = req.body;
+    const tempAsset = await TempServiced.findById(id);
+    if (!tempAsset) {
+      return res.status(404).json({ message: "Temporary serviced asset not found" });
+    }
+
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, itemIds, serviceNo, serviceDate, serviceAmount } = tempAsset;
+
+    // Save to RejectedAsset
+    const rejectedAsset = new RejectedAsset({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemIds,
+      serviceNo,
+      serviceDate,
+      serviceAmount,
+      rejectionRemarks,
+      approved: "no",
+    });
+    await rejectedAsset.save();
+
+    // Update existing ReturnedPermanent documents
+    if (assetType === "Permanent") {
+      await ReturnedPermanent.updateMany(
+        {
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          itemId: { $in: itemIds },
+        },
+        {
+          $set: {
+            servicedEntry: "no",
+            servicedRejection: "yes",
+            servicedRejectionRemarks: rejectionRemarks,
+          },
+        }
+      );
+    } else if (assetType === "Consumable") {
+      const returnedAsset = new ReturnedConsumable({
+        assetType,
+        assetCategory,
+        itemName,
+        subCategory,
+        itemDescription,
+        status: "returned",
+        returnQuantity: 1,
+        rejectionRemarks,
+        servicedEntry: "no",
+        servicedRejection: "yes",
+      });
+      await returnedAsset.save();
+    }
+
+    // Remove from TempServiced
+    await TempServiced.findByIdAndDelete(id);
+
+    // Notification with rejectedAssetId
+    const temp = {
+      ...tempAsset.toObject(),
+      rejectionRemarks,
+      rejectedAssetId: rejectedAsset._id,
+    };
+    await storeAssetNotification(temp, "service rejected", new Date());
+
+    res.status(200).json({ success: true, message: "Service rejected and returned assets updated" });
+  } catch (error) {
+    console.error("Failed to reject service:", error);
+    res.status(500).json({ message: "Failed to reject service" });
+  }
+};
+exports.saveServiced = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, itemIds, serviceNo, serviceDate, serviceAmount } = req.body;
+
+    // Create new temporary service entry
+    const newTempService = new TempServiced({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemIds: assetType === "Permanent" ? itemIds : undefined,
+      serviceNo,
+      serviceDate,
+      serviceAmount,
+    });
+    await newTempService.save();
+
+    if (assetType === "Permanent") {
+      await ReturnedPermanent.updateOne(
+        {
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          itemId: { $in: itemIds }
+        },
+        {
+          $set: {
+
+            servicedEntry: "yes",
+            servicedRejection: null,
+            servicedRejectionRemarks: null
+          }
+        }
+      );
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Service request saved for approval",
+      data: newTempService
+    });
+  } catch (error) {
+    console.error("Failed to save service request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save service request",
+      error: error.message
+    });
+  }
+};
+exports.requestDisposal = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      itemIds,
+      quantity,
+      purchaseValue,
+      bookValue,
+      inspectionDate,
+      condemnationDate,
+      remark,
+      disposalValue,
+      condemnationYear,
+      certificateObtained,
+      authority,
+      dateOfReferenceUrl,
+      agency,
+      agencyReferenceNumberUrl,
+      date,
+      demolitionPeriod,
+      demolitionEstimate,
+      methodOfDisposal, // New field
+    } = req.body;
+
+    if (!methodOfDisposal || !["Sold", "Auctioned", "Destroyed", "Other"].includes(methodOfDisposal)) {
+      return res.status(400).json({ message: "Method of Disposal is required and must be one of: Sold, Auctioned, Destroyed, Other" });
+    }
+
+    if (assetCategory === "Building") {
+      const newDisposed = new TempDispose({
+        assetType,
+        assetCategory,
+        subCategory,
+        condemnationYear,
+        certificateObtained,
+        authority,
+        dateOfReferenceUrl,
+        agency,
+        agencyReferenceNumberUrl,
+        date,
+        demolitionPeriod,
+        demolitionEstimate,
+        methodOfDisposal, // Add to Building disposal
+      });
+      await newDisposed.save();
+
+      res.status(201).json({ message: "Building disposal request created successfully" });
+    } else {
+      let availableQuantity = 0;
+      if (assetType === "Consumable") {
+        const returnedItems = await ReturnedConsumable.find({
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          approved: "yes",
+          disposedEntry: { $ne: "yes" },
+        });
+        availableQuantity = returnedItems.reduce((sum, item) => sum + (item.returnQuantity || 0), 0);
+
+        if (quantity > availableQuantity) {
+          return res.status(400).json({
+            message: `Requested quantity (${quantity}) exceeds available approved quantity (${availableQuantity})`,
+          });
+        }
+      } else if (assetType === "Permanent") {
+        const approvedItems = await ReturnedPermanent.find({
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          itemId: { $in: itemIds },
+          approved: "yes",
+          disposedEntry: { $ne: "yes" },
+        });
+
+        if (approvedItems.length !== itemIds.length) {
+          const unapprovedIds = itemIds.filter((id) => !approvedItems.some((item) => item.itemId === id));
+          return res.status(400).json({
+            message: `Some items are not approved for disposal or already marked for disposal`,
+            unapprovedItemIds: unapprovedIds,
+          });
+        }
+      }
+
+      const newDisposed = new TempDispose({
+        assetType,
+        assetCategory,
+        itemName,
+        subCategory,
+        itemDescription,
+        itemIds: assetType === "Permanent" ? itemIds : undefined,
+        quantity: assetType === "Consumable" ? quantity : undefined,
+        purchaseValue,
+        bookValue,
+        inspectionDate,
+        condemnationDate,
+        remark,
+        disposalValue,
+        methodOfDisposal, // Add to non-Building disposal
+      });
+      await newDisposed.save();
+
+      if (assetType === "Permanent") {
+        await ReturnedPermanent.updateMany(
+          {
+            assetCategory,
+            itemName,
+            subCategory,
+            itemDescription,
+            itemId: { $in: itemIds },
+            approved: "yes",
+          },
+          {
+            $set: {
+              disposedEntry: "yes",
+              rejectedDisposal: null,
+              disposalRemarks: null,
+            },
+          }
+        );
+      } else if (assetType === "Consumable") {
+        await ReturnedConsumable.updateMany(
+          {
+            assetCategory,
+            itemName,
+            subCategory,
+            itemDescription,
+            approved: "yes",
+            returnQuantity: { $gt: 0 },
+          },
+          {
+            $set: {
+              disposedEntry: "yes",
+              rejectedDisposal: null,
+              disposalRemarks: null,
+            },
+          }
+        );
+      }
+
+      res.status(201).json({ message: "Disposal request created successfully" });
+    }
+  } catch (error) {
+    console.error("Failed to create disposal request:", error);
+    res.status(500).json({ message: "Failed to create disposal request", error: error.message });
+  }
+};
+exports.getAvailableDisposableQuantity = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription } = req.body;
+    if (assetType === "Consumable") {
+      const returnedItems = await ReturnedConsumable.find({
+        assetCategory,
+        itemName,
+        itemDescription,
+        approved: "yes",
+        status: "dispose",
+        $or: [{ disposedEntry: "no" }, { disposedEntry: null }],    });
+      const availableQuantity = returnedItems.reduce((sum, item) => sum + (item.returnQuantity || 0), 0);
+      return res.status(200).json({ availableQuantity });
+    } else {
+      const availableItems = await ReturnedPermanent.find({
+        assetCategory,
+        itemName,
+        subCategory,
+        itemDescription,
+        approved: "yes",
+        status: "dispose",
+        $or: [{ disposedEntry: "no" }, { disposedEntry: null }],    });
+
+      const availableQuantity = availableItems.length;
+      return res.status(200).json({
+        availableQuantity,
+        itemIds: availableItems.map(item => item.itemId)
+      });
+    }
+  } catch (error) {
+    console.error("Failed to fetch available quantity:", error);
+    res.status(500).json({ message: "Failed to fetch available quantity" });
+  }
+};
+exports.getTempDisposeAssets = async (req, res) => {
+  try {
+    const tempDisposeAssets = await TempDispose.find();
+    res.status(200).json(tempDisposeAssets);
+  } catch (error) {
+    console.error("Failed to fetch TempDispose assets:", error);
+    res.status(500).json({ message: "Failed to fetch disposal assets" });
+  }
+};
+
+// Adjust path
+
+exports.disposeAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const asset = await TempDispose.findById(id);
+    if (!asset) {
+      return res.status(404).json({ message: "Asset not found in TempDispose" });
+    }
+
+    if (asset.assetCategory === "Building") {
+      // Handle building disposal (store in DisposedAsset)
+      const disposedAssetData = {
+        assetType: asset.assetType,
+        assetCategory: asset.assetCategory,
+        condemnationYear: asset.condemnationYear,
+        certificateObtained: asset.certificateObtained,
+        authority: asset.authority,
+        dateOfReferenceUrl: asset.dateOfReferenceUrl,
+        agency: asset.agency,
+        agencyReferenceNumberUrl: asset.agencyReferenceNumberUrl,
+        date: asset.date,
+        demolitionPeriod: asset.demolitionPeriod,
+        demolitionEstimate: asset.demolitionEstimate,
+        methodOfDisposal: asset.methodOfDisposal, // Include method of disposal
+      };
+
+      const disposedAsset = new DisposedAsset(disposedAssetData);
+      await disposedAsset.save();
+    } else {
+      // Handle non-building disposal (store in DeadStockRegister)
+      const { assetType, assetCategory, subCategory, itemName, itemDescription, quantity, itemIds, remark, methodOfDisposal } = asset;
+
+      // Check if entry exists in DeadStockRegister
+      let deadStockEntry = await DeadStockRegister.findOne({
+        assetType,
+        assetCategory,
+        assetSubCategory: subCategory,
+        itemName,
+        itemDescription,
+      });
+
+      if (deadStockEntry) {
+        deadStockEntry.condemnedQuantity += assetType === "Permanent" ? itemIds.length : quantity;
+        deadStockEntry.methodOfDisposal = methodOfDisposal; // Update method if needed
+        if (remark) deadStockEntry.remarks = remark; // Update remarks if provided
+        await deadStockEntry.save();
+      } else {
+        // Calculate OverallQuantity from Permanent/Consumable
+        let overallQuantity = 0;
+        if (assetType === "Permanent") {
+          const permanentAssets = await Permanent.find({
+            assetCategory,
+            "items.itemName": itemName,
+            "items.description": itemDescription,
+          });
+          overallQuantity = permanentAssets.reduce((total, asset) => {
+            const matchingItems = asset.items.filter(
+              (item) => item.itemName === itemName && item.subCategory === subCategory
+            );
+            return total + matchingItems.reduce((sum, item) => sum + (item.quantityReceived || 0), 0);
+          }, 0);
+        } else {
+          const consumableAssets = await Consumable.find({
+            assetCategory,
+            "items.itemName": itemName,
+            "items.description": itemDescription,
+          });
+          overallQuantity = consumableAssets.reduce((total, asset) => {
+            const matchingItems = asset.items.filter(
+              (item) => item.itemName === itemName && item.subCategory === subCategory
+            );
+            return total + matchingItems.reduce((sum, item) => sum + (item.quantityReceived || 0), 0);
+          }, 0);
+        }
+
+        let servicableQuantity = 0;
+        if (assetType === "Permanent") {
+          const returnedAssets = await ReturnedPermanent.find({
+            assetCategory,
+            itemName,
+            itemDescription,
+            status: "service",
+            approved:"yes"
+          });
+          servicableQuantity = returnedAssets.length; 
+        } else {
+          const returnedAssets = await ReturnedConsumable.find({
+            assetCategory,
+            itemName,
+            itemDescription,
+            status: "service",
+            approved:"yes"
+        });
+          servicableQuantity = returnedAssets.reduce((total, asset) => total + (asset.returnQuantity || 0), 0);
+        }
+
+        // Create new DeadStockRegister entry
+        deadStockEntry = new DeadStockRegister({
+          assetType,
+          assetCategory,
+          assetSubCategory: subCategory,
+          itemName,
+          itemDescription,
+          servicableQuantity,
+          condemnedQuantity: assetType === "Permanent" ? itemIds.length : quantity,
+          overallQuantity,
+          methodOfDisposal,
+          remarks: remark,
+        });
+        await deadStockEntry.save();
+      }
+
+      // Remove from Returned collections
+      if (assetType === "Permanent") {
+        await ReturnedPermanent.deleteMany({
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          itemId: { $in: itemIds },
+          disposedEntry: "yes",
+        });
+      } else {
+        await ReturnedConsumable.deleteMany({
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          returnQuantity: { $lte: 0 },
+          disposedEntry: "yes",
+        });
+      }
+    }
+
+    // Delete from TempDispose
+    await TempDispose.findByIdAndDelete(id);
+
+    // Send notification
+    await storeAssetNotification(asset, "asset disposal approved", new Date());
+
+    res.status(200).json({ success: true, message: "Asset disposed successfully" });
+  } catch (error) {
+    console.error("Failed to dispose asset:", error);
+    res.status(500).json({ message: "Failed to dispose asset" });
+  }
+};
+// Cancel disposal (move from TempDispose to ReturnedPermanent)
+exports.cancelDisposal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionRemarks } = req.body;
+
+    const asset = await TempDispose.findById(id);
+    if (!asset) {
+      return res.status(404).json({ message: "Asset not found in TempDispose" });
+    }
+
+    if (!rejectionRemarks || rejectionRemarks.trim() === "") {
+      return res.status(400).json({ message: "Rejection remarks are required" });
+    }
+
+    if (asset.assetCategory === "Building") {
+      const rejectedAsset = new RejectedAsset({
+        assetType: asset.assetType,
+        assetCategory: asset.assetCategory,
+        subCategory: asset.subCategory,
+        condemnationYear: asset.condemnationYear,
+        certificateObtained: asset.certificateObtained,
+        authority: asset.authority,
+        dateOfReferenceUrl: asset.dateOfReferenceUrl,
+        agency: asset.agency,
+        agencyReferenceNumberUrl: asset.agencyReferenceNumberUrl,
+        date: asset.date,
+        demolitionPeriod: asset.demolitionPeriod,
+        demolitionEstimate: asset.demolitionEstimate,
+        methodOfDisposal: asset.methodOfDisposal, // Add to RejectedAsset
+        rejectionRemarks,
+        approved: "no",
+      });
+      await rejectedAsset.save();
+
+      await TempDispose.findByIdAndDelete(id);
+
+      const temp = {
+        ...asset.toObject(),
+        rejectedAssetId: rejectedAsset._id,
+        rejectionRemarks,
+      };
+      await storeAssetNotification(temp, "building disposal cancelled", new Date());
+
+      return res.status(200).json({ success: true, message: "Building disposal cancelled successfully" });
+    } else {
+      if (asset.assetType === "Permanent") {
+        await ReturnedPermanent.updateMany(
+          {
+            assetCategory: asset.assetCategory,
+            itemName: asset.itemName,
+            subCategory: asset.subCategory,
+            itemDescription: asset.itemDescription,
+            itemId: { $in: asset.itemIds },
+            disposedEntry: "yes",
+          },
+          {
+            $set: {
+              disposedEntry: null,
+              rejectedDisposal: "yes",
+              disposalRemarks: rejectionRemarks,
+            },
+          }
+        );
+      } else {
+        await ReturnedConsumable.updateMany(
+          {
+            assetCategory: asset.assetCategory,
+            itemName: asset.itemName,
+            subCategory: asset.subCategory,
+            itemDescription: asset.itemDescription,
+            disposedEntry: "yes",
+          },
+          {
+            $set: {
+              disposedEntry: null,
+              rejectedDisposal: "yes",
+              disposalRemarks: rejectionRemarks,
+            },
+            $inc: { returnQuantity: asset.quantity },
+          }
+        );
+      }
+
+      const rejectedAsset = new RejectedAsset({
+        assetType: asset.assetType,
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        subCategory: asset.subCategory,
+        itemDescription: asset.itemDescription,
+        itemIds: asset.itemIds,
+        quantity: asset.quantity,
+        purchaseValue: asset.purchaseValue,
+        bookValue: asset.bookValue,
+        inspectionDate: asset.inspectionDate,
+        condemnationDate: asset.condemnationDate,
+        remark: asset.remark,
+        disposalValue: asset.disposalValue,
+        methodOfDisposal: asset.methodOfDisposal, // Add to RejectedAsset
+        rejectionRemarks,
+        approved: "no",
+      });
+      await rejectedAsset.save();
+
+      await TempDispose.findByIdAndDelete(id);
+
+      const temp = {
+        ...asset.toObject(),
+        rejectedAssetId: rejectedAsset._id,
+        rejectionRemarks,
+      };
+      await storeAssetNotification(temp, "asset disposal cancelled", new Date());
+
+      res.status(200).json({ success: true, message: "Disposal cancelled successfully" });
+    }
+  } catch (error) {
+    console.error("Failed to cancel disposal:", error);
+    res.status(500).json({ message: "Failed to cancel disposal" });
+  }
+};
+
+exports.getIssuedLocations = async (req, res) => {
+  const { assetType, assetCategory, itemName, subCategory, itemDescription } = req.body;
+  try {
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ success: false, message: "Valid asset type is required" });
+    }
+    if (!assetCategory || !itemName || !itemDescription) {
+      return res.status(400).json({ success: false, message: "All required asset details are missing" });
+    }
+
+    const Model = assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
+    const query = {
+      assetType,
+      assetCategory,
+      itemName,
+      itemDescription,
+    };
+    if (assetType === "Permanent" && subCategory) {
+      query.subCategory = subCategory;
+    }
+
+    const issuedRecords = await Model.find(query);
+    const locations = [...new Set(issuedRecords.flatMap(record => record.issues.map(issue => issue.issuedTo)))];
+
+    res.status(200).json({ success: true, locations });
+  } catch (error) {
+    console.error("Error fetching issued locations:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch issued locations" });
+  }
+};
+exports.getDisposableItems = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, subCategory, itemDescription } = req.body;
+
+    // Fetch items from ReturnedPermanent with status "dispose"
+    const disposableItems = await ReturnedPermanent.find({
+      assetType,
+      assetCategory,
+      itemName,
+      subCategory,
+      itemDescription,
+      status: "dispose",
+      approved: "yes"
+    });
+
+    // Extract itemIds from the matching documents
+    const itemIds = disposableItems.map(item => item.itemId);
+
+    res.status(200).json({ itemIds });
+  } catch (error) {
+    console.error("Failed to fetch disposable items:", error);
+    res.status(500).json({ message: "Failed to fetch disposable items" });
+  }
+};
+
+exports.getStoreItemDetails = async (req, res) => {
+  try {
+    const { itemId } = req.body;
+
+    // Validate input
+    if (!itemId) {
+      return res.status(400).json({ message: "itemId is required" });
+    }
+
+    // Fetch the purchase record containing the itemId in items.itemIds
+    const purchaseRecord = await Permanent.findOne({ "items.itemIds": itemId })
+      .sort({ purchaseDate: -1 }) // Get the latest purchase
+      .select("items"); // Only fetch the items array to optimize
+
+    if (!purchaseRecord) {
+      return res.status(404).json({ message: "No purchase record found for this itemId", unitPrice: 0 });
+    }
+
+    // Find the specific item within the items array that contains the itemId
+    const item = purchaseRecord.items.find((i) => i.itemIds && i.itemIds.includes(itemId));
+
+    if (!item) {
+      return res.status(404).json({ message: "Item with this itemId not found in purchase record", unitPrice: 0 });
+    }
+
+    res.status(200).json({ unitPrice: item.unitPrice || 0 });
+  } catch (error) {
+    console.error("Failed to fetch store item details:", error);
+    res.status(500).json({ message: "Failed to fetch store item details", error: error.message });
+  }
+};
+
+exports.checkInStock = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, itemDescription } = req.body;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const storeItem = await StoreModel.findOne({ itemName, itemDescription, assetCategory });
+    res.status(200).json({ inStock: storeItem ? storeItem.inStock : 0 });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to check in-stock quantity" });
+  }
+};
+
+exports.getServicableItems = async (req, res) => {
+  try {
+    const { assetType, assetCategory, itemName, itemDescription } = req.body;
+    console.log("entered")
+    // Fetch items from ReturnedPermanent where status is "service"
+    const servicableItems = await ReturnedPermanent.find({
+      assetType,
+      assetCategory,
+      itemName,
+      itemDescription,
+      status: "service",
+      approved: "yes",
+      $or: [{ servicedEntry: "no" }, { servicedEntry: null }],    });
+    const itemIds = servicableItems.map(item => item.itemId);
+
+    res.status(200).json({ itemIds });
+  } catch (error) {
+    console.error("Failed to fetch servicable items:", error);
+    res.status(500).json({ message: "Failed to fetch servicable items" });
+  }
+};
+
+exports.filterStoreIssue = async (req, res) => {
+  try {
+    const filters = req.body;
+    const query = {};
+
+    if (filters.assetCategory && filters.assetCategory.trim() !== "")
+      query.assetCategory = { $regex: filters.assetCategory, $options: "i" };
+    if (filters.subCategory && filters.subCategory.trim() !== "")
+      query.subCategory = { $regex: filters.subCategory, $options: "i" };
+    if (filters.itemName && filters.itemName.trim() !== "")
+      query.itemName = { $regex: filters.itemName, $options: "i" };
+    if (filters.itemDescription && filters.itemDescription.trim() !== "")
+      query.itemDescription = { $regex: filters.itemDescription, $options: "i" };
+
+    let result = [];
+
+    if (filters.location === "store") {
+      if (!filters.assetType || filters.assetType === "") {
+        const permanentAssets = await StorePermanent.find(query).lean();
+        const consumableAssets = await StoreConsumable.find(query).lean();
+        result = [...permanentAssets, ...consumableAssets].map((asset) => ({
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory || "N/A",
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          inStock: asset.inStock,
+          itemIds: asset.itemIds || [],
+        }));
+      } else if (filters.assetType === "Permanent") {
+        const assets = await StorePermanent.find(query).lean();
+        result = assets.map((asset) => ({
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory || "N/A",
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          inStock: asset.inStock,
+          itemIds: asset.itemIds || [],
+        }));
+      } else if (filters.assetType === "Consumable") {
+        const assets = await StoreConsumable.find(query).lean();
+        result = assets.map((asset) => ({
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory || "N/A",
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          inStock: asset.inStock,
+          itemIds: [],
+        }));
+      }
+      if (filters.itemId && filters.itemId.trim() !== "") {
+        result = result
+          .map((asset) => {
+            const matchingItemIds = asset.itemIds.filter((id) =>
+              id.includes(filters.itemId)
+            );
+            if (matchingItemIds.length > 0) {
+              return { ...asset, itemIds: matchingItemIds };
+            }
+            return null;
+          })
+          .filter((asset) => asset !== null);
+      }
+    } else {
+      const issueQuery = { ...query };
+      if (filters.location && filters.location !== "all_issued" && filters.location.trim() !== "")
+        issueQuery["issues.issuedTo"] = { $regex: filters.location, $options: "i" };
+      if (filters.issuedDateFrom || filters.issuedDateTo) {
+        issueQuery["issues.issuedDate"] = {};
+        if (filters.issuedDateFrom) issueQuery["issues.issuedDate"].$gte = new Date(filters.issuedDateFrom);
+        if (filters.issuedDateTo) issueQuery["issues.issuedDate"].$lte = new Date(filters.issuedDateTo);
+      }
+      if (filters.itemId && filters.itemId.trim() !== "")
+        issueQuery["issues.issuedIds"] = { $elemMatch: { $regex: filters.itemId, $options: "i" } };
+
+      let permanentAssets = [];
+      let consumableAssets = [];
+
+      if (!filters.assetType || filters.assetType === "") {
+        permanentAssets = await IssuedPermanent.find(issueQuery).lean();
+        consumableAssets = await IssuedConsumable.find(issueQuery).lean();
+      } else if (filters.assetType === "Permanent") {
+        permanentAssets = await IssuedPermanent.find(issueQuery).lean();
+      } else if (filters.assetType === "Consumable") {
+        consumableAssets = await IssuedConsumable.find(issueQuery).lean();
+      }
+
+      result = [...permanentAssets, ...consumableAssets].flatMap((asset) =>
+        asset.issues
+          .filter((issue) =>
+            filters.location === "all_issued" || issue.issuedTo.match(new RegExp(filters.location, "i"))
+          )
+          .map((issue) => {
+            let matchingIssuedIds = issue.issuedIds;
+            if (filters.itemId && filters.itemId.trim() !== "") {
+              matchingIssuedIds = issue.issuedIds.filter((id) =>
+                id.includes(filters.itemId)
+              );
+              if (matchingIssuedIds.length === 0) return null;
+            }
+            return {
+              assetType: asset.assetType,
+              assetCategory: asset.assetCategory,
+              subCategory: asset.subCategory || "N/A",
+              itemName: asset.itemName,
+              itemDescription: asset.itemDescription,
+              location: issue.issuedTo || "N/A",
+              quantityIssued: issue.quantity || 0,
+              issuedDate: issue.issuedDate || null,
+              issuedIds: matchingIssuedIds,
+            };
+          })
+          .filter((issue) => issue !== null)
+      );
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error filtering store/issue assets:", error);
+    res.status(500).json({ message: "Error filtering store/issue assets" });
+  }
+};
+exports.filterPurchase = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      subCategory,
+      itemName,
+      purchaseDateFrom,
+      purchaseDateTo,
+      supplierName,
+      source,
+      modeOfPurchase,
+      billNo,
+      receivedBy,
+      amcDateFrom,
+      amcDateTo,
+    } = req.body;
+
+    let query = {};
+    if (assetCategory) query.assetCategory = { $regex: assetCategory, $options: "i" };
+    if (subCategory) query["items.subCategory"] = { $regex: subCategory, $options: "i" };
+    if (itemName) query["items.itemName"] = { $regex: itemName, $options: "i" };
+    if (supplierName) query.supplierName = { $regex: supplierName, $options: "i" };
+    if (source) query.source = { $regex: source, $options: "i" };
+    if (modeOfPurchase) query.modeOfPurchase = { $regex: modeOfPurchase, $options: "i" };
+    if (billNo) query.billNo = { $regex: billNo, $options: "i" };
+    if (receivedBy) query.receivedBy = { $regex: receivedBy, $options: "i" };
+    if (purchaseDateFrom || purchaseDateTo) {
+      query.purchaseDate = {};
+      if (purchaseDateFrom) query.purchaseDate.$gte = new Date(purchaseDateFrom);
+      if (purchaseDateTo) query.purchaseDate.$lte = new Date(purchaseDateTo);
+    }
+    if (amcDateFrom || amcDateTo) {
+      query["items.amcFromDate"] = {};
+      if (amcDateFrom) query["items.amcFromDate"].$gte = new Date(amcDateFrom);
+      if (amcDateTo) query["items.amcToDate"] = { $lte: new Date(amcDateTo) }; // Adjusted to use amcToDate
+    }
+
+    let result = [];
+
+    if (!assetType || assetType === "" || assetType === "Permanent") {
+      const permanentAssets = await Permanent.find(query).lean();
+      result = permanentAssets.flatMap((asset) => {
+        if (!Array.isArray(asset.items)) {
+          return [];
+        }
+        return asset.items
+          .filter((item) => !itemName || item.itemName.match(new RegExp(itemName, "i")))
+          .map((item) => ({
+            assetType: asset.assetType,
+            assetCategory: asset.assetCategory,
+            subCategory: item.subCategory || "N/A",
+            itemName: item.itemName,
+            purchaseDate: asset.purchaseDate,
+            supplierName: asset.supplierName,
+            supplierAddress: asset.supplierAddress,
+            source: asset.source,
+            modeOfPurchase: asset.modeOfPurchase,
+            billNo: asset.billNo,
+            receivedBy: asset.receivedBy,
+            billPhotoUrl: asset.billPhotoUrl,
+            itemDescription: item.itemDescription,
+            quantityReceived: item.quantityReceived,
+            unitPrice: item.unitPrice,
+            overallPrice: item.totalPrice || item.quantityReceived * item.unitPrice,
+            amcFromDate: item.amcFromDate || null,
+            amcToDate: item.amcToDate || null,
+            amcCost: item.amcCost || null,
+            amcPhotoUrl: item.amcPhotoUrl || null,
+            itemPhotoUrl: item.itemPhotoUrl || null,
+            warrantyNumber: item.warrantyNumber || null,
+            warrantyValidUpto: item.warrantyValidUpto || null,
+            warrantyPhotoUrl: item.warrantyPhotoUrl || null,
+            itemIds: item.itemIds || [],
+          }));
+      });
+    }
+
+    if (!assetType || assetType === "" || assetType === "Consumable") {
+      const consumableAssets = await Consumable.find(query).lean();
+      result = result.concat(
+        consumableAssets.flatMap((asset) => {
+          if (!Array.isArray(asset.items)) {
+            console.warn("Asset with missing or invalid items:", asset);
+            return [];
+          }
+          return asset.items
+            .filter((item) => !itemName || item.itemName.match(new RegExp(itemName, "i")))
+            .map((item) => ({
+              assetType: asset.assetType,
+              assetCategory: asset.assetCategory,
+              subCategory: item.subCategory || "N/A",
+              itemName: item.itemName,
+              purchaseDate: asset.purchaseDate,
+              supplierName: asset.supplierName,
+              supplierAddress: asset.supplierAddress,
+              source: asset.source,
+              modeOfPurchase: asset.modeOfPurchase,
+              billNo: asset.billNo,
+              receivedBy: asset.receivedBy,
+              billPhotoUrl: asset.billPhotoUrl,
+              itemDescription: item.itemDescription,
+              quantityReceived: item.quantityReceived,
+              unitPrice: item.unitPrice,
+              overallPrice: item.totalPrice || item.quantityReceived * item.unitPrice,
+              amcFromDate: item.amcFromDate || null,
+              amcToDate: item.amcToDate || null,
+              amcCost: item.amcCost || null,
+              amcPhotoUrl: item.amcPhotoUrl || null,
+              itemPhotoUrl: item.itemPhotoUrl || null,
+              warrantyNumber: item.warrantyNumber || null,
+              warrantyValidUpto: item.warrantyValidUpto || null,
+              warrantyPhotoUrl: item.warrantyPhotoUrl || null,
+              itemIds: [], // Consumables typically don't have itemIds
+            }));
+        })
+      );
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error filtering purchase assets:", error);
+    res.status(500).json({ message: "Error filtering purchase assets", error: error.message });
+  }
+};
+exports.filterServiceReturn = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      subCategory,
+      itemName,
+      location,
+      condition,
+      serviceDateFrom,
+      serviceDateTo,
+      serviceNo,
+      serviceAmountFrom,
+      serviceAmountTo,
+    } = req.body;
+
+    let query = {};
+    if (assetType) query.assetType = { $regex: assetType, $options: "i" };
+    if (assetCategory) query.assetCategory = { $regex: assetCategory, $options: "i" };
+    if (subCategory) query.subCategory = { $regex: subCategory, $options: "i" };
+    if (itemName) query.itemName = { $regex: itemName, $options: "i" };
+    if (location) query.location = { $regex: location, $options: "i" };
+
+    let result = [];
+
+    if (condition === "InService") {
+      query.status = "service";
+      const inServiceAssets = await ReturnedPermanent.find(query);
+      result = inServiceAssets.map((asset) => ({
+        assetType: asset.assetType,
+        assetCategory: asset.assetCategory,
+        subCategory: asset.subCategory,
+        itemName: asset.itemName,
+        location: asset.location || "N/A",
+        condition: "InService",
+        itemId: asset.itemId,
+        itemIds: asset.itemId ? [asset.itemId] : [],
+        servicedEntry: asset.servicedEntry,
+        servicedRejection: asset.servicedRejection,
+        servicedRejectionRemarks: asset.servicedRejectionRemarks,
+      }));
+    } else if (condition === "Serviced") {
+      let serviceQuery = {};
+      if (assetType) serviceQuery.assetType = { $regex: assetType, $options: "i" };
+      if (assetCategory) serviceQuery.assetCategory = { $regex: assetCategory, $options: "i" };
+      if (subCategory) serviceQuery.subCategory = { $regex: subCategory, $options: "i" };
+      if (itemName) serviceQuery.itemName = { $regex: itemName, $options: "i" };
+      if (serviceNo) serviceQuery.serviceNo = { $regex: serviceNo, $options: "i" };
+      if (serviceDateFrom || serviceDateTo) {
+        serviceQuery.serviceDate = {};
+        if (serviceDateFrom) serviceQuery.serviceDate.$gte = new Date(serviceDateFrom);
+        if (serviceDateTo) serviceQuery.serviceDate.$lte = new Date(serviceDateTo);
+      }
+      if (serviceAmountFrom || serviceAmountTo) {
+        serviceQuery.serviceAmount = {};
+        if (serviceAmountFrom) serviceQuery.serviceAmount.$gte = Number(serviceAmountFrom);
+        if (serviceAmountTo) serviceQuery.serviceAmount.$lte = Number(serviceAmountTo);
+      }
+
+      const servicedAssets = await ServicedAsset.find(serviceQuery);
+      result = servicedAssets.map((asset) => ({
+        assetType: asset.assetType,
+        assetCategory: asset.assetCategory,
+        subCategory: asset.subCategory,
+        itemName: asset.itemName,
+        location: "N/A",
+        condition: "Serviced",
+        itemIds: asset.itemIds || [],
+        serviceNo: asset.serviceNo,
+        serviceDate: asset.serviceDate,
+        serviceAmount: asset.serviceAmount,
+      }));
+    } else if (condition === "Returned") {
+      const returnedPermanent = await ReturnedPermanent.find({ ...query, status: "returned" });
+      const returnedConsumable = await ReturnedConsumable.find({ ...query, status: "returned" });
+      result = [
+        ...returnedPermanent.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory,
+          itemName: asset.itemName,
+          location: asset.location || "N/A",
+          condition: "Returned",
+          itemIds: asset.itemId ? [asset.itemId] : [],
+          remark: asset.remark,
+          approved: asset.approved,
+        })),
+        ...returnedConsumable.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory,
+          itemName: asset.itemName,
+          location: asset.location || "N/A",
+          condition: "Returned",
+          itemIds: [],
+          returnedQuantity: asset.returnQuantity,
+          remark: asset.remark,
+          approved: asset.approved,
+        })),
+      ];
+    } else if (condition === "Exchanged") {
+      const exchangedConsumable = await ExchangedConsumable.find(query);
+      result = exchangedConsumable.map((asset) => ({
+        assetType: asset.assetType,
+        assetCategory: asset.assetCategory,
+        subCategory: asset.subCategory || "N/A",
+        itemName: asset.itemName,
+        location: asset.location || "N/A",
+        condition: "Exchanged",
+        returnedQuantity: asset.returnedQuantity,
+        exchangeDate: asset.exchangeDate,
+        remark: asset.remark,
+      }));
+    } else {
+      // All conditions except "dispose"
+      const returnedPermanent = await ReturnedPermanent.find({
+        ...query,
+        status: { $ne: "dispose" },
+      });
+      const returnedConsumable = await ReturnedConsumable.find({
+        ...query,
+        status: { $ne: "dispose" },
+      });
+      const exchangedConsumable = await ExchangedConsumable.find(query);
+
+      result = [
+        ...returnedPermanent.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory,
+          itemName: asset.itemName,
+          location: asset.location || "N/A",
+          condition: asset.status === "service" ? "InService" : "Returned",
+          itemIds: asset.itemId ? [asset.itemId] : [],
+          ...(asset.status === "service" && {
+            servicedEntry: asset.servicedEntry,
+            servicedRejection: asset.servicedRejection,
+            servicedRejectionRemarks: asset.servicedRejectionRemarks,
+          }),
+          remark: asset.remark,
+          approved: asset.approved,
+        })),
+        ...returnedConsumable.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory,
+          itemName: asset.itemName,
+          location: asset.location || "N/A",
+          condition: "Returned",
+          itemIds: [],
+          returnedQuantity: asset.returnQuantity,
+          remark: asset.remark,
+          approved: asset.approved,
+        })),
+        ...exchangedConsumable.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory || "N/A",
+          itemName: asset.itemName,
+          location: asset.location || "N/A",
+          condition: "Exchanged",
+          returnedQuantity: asset.returnedQuantity,
+          exchangeDate: asset.exchangeDate,
+          remark: asset.remark,
+        })),
+      ];
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error filtering service/return assets:", error);
+    res.status(500).json({ message: "Error filtering service/return assets", error: error.message });
+  }
+};
+
+exports.filterDisposal = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      subCategory,
+      itemName,
+      inspectionDateFrom,
+      inspectionDateTo,
+      condemnationDateFrom,
+      condemnationDateTo,
+      remark,
+      purchaseValueFrom,
+      purchaseValueTo,
+      bookValueFrom,
+      bookValueTo,
+      disposalValueFrom,
+      disposalValueTo,
+    } = req.body;
+
+    let query = {};
+    if (assetType) query.assetType = { $regex: assetType, $options: "i" };
+    if (assetCategory) query.assetCategory = { $regex: assetCategory, $options: "i" };
+    if (subCategory) query.subCategory = { $regex: subCategory, $options: "i" };
+    if (itemName) query.itemName = { $regex: itemName, $options: "i" };
+    if (remark) query.remark = { $regex: remark, $options: "i" };
+
+    if (inspectionDateFrom || inspectionDateTo) {
+      query.inspectionDate = {};
+      if (inspectionDateFrom) query.inspectionDate.$gte = new Date(inspectionDateFrom);
+      if (inspectionDateTo) query.inspectionDate.$lte = new Date(inspectionDateTo);
+    }
+    if (condemnationDateFrom || condemnationDateTo) {
+      query.condemnationDate = {};
+      if (condemnationDateFrom) query.condemnationDate.$gte = new Date(condemnationDateFrom);
+      if (condemnationDateTo) query.condemnationDate.$lte = new Date(condemnationDateTo);
+    }
+    if (purchaseValueFrom || purchaseValueTo) {
+      query.purchaseValue = {};
+      if (purchaseValueFrom) query.purchaseValue.$gte = Number(purchaseValueFrom);
+      if (purchaseValueTo) query.purchaseValue.$lte = Number(purchaseValueTo);
+    }
+    if (bookValueFrom || bookValueTo) {
+      query.bookValue = {};
+      if (bookValueFrom) query.bookValue.$gte = Number(bookValueFrom);
+      if (bookValueTo) query.bookValue.$lte = Number(bookValueTo);
+    }
+    if (disposalValueFrom || disposalValueTo) {
+      query.disposalValue = {};
+      if (disposalValueFrom) query.disposalValue.$gte = Number(disposalValueFrom);
+      if (disposalValueTo) query.disposalValue.$lte = Number(disposalValueTo);
+    }
+
+    const assets = await DisposedAsset.find(query);
+    res.status(200).json(assets);
+  } catch (error) {
+    console.error("Error filtering disposal assets:", error);
+    res.status(500).json({ message: "Error filtering disposal assets" });
+  }
+};
+
+exports.saveAsset = async (req, res) => {
+  try {
+    console.log("entered");
+    const { assetType, items } = req.body;
+
+    if (assetType === "Permanent") {
+      const permanentAsset = new Permanent(req.body);
+      await permanentAsset.save();
+      res.status(201).json({ message: "Permanent asset saved successfully", data: permanentAsset });
+    } else if (assetType === "Consumable") {
+      if (!items || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required for Consumable assets" });
+      }
+      const consumableAsset = new Consumable(req.body);
+      await consumableAsset.save();
+      console.log("done");
+      res.status(201).json({ message: "Consumable asset saved successfully", data: consumableAsset });
+    } else {
+      res.status(400).json({ message: "Invalid asset type" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Error saving asset", error: error.message });
+  }
+};
+
+exports.uploadFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+
+    res.status(200).json({ message: "File uploaded successfully", fileUrl });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to upload file" });
+  }
+};
+
+exports.uploadInvoice = async (req, res) => {
+  console.log("entered");
+  if (!req.file) {
+    return res.status(400).json({ message: 'No file uploaded' });
+  }
+
+  const filePath = req.file.path;
+  const imageUrl = `http://localhost:3001/${filePath}`;
+
+  res.json({ imageUrl });
+};
+// Get exchanged items for approval
+exports.getExchangedForApproval = async (req, res) => {
+  try {
+    const exchangedItems = await ExchangedConsumable.find();
+    res.json(exchangedItems);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Approve exchange
+exports.approveExchange = async (req, res) => {
+  try {
+    console.log("entered")
+    const exchange = await ExchangedConsumable.findById(req.params.id);
+    if (!exchange) {
+      return res.status(404).json({ message: 'Exchange not found' });
+    }
+
+    // Add quantity back to stock
+    const stockItem = await StoreConsumable.findOne({
+      assetCategory: exchange.assetCategory,
+      itemName: exchange.itemName
+    });
+
+    if (stockItem) {
+      stockItem.inStock += exchange.returnedQuantity;
+      await stockItem.save();
+    }
+
+    // Delete the exchange record
+
+    // notification
+    storeAssetNotification(exchange, 'exchange approved', new Date());
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Reject exchange
+exports.rejectExchange = async (req, res) => {
+  try {
+    const exchange = await ExchangedConsumable.findById(req.params.id);
+    if (!exchange) {
+      return res.status(404).json({ message: 'Exchange not found' });
+    }
+
+    const returnedConsumable = new ReturnedConsumable({
+      assetType: exchange.assetType,
+      assetCategory: exchange.assetCategory,
+      itemName: exchange.itemName,
+      subCategory: exchange.subCategory,
+      itemDescription: exchange.itemDescription,
+      returnQuantity: exchange.returnedQuantity,
+      status: "dispose",
+      approved: "yes",
+      pdfUrl: exchange.pdfUrl,
+      signedPdfUrl: exchange.signedPdfUrl,
+      remark: exchange.remark
+    });
+
+    await returnedConsumable.save();
+
+    // Delete the exchange record
+    await ExchangedConsumable.findByIdAndDelete(req.params.id);
+
+    // notification
+    storeAssetNotification(exchange, 'exchange rejected', new Date());
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+exports.saveAssetData = async (req, res) => {
+  const { assetType, location, data, dataAdded } = req.body;
+  if (!assetType || !location || !data) {
+    return res.status(400).send("Asset Type, Location, and Data are required.");
+  }
+  try {
+    const existingAsset = await ConfirmedAsset.findOne({ assetType, location });
+    if (existingAsset) {
+      const previousData = existingAsset.data;
+      const combinedData = { ...data };
+      Object.entries(dataAdded).forEach(([key, value]) => {
+        if (combinedData[key] !== undefined) {
+          combinedData[key].quantity += value.quantity || 0;
+        } else {
+          combinedData[key] = {
+            quantity: value.quantity || 0,
+            purchaserName: value.purchaserName || "",
+            purchaseDate: value.purchaseDate ? new Date(value.purchaseDate) : null,
+            vendor: value.vendor || "",
+            deliveryDate: value.deliveryDate ? new Date(value.deliveryDate) : null,
+            amcDate: value.amcDate ? new Date(value.amcDate) : null,
+            invoicePicture: value.invoicePicture || "",
+          };
+        }
+      });
+
+      const isDifferent = JSON.stringify(combinedData) !== JSON.stringify(previousData);
+      if (isDifferent) {
+        const update = new UpdatesAsset({
+          assetType,
+          location,
+          previousData,
+          newData: combinedData,
+          addedQuantity: dataAdded,
+        });
+        await update.save();
+        return res.status(200).send("Asset data updated successfully, changes recorded.");
+      }
+
+      return res.status(200).send("No changes detected.");
+    } else {
+      const assetRecord = new Asset({
+        assetType,
+        location,
+        data: Object.fromEntries(
+          Object.entries(dataAdded).map(([key, value]) => [
+            key,
+            {
+              quantity: value.quantity || 0,
+              purchaserName: value.purchaserName || "",
+              purchaseDate: value.purchaseDate ? new Date(value.purchaseDate) : null,
+              vendor: value.vendor || "",
+              deliveryDate: value.deliveryDate ? new Date(value.deliveryDate) : null,
+              amcDate: value.amcDate ? new Date(value.amcDate) : null,
+              invoicePicture: value.invoicePicture || "",
+            },
+          ])
+        ),
+      });
+      await assetRecord.save();
+      return res.status(200).send("Asset data saved successfully.");
+    }
+  } catch (error) {
+    console.error("Error saving or updating asset data:", error);
+    res.status(500).send("Failed to save or update data.");
+  }
+};
+
+exports.deleteAssetData = async (req, res) => {
+  const { assetType, location, dataToDelete } = req.body;
+
+  if (!assetType || !location || !dataToDelete) {
+    return res.status(400).send("Asset Type, Location, and dataToDelete are required.");
+  }
+
+  try {
+    const asset = await ConfirmedAsset.findOne({ assetType, location });
+
+    if (asset) {
+      const existingData = JSON.parse(JSON.stringify(asset.data));
+      const newData = JSON.parse(JSON.stringify(existingData));
+
+      let isDataModified = false;
+
+      Object.keys(dataToDelete).forEach((key) => {
+        if (existingData[key]) {
+          const newQuantity = existingData[key].quantity - dataToDelete[key];
+
+          if (newQuantity <= 0) {
+            delete newData[key];
+          } else {
+            newData[key].quantity = newQuantity;
+          }
+
+          isDataModified = true;
+        }
+      });
+
+      if (isDataModified) {
+        const updatedAsset = new UpdatesAsset({
+          assetType,
+          location,
+          previousData: existingData,
+          newData: newData,
+          deletedQuantity: dataToDelete,
+        });
+
+        await updatedAsset.save();
+        return res.status(200).send({ success: true, message: "Asset data updated and saved to UpdatedAsset." });
+      } else {
+        return res.status(400).send({ success: false, message: "No matching data to modify." });
+      }
+    } else {
+      return res.status(404).send({ success: false, message: "Asset not found." });
+    }
+  } catch (error) {
+    console.error("Error updating asset data:", error);
+    res.status(500).send({ success: false, message: "Error updating asset data." });
+  }
+};
+
+exports.getAssetData = async (req, res) => {
+  const { assetType, location } = req.body;
+
+  try {
+    const update1 = await UpdatesAsset.findOne({ assetType, location });
+    if (update1) {
+      return res.status(200).json({
+        message: "Asset Updation is waiting for Admin's approval",
+        data: update1.data,
+        status: "pending",
+      });
+    }
+    const confirmedAsset = await ConfirmedAsset.findOne({ assetType, location });
+    if (confirmedAsset) {
+      return res.status(200).json({
+        message: "Data found in confirmed assets",
+        data: confirmedAsset.data,
+        status: "confirmed",
+      });
+    }
+    const rejectedAsset = await RejectedAsset.findOne({ assetType, location });
+    if (rejectedAsset) {
+      return res.status(200).json({
+        message: "Data Entry is rejected",
+        data: rejectedAsset.data,
+        status: "rejected",
+      });
+    }
+    const asset = await Asset.findOne({ assetType, location });
+    if (asset) {
+      return res.status(200).json({
+        message: "Asset entry waiting for Admin's approval",
+        data: asset.data,
+        status: "pending",
+      });
+    }
+
+    return res.status(200).json({ message: "No data found" });
+  } catch (err) {
+    console.error("Error fetching asset data:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.rejectUpdatedAsset = async (req, res) => {
+  const { id } = req.params;
+  const { remark } = req.body;
+
+  if (!remark) {
+    return res.status(400).json({ message: "Remark is required for rejection." });
+  }
+
+  try {
+    const asset = await UpdatesAsset.findById(id);
+    if (!asset) {
+      return res.status(404).json({ message: "Asset not found." });
+    }
+
+    const rejectedAsset = new RejectedAsset({ ...asset.toObject(), remark });
+    await rejectedAsset.save();
+
+    await UpdatesAsset.findByIdAndDelete(id);
+
+    res.status(200).json({ message: "Asset rejected successfully with remark." });
+  } catch (error) {
+    console.error("Error rejecting asset:", error);
+    res.status(500).json({ message: "Error rejecting asset.", error });
+  }
+};
+
+exports.rejectAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionRemarks } = req.body;
+
+    if (!rejectionRemarks) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejection remarks are required",
+      });
+    }
+
+    const tempAsset = await TempAsset.findById(id);
+    if (!tempAsset) {
+      return res.status(404).json({
+        success: false,
+        message: "Asset not found in temporary storage",
+      });
+    }
+
+    const rejectedAssetData = {
+      assetType: tempAsset.assetType || undefined,
+      assetCategory: tempAsset.assetCategory || undefined,
+      entryDate: tempAsset.entryDate || undefined,
+      subCategory: tempAsset.subCategory || undefined,
+      location: tempAsset.location || undefined,
+      status: tempAsset.status || undefined,
+      purchaseDate: tempAsset.purchaseDate || undefined,
+      supplierName: tempAsset.supplierName || undefined,
+      supplierAddress: tempAsset.supplierAddress || undefined,
+      source: tempAsset.source || undefined,
+      modeOfPurchase: tempAsset.modeOfPurchase || undefined,
+      billNo: tempAsset.billNo || undefined,
+      receivedBy: tempAsset.receivedBy || undefined,
+      billPhotoUrl: tempAsset.billPhotoUrl || undefined,
+      items: tempAsset.items
+        ? tempAsset.items.map((item) => ({
+            itemName: item.itemName || undefined,
+            subCategory: item.subCategory || undefined,
+            itemDescription: item.itemDescription || undefined,
+            quantityReceived: item.quantityReceived || undefined,
+            unitPrice: item.unitPrice || undefined,
+            overallPrice: item.overallPrice || undefined,
+            amcDate: item.amcDate || undefined,
+            itemPhotoUrl: item.itemPhotoUrl || undefined,
+            itemIds: item.itemIds || [],
+          }))
+        : [],
+      dateOfPossession: tempAsset.dateOfPossession || undefined,
+      controllerOrCustody: tempAsset.controllerOrCustody || undefined,
+      details: tempAsset.details || undefined,
+      type: tempAsset.type || undefined,
+      buildingNo: tempAsset.buildingNo || undefined,
+      plinthArea: tempAsset.plinthArea || undefined,
+      dateOfConstruction: tempAsset.dateOfConstruction || undefined,
+      costOfConstruction: tempAsset.costOfConstruction || undefined,
+      remarks: tempAsset.remarks || undefined,
+      rejectionRemarks,
+    };
+
+    const rejectedAsset = new RejectedAsset(rejectedAssetData);
+    await rejectedAsset.save();
+
+    await TempAsset.deleteOne({ _id: id });
+
+    // Pass the rejectedAsset _id to the notification
+    const temp = {
+      ...tempAsset.toObject(),
+      rejectionRemarks,
+      rejectedAssetId: rejectedAsset._id, // Add the rejected asset ID
+    };
+
+    await storeAssetNotification(temp, "asset rejected", new Date());
+
+    return res.status(200).json({
+      success: true,
+      message: `${tempAsset.assetCategory || "Asset"} rejected successfully`,
+      data: rejectedAsset,
+    });
+  } catch (error) {
+    console.error("Failed to reject asset:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reject asset",
+      error: error.message,
+    });
+  }
+};
+const mongoose = require('mongoose');
+
+exports.approveAsset = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const tempAsset = await TempAsset.findById(id).session(session);
+
+    if (!tempAsset) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "Asset not found in temporary storage"
+      });
+    }
+
+    const { assetCategory, assetType } = tempAsset;
+    let savedAssets = [];
+
+    // Helper function to normalize strings for comparison
+    const normalizeString = (str) => {
+      return str.trim().replace(/\s+/g, ' ').toLowerCase();
+    };
+
+    if (assetCategory === "Building") {
+      const {
+        entryDate,
+        subCategory,
+        location,
+        status,
+        type,
+        buildingNo,
+        plinthArea,
+        approvedEstimate,
+        dateOfConstruction,
+        costOfConstruction,
+        remarks,
+        approvedBuildingPlanUrl,
+        kmzOrkmlFileUrl
+      } = tempAsset;
+
+      const newBuilding = new Building({
+        assetType,
+        assetCategory,
+        entryDate,
+        subCategory: subCategory?.trim(),
+        location: location?.trim(),
+        type: type?.trim(),
+        buildingNo: buildingNo?.trim(),
+        plinthArea,
+        approvedEstimate,
+        status: status?.trim(),
+        dateOfConstruction,
+        costOfConstruction,
+        remarks: remarks?.trim(),
+        approvedBuildingPlanUrl,
+        kmzOrkmlFileUrl
+      });
+
+      savedAssets.push(await newBuilding.save({ session }));
+
+    } else if (assetCategory === "Land") {
+      const {
+        entryDate,
+        subCategory,
+        location,
+        status,
+        dateOfPossession,
+        controllerOrCustody,
+        details
+      } = tempAsset;
+
+      const newLand = new Land({
+        assetType,
+        assetCategory,
+        entryDate,
+        subCategory: subCategory?.trim(),
+        location: location?.trim(),
+        status: status?.trim(),
+        dateOfPossession,
+        controllerOrCustody: controllerOrCustody?.trim(),
+        details: details?.trim()
+      });
+
+      savedAssets.push(await newLand.save({ session }));
+
+    } else {
+      const {
+        entryDate,
+        purchaseDate,
+        supplierName,
+        supplierAddress,
+        source,
+        modeOfPurchase,
+        billNo,
+        receivedBy,
+        billPhotoUrl,
+        items
+      } = tempAsset;
+
+      const PurchaseModel = assetType === "Permanent" ? Permanent : Consumable;
+      const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+
+      for (const item of items) {
+        // Normalize item details for comparison
+        const normalizedItemName = normalizeString(item.itemName);
+        const normalizedDescription = normalizeString(item.itemDescription);
+
+        // Create purchase record with cleaned data
+        const newPurchase = new PurchaseModel({
+          assetType,
+          assetCategory,
+          entryDate,
+          purchaseDate,
+          supplierName: supplierName?.trim(),
+          supplierAddress: supplierAddress?.trim(),
+          source: source?.trim(),
+          modeOfPurchase: modeOfPurchase?.trim(),
+          billNo: billNo?.trim(),
+          receivedBy: receivedBy?.trim(),
+          billPhotoUrl,
+          items: [{
+            itemName: item.itemName.trim(),
+            subCategory: item.subCategory?.trim(),
+            itemDescription: item.itemDescription.trim(),
+            quantityReceived: item.quantityReceived,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            amcFromDate: item.amcFromDate,
+            amcToDate: item.amcToDate,
+            amcCost: item.amcCost,
+            amcPhotoUrl: item.amcPhotoUrl,
+            warrantyNumber: item.warrantyNumber?.trim(),
+            warrantyValidUpto: item.warrantyValidUpto,
+            warrantyPhotoUrl: item.warrantyPhotoUrl,
+            itemPhotoUrl: item.itemPhotoUrl,
+            itemIds: assetType === "Permanent" ? item.itemIds?.map(id => id?.trim()) : undefined
+          }]
+        });
+
+        const savedAsset = await newPurchase.save({ session });
+        savedAssets.push(savedAsset);
+
+        // Find matching item using aggregation for case/space insensitivity
+        const [existingItem] = await StoreModel.aggregate([
+          {
+            $match: {
+              assetCategory,
+              $expr: {
+                $and: [
+                  {
+                    $eq: [
+                      { $trim: { input: { $toLower: "$itemName" } } },
+                      normalizedItemName
+                    ]
+                  },
+                  {
+                    $eq: [
+                      { $trim: { input: { $toLower: "$itemDescription" } } },
+                      normalizedDescription
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]).session(session);
+
+        if (existingItem) {
+          // Update existing item
+          await StoreModel.updateOne(
+            { _id: existingItem._id },
+            {
+              $inc: { inStock: item.quantityReceived },
+              $set: {
+                ...(assetType === "Permanent" && item.itemIds && {
+                  itemIds: [...new Set([
+                    ...(existingItem.itemIds || []),
+                    ...item.itemIds.map(id => id?.trim())
+                  ])]
+                })
+              }
+            }
+          ).session(session);
+        } else {
+          // Create new store item
+          const newStoreItem = new StoreModel({
+            assetCategory,
+            itemName: item.itemName.trim(),
+            subCategory: item.subCategory?.trim(),
+            itemDescription: item.itemDescription.trim(),
+            inStock: item.quantityReceived,
+            ...(assetType === "Permanent" && {
+              itemIds: item.itemIds?.map(id => id?.trim())
+            })
+          });
+          await newStoreItem.save({ session });
+        }
+      }
+    }
+
+    // Delete temporary asset
+    await TempAsset.deleteOne({ _id: id }).session(session);
+
+    await session.commitTransaction();
+
+    // notification
+    storeAssetNotification(tempAsset, 'asset approved', new Date());
+
+    return res.status(201).json({
+      success: true,
+      message: `${assetCategory} inventory saved successfully`,
+      count: savedAssets.length,
+      assets: savedAssets
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Failed to approve and save asset:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save asset",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+exports.approveUpdatedAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const asset = await UpdatesAsset.findById(id);
+
+    if (!asset) {
+      return res.status(404).json({ message: "Asset not found" });
+    }
+
+    const { assetType, location, newData } = asset;
+
+    const confirmedAsset = await ConfirmedAsset.findOne({ assetType, location });
+
+    if (!confirmedAsset) {
+      return res.status(404).json({ message: "Corresponding confirmed asset not found" });
+    }
+
+    confirmedAsset.data = newData;
+
+    await confirmedAsset.save();
+
+    await asset.deleteOne();
+
+    res.status(200).json({ message: "Asset approved and updated successfully" });
+  } catch (error) {
+    console.error("Error approving updated asset:", error);
+    res.status(500).json({ message: "Error approving updated asset", error });
+  }
+};
+
+exports.getAllAssets = async (req, res) => {
+  try {
+    const assets = await TempAsset.find();
+    res.status(200).json(assets);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching assets", error });
+  }
+};
+
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+exports.filterDeadStock = async (req, res) => {
+  try {
+    const {
+      assetType,
+      assetCategory,
+      subCategory,
+      itemName,
+      methodOfDisposal,
+    } = req.body;
+
+    const query = {};
+    if (assetType) query.assetType = assetType;
+    if (assetCategory) query.assetCategory = assetCategory;
+    if (subCategory) query.assetSubCategory = subCategory;
+    if (itemName) query.itemName = { $regex: itemName, $options: "i" };
+    if (methodOfDisposal) query.methodOfDisposal = methodOfDisposal;
+
+    const deadStockItems = await DeadStockRegister.find(query);
+    res.status(200).json(deadStockItems);
+  } catch (error) {
+    console.error("Error filtering dead stock:", error);
+    res.status(500).json({ message: "Failed to filter dead stock", error: error.message });
+  }
+};
+exports.filterAssets = async (req, res) => {
+  const {
+    assetType,
+    location,
+    accessories,
+    amcFromDate,
+    amcToDate,
+    purchaserName,
+    purchaseDateFrom,
+    purchaseDateTo,
+    userPermissions
+  } = req.body;
+  console.log("assettype", assetType);
+  const query = {};
+
+  if (assetType) {
+    query.assetType = { $regex: new RegExp(`^${escapeRegExp(assetType)}`, "i") };
+  } else if (userPermissions && userPermissions.length > 0) {
+    query.assetType = {
+      $in: userPermissions.map((permission) => new RegExp(`^${escapeRegExp(permission)}$`, "i")),
+    };
+  }
+
+  if (location) {
+    query.location = { $regex: new RegExp(escapeRegExp(location), "i") };
+  }
+
+  try {
+    const assets = await ConfirmedAsset.find(query).lean();
+
+    let filteredAssets = assets.map((asset) => {
+      const filteredData = {};
+
+      Object.keys(asset.data).forEach((key) => {
+        const item = asset.data[key];
+        const amcDate = item.amcDate ? new Date(item.amcDate) : null;
+        const purchaseDate = item.purchaseDate ? new Date(item.purchaseDate) : null;
+
+        if (
+          (!amcFromDate || (amcDate && amcDate >= new Date(amcFromDate))) &&
+          (!amcToDate || (amcDate && amcDate <= new Date(amcToDate))) &&
+          (!purchaseDateFrom || (purchaseDate && purchaseDate >= new Date(purchaseDateFrom))) &&
+          (!purchaseDateTo || (purchaseDate && purchaseDate <= new Date(purchaseDateTo))) &&
+          (!purchaserName || (item.purchaserName && item.purchaserName.toLowerCase().includes(purchaserName.toLowerCase())))
+        ) {
+          filteredData[key] = item;
+        }
+      });
+
+      if (Object.keys(filteredData).length > 0) {
+        return { ...asset, data: filteredData };
+      } else {
+        return null;
+      }
+    }).filter((asset) => asset);
+
+    if (accessories) {
+      filteredAssets = filteredAssets.map((asset) => {
+        const matchingAccessory = Object.keys(asset.data).find((key) =>
+          key.toLowerCase().includes(accessories.toLowerCase())
+        );
+
+        if (matchingAccessory) {
+          return {
+            ...asset,
+            data: { [matchingAccessory]: asset.data[matchingAccessory] },
+          };
+        } else {
+          return null;
+        }
+      }).filter((asset) => asset);
+    }
+    if (userPermissions && userPermissions.length > 0) {
+      filteredAssets = filteredAssets.filter((asset) =>
+        userPermissions.some(
+          (permission) => permission.toLowerCase() === asset.assetType.toLowerCase()
+        )
+      );
+    }
+    if (filteredAssets.length > 0) {
+      res.status(200).json(filteredAssets);
+    } else {
+      res.status(404).json({ message: "No matching records found." });
+    }
+  } catch (error) {
+    console.error("Error fetching assets:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+exports.getUpdatedAssets = async (req, res) => {
+  try {
+    const updatedAssets = await UpdatesAsset.find();
+    res.json(updatedAssets);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching updated assets" });
+  }
+};
+
+exports.rejectedassets = async (req, res) => {
+  try {
+    const rejectedPurchased = await RejectedAsset.find();
+    const rejectedIssues = await TempIssue.find({ rejected: "yes" });
+    res.status(200).json([...rejectedPurchased, ...rejectedIssues]);
+  } catch (error) {
+    console.error("Error fetching rejected assets:", error);
+    res.status(500).json({ message: "Error fetching rejected assets" });
+  }
+};
+exports.getRejectedAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rejectedAsset = await RejectedAsset.findById(id);
+    if (!rejectedAsset) {
+      return res.status(404).json({ success: false, message: "Rejected asset not found" });
+    }
+    res.status(200).json({ success: true, data: rejectedAsset });
+  } catch (error) {
+    console.error("Failed to fetch rejected asset:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch rejected asset", error: error.message });
+  }
+};
+
+// Delete rejected asset
+exports.deleteRejectedAsset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedAsset = await RejectedAsset.findByIdAndDelete(id);
+    if (!deletedAsset) {
+      return res.status(404).json({ success: false, message: "Rejected asset not found" });
+    }
+    res.status(200).json({ success: true, message: "Rejected asset deleted successfully" });
+  } catch (error) {
+    console.error("Failed to delete rejected asset:", error);
+    res.status(500).json({ success: false, message: "Failed to delete rejected asset", error: error.message });
+  }
+};
+
+exports.getRejectedAssetData = async (req, res) => {
+  const { assetTypeParam, locationParam } = req.body;
+
+  try {
+    const assetType = assetTypeParam;
+    const location = locationParam;
+    const rejectedAssets = await RejectedAsset.findOne({ assetType, location });
+
+    if (!rejectedAssets) {
+      return res.status(200).json({ message: "No rejected assets found" });
+    }
+
+    if (rejectedAssets.data) {
+      return res.status(200).json({
+        message: "Rejected assets found",
+        data: rejectedAssets.data,
+        status: "confirmed",
+      });
+    } else {
+      return res.status(200).json({
+        message: "Rejected assets found",
+        data: rejectedAssets.previousData,
+        status: "confirmed",
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error fetching rejected assets" });
+  }
+};
+
+exports.removeRejectedData = async (req, res) => {
+  const { assetType, location, data } = req.body;
+
+  if (!assetType || !location || !data) {
+    return res.status(400).json({ success: false, message: "Missing required fields." });
+  }
+
+  try {
+    const deletedRejectedAsset = await RejectedAsset.findOneAndDelete({ assetType, location });
+
+    if (!deletedRejectedAsset) {
+      return res.status(404).json({ success: false, message: "Rejected asset not found." });
+    }
+
+    const assetRecord = new Asset({
+      assetType,
+      location,
+      data,
+    });
+
+    await assetRecord.save();
+
+    return res.status(200).json({ success: true, message: "Rejected asset removed, and new asset saved successfully." });
+  } catch (error) {
+    console.error("Error in removeRejectedData:", error);
+    return res.status(500).json({ success: false, message: "Server error occurred while processing the request." });
+  }
+};
+
+async function storeAssetNotification(data, action, actionTime) {
+  try {
+    const itemNames =
+      Array.isArray(data.items) && data.items.every((item) => typeof item === "object")
+        ? data.items.map((item) => item.itemName)
+        : data.itemName;
+
+    const actionData = {
+      assetType: data.assetType,
+      assetCategory: data.assetCategory,
+      action,
+      actionTime,
+      itemNames,
+    };
+
+    switch (action) {
+      case "asset approved":
+      case "asset rejected":
+        Object.assign(actionData, {
+          supplierName: data.supplierName,
+          purchaseDate: data.purchaseDate,
+          billNo: data.billNo,
+          receivedBy: data.receivedBy,
+        });
+        if (action === "asset rejected") {
+          actionData.rejectionRemarks = data.rejectionRemarks;
+          actionData.rejectedAssetId = data.rejectedAssetId;
+        }
+        break;
+
+      case "issue approved":
+      case "issue rejected":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          quantity: data.quantity,
+          location: data.issuedTo,
+        });
+        if (action === "issue rejected") {
+          actionData.rejectionRemarks = data.rejectionRemarks;
+          actionData.rejectedAssetId = data.rejectedAssetId;
+        }
+        break;
+
+      case "service approved":
+      case "service rejected":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          quantity: data.quantity,
+        });
+        if (action === "service rejected") {
+          actionData.rejectionRemarks = data.rejectionRemarks;
+          actionData.rejectedAssetId = data.rejectedAssetId;
+        }
+        break;
+
+      case "exchange approved":
+      case "exchange rejected":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          quantity: data.returnedQuantity,
+        });
+        break;
+
+      case "return approved":
+      case "return rejected":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          location: data.location,
+          condition: data.status,
+        });
+        if (action === "return rejected") {
+          actionData.rejectionRemarks = data.rejectionRemarks;
+          actionData.rejectedAssetId = data.rejectedAssetId;
+        }
+        break;
+
+      case "asset disposal approved":
+      case "asset disposal cancelled":
+        Object.assign(actionData, { subCategory: data.subCategory });
+        if (action === "asset disposal cancelled") {
+          actionData.rejectionRemarks = data.rejectionRemarks || "Cancelled";
+          actionData.rejectedAssetId = data.rejectedAssetId;
+        }
+        break;
+
+      case "building disposal cancelled": // New case for building disposal cancellation
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          rejectionRemarks: data.rejectionRemarks || "Cancelled",
+          rejectedAssetId: data.rejectedAssetId,
+        });
+        break;
+
+      case "condition changed":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          condition: data.oldCondition,
+          changedCondition: data.condition,
+          location: data.location,
+        });
+        break;
+
+      case "asset updation approved":
+      case "asset updation rejected":
+        Object.assign(actionData, {
+          subCategory: data.subCategory || (data.updatedData?.items?.[0]?.subCategory),
+        });
+        if (action === "asset updation rejected") {
+          actionData.rejectionRemarks = data.rejectionRemarks;
+          actionData.rejectedAssetId = data.rejectedAssetId;
+        }
+        break;
+
+      case "building upgrade approved":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          location: data.location,
+        });
+        break;
+
+      case "building upgrade rejected":
+        Object.assign(actionData, {
+          subCategory: data.subCategory,
+          location: data.location,
+          rejectionRemarks: data.rejectionRemarks,
+          rejectedAssetId: data.rejectedAssetId,
+        });
+        break;
+        case "building maintenance approved":
+          Object.assign(actionData, {
+            subCategory: data.subCategory,
+            location: data.location,
+          });
+          break;
+  
+        case "building maintenance rejected":
+          Object.assign(actionData, {
+            subCategory: data.subCategory,
+            location: data.location,
+            rejectionRemarks: data.rejectionRemarks,
+            rejectedAssetId: data.rejectedAssetId,
+          });
+          break;
+      default:
+        throw new Error("Invalid action type");
+    }
+
+    const assetAction = new AssetNotification(actionData);
+    await assetAction.save();
+
+    console.log(`Action "${action}" stored successfully`);
+    return assetAction;
+  } catch (error) {
+    console.error("Error storing asset action:", error.message);
+    throw error;
+  }
+}
+// Add these at the appropriate place in your existing file, after the model imports and before the exports.
+//ADDITIONAL LOGIC FOR GRAPH
+exports.getPurchasedAssetsByType = async (req, res) => {
+  try {
+    const { assetType, location, year } = req.query;
+
+    if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({ error: "Invalid or missing assetType. Must be 'Permanent' or 'Consumable'." });
+    }
+
+    const permanentAssetOptions = [
+      "Furniture", "Vehicle", "Building", "Instruments", "Sports and Goods",
+      "Curtains", "Electrical", "Electronics", "Photograph Items", "Land", "ICT Goods"
+    ];
+    const consumableAssetOptions = [
+      "Stationery", "IT", "Electrical", "Plumbing", "Glassware/Laboratory Items",
+      "Sanitory Items", "Sports Goods", "Beds and Pillows", "Instruments"
+    ];
+
+    const PurchaseModel = assetType === "Permanent" ? Permanent : Consumable; // Fixed model reference
+    const assetCategoryMapping = assetType === "Permanent"
+      ? permanentAssetOptions.reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {})
+      : consumableAssetOptions.reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {});
+
+    let query = {};
+    if (location && location !== "All") {
+      query.location = location;
+    }
+
+    let result;
+    const categoryCount = assetType === "Permanent" ? permanentAssetOptions.length : consumableAssetOptions.length;
+    if (year === "all") {
+      result = Array.from({ length: 11 }, () => Array(categoryCount).fill(0));
+    } else {
+      const startDate = new Date(`${year}-01-01`);
+      const endDate = new Date(`${year}-12-31`);
+      query.purchaseDate = { $gte: startDate, $lte: endDate };
+      result = Array.from({ length: 12 }, () => Array(categoryCount).fill(0));
+    }
+
+    const assets = await PurchaseModel.find(query);
+
+    assets.forEach((asset) => {
+      const category = asset.assetCategory;
+      const purchaseDate = new Date(asset.purchaseDate);
+
+      if (assetCategoryMapping.hasOwnProperty(category)) {
+        const categoryIndex = assetCategoryMapping[category];
+
+        const totalQuantity = asset.items.reduce((sum, item) => sum + (item.quantityReceived || 0), 0);
+
+        if (year === "all") {
+          const yearIndex = purchaseDate.getFullYear() - 2025;
+          if (yearIndex >= 0 && yearIndex < 11) {
+            result[yearIndex][categoryIndex] += totalQuantity;
+          }
+        } else {
+          const monthIndex = purchaseDate.getMonth();
+          result[monthIndex][categoryIndex] += totalQuantity;
+        }
+      }
+    });
+
+    res.status(200).json({
+      data: result,
+      categories: assetType === "Permanent" ? permanentAssetOptions : consumableAssetOptions
+    });
+  } catch (error) {
+    console.error("Error fetching purchased assets:", error);
+    res.status(500).json({ error: "Error fetching purchased assets: " + error.message });
+  }
+};
+
+exports.getStoreConsumableAssets = async (req, res) => {
+  try {
+    const { year } = req.query;
+    const consumableAssetCategories = [
+      "Stationery", "IT", "Electrical", "Plumbing", "Glassware/Laboratory Items",
+      "Sanitory Items", "Sports Goods", "Beds and Pillows", "Instruments"
+    ];
+    const categoryMapping = consumableAssetCategories.reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {});
+    let result;
+    const categoryCount = consumableAssetCategories.length;
+    if (year === "all") {
+      result = Array.from({ length: 12 }, () => Array(categoryCount).fill(0)); // 2024-2035
+    } else {
+      result = Array.from({ length: 12 }, () => Array(categoryCount).fill(0)); // 12 months
+    }
+    const assets = await StoreConsumable.find({});
+    // console.log("Fetched StoreConsumable assets:", assets);
+    assets.forEach((asset) => {
+      const category = asset.assetCategory;
+      const createdDate = asset.createdAt ? new Date(asset.createdAt) : new Date(); // Fallback to current date
+      if (categoryMapping.hasOwnProperty(category)) {
+        const categoryIndex = categoryMapping[category];
+        const inStock = asset.inStock || 0;
+        if (year === "all") {
+          const yearIndex = createdDate.getFullYear() - 2024; // Start from 2024
+          if (yearIndex >= 0 && yearIndex < 12) {
+            result[yearIndex][categoryIndex] += inStock;
+          }
+        } else if (createdDate.getFullYear() === parseInt(year)) {
+          const monthIndex = createdDate.getMonth();
+          result[monthIndex][categoryIndex] += inStock;
+        }
+      }
+    });
+    // console.log("Resulting data array:", result); // Debug log
+    res.status(200).json({
+      data: result,
+      categories: consumableAssetCategories
+    });
+  } catch (error) {
+    console.error("Error fetching store consumable assets:", error);
+    res.status(500).json({ error: "Error fetching store consumable assets: " + error.message });
+  }
+};
+
+// Get Issued Permanent Assets by Month/Year
+exports.getIssuedPermanentAssets = async (req, res) => {
+  try {
+    const { year, location } = req.query;
+
+    const permanentAssetCategories = [
+      "Furniture", "Vehicle", "Building", "Instruments", "Sports and Goods",
+      "Curtains", "Electrical", "Electronics", "Photograph Items", "Land", "ICT Goods"
+    ];
+    const categoryMapping = permanentAssetCategories.reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {});
+
+    let query = {};
+    if (location && location !== "All") {
+      query["issues.issuedTo"] = location;
+    }
+
+    let result;
+    const categoryCount = permanentAssetCategories.length;
+    if (year === "all") {
+      result = Array.from({ length: 11 }, () => Array(categoryCount).fill(0)); // Years 2025-2035
+    } else {
+      const startDate = new Date(`${year}-01-01`);
+      const endDate = new Date(`${year}-12-31`);
+      query["issues.issuedDate"] = { $gte: startDate, $lte: endDate };
+      result = Array.from({ length: 12 }, () => Array(categoryCount).fill(0)); // 12 months
+    }
+
+    const issuedAssets = await IssuedPermanent.find(query);
+
+    issuedAssets.forEach((asset) => {
+      const category = asset.assetCategory;
+      if (categoryMapping.hasOwnProperty(category)) {
+        const categoryIndex = categoryMapping[category];
+        asset.issues.forEach((issue) => {
+          const issuedDate = new Date(issue.issuedDate);
+          const totalQuantity = issue.quantity || 0;
+
+          if (year === "all") {
+            const yearIndex = issuedDate.getFullYear() - 2025; // Start from 2025
+            if (yearIndex >= 0 && yearIndex < 11) {
+              result[yearIndex][categoryIndex] += totalQuantity;
+            }
+          } else if (issuedDate.getFullYear() === parseInt(year)) {
+            const monthIndex = issuedDate.getMonth();
+            result[monthIndex][categoryIndex] += totalQuantity;
+          }
+        });
+      }
+    });
+
+    res.status(200).json({
+      data: result,
+      categories: permanentAssetCategories
+    });
+  } catch (error) {
+    console.error("Error fetching issued permanent assets:", error);
+    res.status(500).json({ error: "Error fetching issued permanent assets: " + error.message });
+  }
+};
+
+
+exports.getIssuedConsumableAssets = async (req, res) => {
+  try {
+    const { year, location } = req.query;
+
+    const consumableAssetCategories = [
+      "Stationery", "IT", "Electrical", "Plumbing", "Glassware/Laboratory Items",
+      "Sanitory Items", "Sports Goods", "Beds and Pillows", "Instruments"
+    ];
+    const categoryMapping = consumableAssetCategories.reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {});
+
+    let query = {};
+    if (location && location !== "All") {
+      query["issues.issuedTo"] = location;
+    }
+
+    let result;
+    const categoryCount = consumableAssetCategories.length;
+    if (year === "all") {
+      result = Array.from({ length: 11 }, () => Array(categoryCount).fill(0)); // Years 2025-2035
+    } else {
+      const startDate = new Date(`${year}-01-01`);
+      const endDate = new Date(`${year}-12-31`);
+      query["issues.issuedDate"] = { $gte: startDate, $lte: endDate };
+      result = Array.from({ length: 12 }, () => Array(categoryCount).fill(0)); // 12 months
+    }
+
+    const issuedAssets = await IssuedConsumable.find(query);
+
+    issuedAssets.forEach((asset) => {
+      const category = asset.assetCategory;
+      if (categoryMapping.hasOwnProperty(category)) {
+        const categoryIndex = categoryMapping[category];
+        asset.issues.forEach((issue) => {
+          const issuedDate = new Date(issue.issuedDate);
+          const totalQuantity = issue.quantity || 0;
+
+          if (year === "all") {
+            const yearIndex = issuedDate.getFullYear() - 2025; // Start from 2025
+            if (yearIndex >= 0 && yearIndex < 11) {
+              result[yearIndex][categoryIndex] += totalQuantity;
+            }
+          } else if (issuedDate.getFullYear() === parseInt(year)) {
+            const monthIndex = issuedDate.getMonth();
+            result[monthIndex][categoryIndex] += totalQuantity;
+          }
+        });
+      }
+    });
+
+    res.status(200).json({
+      data: result,
+      categories: consumableAssetCategories
+    });
+  } catch (error) {
+    console.error("Error fetching issued consumable assets:", error);
+    res.status(500).json({ error: "Error fetching issued consumable assets: " + error.message });
+  }
+};
+
+exports.getAssetEntriesByMonth = async (req, res) => {
+  try {
+    const assets = await ConfirmedAsset.find({});
+    const monthlyCounts = Array(12).fill(0);
+
+    assets.forEach((asset) => {
+      const month = new Date(asset.joined).getUTCMonth(); // Extract month
+      monthlyCounts[month]++;
+    });
+
+    res.json({
+      labels: [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ],
+      data: monthlyCounts,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching asset data.' });
+  }
+};
+
+exports.getAssetTypeByMonth = async (req, res) => {
+  try {
+    const { location, year } = req.query;
+    console.log(location);
+    console.log(year);
+
+    let query = {};
+    if (location) {
+      query.location = location;
+    }
+
+    // Asset type mapping to fixed index positions
+    const assetTypeMapping = {
+      IT: 0,
+      store: 1,
+      electrical: 2,
+      furniture: 3,
+    };
+
+    // Initialize result array (either 12 months or 11 years)
+    let result;
+    if (year === "all") {
+      result = Array.from({ length: 11 }, () => Array(4).fill(0)); // 11 rows for years (2025-2035)
+    } else {
+      const startDate = new Date(`${year}-01-01`);
+      const endDate = new Date(`${year}-12-31`);
+      query.joined = { $gte: startDate, $lte: endDate };
+      result = Array.from({ length: 12 }, () => Array(4).fill(0)); // 12 rows for months
+    }
+
+    const assets = await ConfirmedAsset.find(query);
+
+    assets.forEach((asset) => {
+      const assetType = asset.assetType; // e.g., "electrical"
+      const joinedDate = new Date(asset.joined);
+
+      if (assetTypeMapping.hasOwnProperty(assetType)) {
+        const assetIndex = assetTypeMapping[assetType];
+
+        // Sum up the total quantity in the `data` object
+        const totalQuantity = Object.values(asset.data).reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+        if (year === "all") {
+          const yearIndex = joinedDate.getFullYear() - 2025; // Map to 2025-2035
+          if (yearIndex >= 0 && yearIndex < 11) {
+            result[yearIndex][assetIndex] += totalQuantity;
+          }
+        } else {
+          const monthIndex = joinedDate.getMonth();
+          result[monthIndex][assetIndex] += totalQuantity;
+        }
+      }
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Error fetching assets: " + error.message });
+  }
+};
+
+exports.amcmonitor = async (req, res) => {
+  try {
+    const currentDate = new Date();
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1); // One month ahead
+
+    const assets = await ConfirmedAsset.find({});
+
+    let amcExpiringAssets = [];
+
+    assets.forEach((asset) => {
+      if (asset.data && typeof asset.data === "object") {
+        Object.entries(asset.data).forEach(([accessoryName, details]) => {
+          const amcDate = new Date(details.amcDate);
+
+          if (amcDate >= currentDate && amcDate <= nextMonth) {
+            amcExpiringAssets.push({
+              assetType: asset.assetType,
+              location: asset.location,
+              accessoryName: accessoryName,
+              amcDate: amcDate.toISOString().split("T")[0], // Format YYYY-MM-DD
+            });
+          }
+        });
+      }
+    });
+    res.status(200).json(amcExpiringAssets);
+  } catch (error) {
+    console.error("Error in AMC Monitor:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};

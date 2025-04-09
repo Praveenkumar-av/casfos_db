@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react"; // Ensure useRef is imported
 import { Helmet } from "react-helmet";
 import "../styles/style.css";
 import { FaPlus } from "react-icons/fa";
@@ -24,8 +24,8 @@ const AssetIssue = () => {
   const [inStock, setInStock] = useState(0);
   const [issueItems, setIssueItems] = useState([]);
   const [tempIssues, setTempIssues] = useState([]);
-
-  const permanentAssetOptions = ["Furniture", "Vehicle", "Building", "Instruments", "Sports and Goods", "Fabrics", "Electrical", "Electronics", "Photograph Items", "Land", "ICT Goods"];
+  const fileInputRefs = useRef({});
+  const permanentAssetOptions = ["Furniture", "Vehicle", "Instruments", "Sports and Goods", "Fabrics", "Electrical", "Electronics", "Photograph Items", "ICT Goods"];
   const consumableAssetOptions = ["Stationery", "IT", "Electrical", "Plumbing", "Glassware/Laboratory Items", "Sanitory Items", "Sports Goods", "Fabrics", "Instruments"];
   const issuedToOptions = ["faculty_chamber", "officer_quarters", "staff_quarters", "corbett_hall", "champion_hall", "gis_lab", "van_vatika", "hostel", "officers_mess", "van_sakthi", "library", "classroom", "office_room", "officers_lounge", "gymnasium", "name"];
   useEffect(() => {
@@ -50,18 +50,18 @@ const AssetIssue = () => {
             designation,
             location: rejectedAsset.location || "",
             quantity: rejectedAsset.quantity || 0,
-            selectedIds: rejectedAsset.itemIds || [],
+            selectedIds: rejectedAsset.issuedIds || [],
           }]);
 
           setIsEditingRejected(true);
-          Swal.fire({
+          await Swal.fire({
             icon: "info",
             title: "Editing Rejected Issue",
             text: "You are now editing a rejected issue. Update the details and resubmit.",
           });
         } catch (error) {
           console.error("Failed to fetch rejected asset:", error);
-          Swal.fire({
+          await Swal.fire({
             icon: "error",
             title: "Error",
             text: "Failed to load rejected issue data.",
@@ -270,7 +270,7 @@ const AssetIssue = () => {
 
   const handleSubmitIssue = async () => {
     if (!selectedItem || issueItems.length === 0) {
-      Swal.fire({ icon: "warning", title: "Warning", text: "Please select an item and add at least one issue!" });
+      await Swal.fire({ icon: "warning", title: "Warning", text: "Please select an item and add at least one issue!" });
       return;
     }
 
@@ -283,20 +283,20 @@ const AssetIssue = () => {
           !issue.designation)) ||
         (assetType === "Permanent" && issue.selectedIds.length !== issue.quantity)
       ) {
-        Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields correctly!" });
+        await Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields correctly!" });
         return;
       }
     }
 
     const totalSelectedIds = issueItems.flatMap((issue) => issue.selectedIds);
     if (assetType === "Permanent" && new Set(totalSelectedIds).size !== totalSelectedIds.length) {
-      Swal.fire({ icon: "warning", title: "Warning", text: "Duplicate IDs selected across locations!" });
+      await Swal.fire({ icon: "warning", title: "Warning", text: "Duplicate IDs selected across locations!" });
       return;
     }
 
     const totalIssuedQuantity = issueItems.reduce((sum, issue) => sum + issue.quantity, 0);
     if (totalIssuedQuantity > inStock) {
-      Swal.fire({ icon: "warning", title: "Warning", text: "Total issued quantity exceeds available stock!" });
+      await Swal.fire({ icon: "warning", title: "Warning", text: "Total issued quantity exceeds available stock!" });
       return;
     }
 
@@ -347,7 +347,7 @@ const AssetIssue = () => {
         await axios.delete(`${serverBaseUrl}/api/assets/rejected-asset/${rejectedId}`);
       }
 
-      Swal.fire({
+      await Swal.fire({
         icon: "success",
         title: "Success!",
         text: "All receipts generated and downloaded successfully!",
@@ -359,7 +359,7 @@ const AssetIssue = () => {
       resetIssueForm();
       setIsEditingRejected(false);
 
-      Swal.fire({
+      await Swal.fire({
         icon: "success",
         title: "Success!",
         text: "All receipts generated and downloaded successfully!",
@@ -369,7 +369,7 @@ const AssetIssue = () => {
 
       resetIssueForm();
     } catch (error) {
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Oops...",
         text: error.response?.data?.message || "Failed to generate receipts!",
@@ -380,43 +380,63 @@ const AssetIssue = () => {
 
   const handleAcknowledgeDone = async (tempIssueId) => {
     const file = uploadedFiles[tempIssueId];
-
+  
     if (!file) {
-      Swal.fire({ icon: "error", title: "Oops...", text: "Please upload a signed receipt first!" });
+      await Swal.fire({ icon: "error", title: "Oops...", text: "Please upload a signed receipt first!" });
       return;
     }
-
+  
+    const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
+    const allowedExtensions = [".pdf", ".jpeg", ".jpg", ".png"];
+    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+  
+    if (!allowedMimeTypes.includes(file.type) || !allowedExtensions.includes(fileExtension)) {
+      await Swal.fire({
+        icon: "error",
+        title: "Invalid File Type",
+        text: "Only PDF, JPEG, and PNG files are allowed!",
+      });
+      return;
+    }
+  
     const formData = new FormData();
     formData.append("file", file);
     formData.append("tempIssueId", tempIssueId);
-
+  
     try {
       const response = await axios.post(`${serverBaseUrl}/api/assets/acknowledgeTempIssue`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
-      setTempIssues((prevIssues) =>
-        prevIssues.map((issue) =>
-          issue._id === tempIssueId
-            ? {
-                ...issue,
-                acknowledged: "yes",
-                signedPdfUrl: response.data.signedPdfUrl.startsWith("http")
-                  ? response.data.signedPdfUrl
-                  : `${serverBaseUrl}${response.data.signedPdfUrl}`,
-              }
-            : issue
-        )
+  
+      // Update state only after the user acknowledges the success alert
+      const updatedTempIssues = tempIssues.map((issue) =>
+        issue._id === tempIssueId
+          ? {
+              ...issue,
+              acknowledged: "yes",
+              signedPdfUrl: response.data.signedPdfUrl.startsWith("http")
+                ? response.data.signedPdfUrl
+                : `${serverBaseUrl}${response.data.signedPdfUrl}`,
+            }
+          : issue
       );
-
+  
       const newUploadedFiles = { ...uploadedFiles };
       delete newUploadedFiles[tempIssueId];
+  
+      // Show success alert and wait for user interaction
+      await Swal.fire({
+        icon: "success",
+        title: "Success!",
+        text: "Receipt acknowledged!",
+      });
+  
+      // Update state after the alert is closed
+      setTempIssues(updatedTempIssues);
       setUploadedFiles(newUploadedFiles);
-
-      Swal.fire({ icon: "success", title: "Success!", text: "Receipt acknowledged!" });
     } catch (error) {
       console.error("Acknowledge error:", error);
-      Swal.fire({
+      await Swal.fire({
         icon: "error",
         title: "Oops...",
         text: error.response?.data?.message || "Failed to acknowledge receipt!",
@@ -424,13 +444,32 @@ const AssetIssue = () => {
     }
   };
 
-  const handleFileChange = (tempIssueId, file) => {
+  const handleFileChange = async (tempIssueId, file) => { // Add async
+    if (!file) return;
+  
+    const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
+    const allowedExtensions = [".pdf", ".jpeg", ".jpg", ".png"];
+    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    const isValidMimeType = allowedMimeTypes.includes(file.type);
+    const isValidExtension = allowedExtensions.includes(fileExtension);
+  
+    if (!isValidMimeType || !isValidExtension) {
+      await Swal.fire({ // Add await
+        icon: "error",
+        title: "Invalid File Type",
+        text: "Only PDF, JPEG, and PNG files are allowed!",
+      });
+      if (fileInputRefs.current[tempIssueId]) {
+        fileInputRefs.current[tempIssueId].value = "";
+      }
+      return;
+    }
+  
     setUploadedFiles({
       ...uploadedFiles,
       [tempIssueId]: file,
     });
   };
-
   const resetIssueForm = () => {
     setAssetCategory("");
     setSelectedItem("");
@@ -620,12 +659,10 @@ const AssetIssue = () => {
                             value={issue.location}
                             onChange={(e) => handleIssueItemChange(index, "location", e.target.value)}
                             style={styles.input}
-                            placeholder="Enter location"
                           />
                         </div>
                           </>
-                        )}
-                        
+                        )}                       
                         <div style={styles.inputGroup}>
                           <label>Quantity:</label>
                           <input
@@ -729,11 +766,12 @@ const AssetIssue = () => {
                               <strong>Upload Signed Receipt:</strong>
                             </label>
                             <input
-                              type="file"
-                              accept="application/pdf,image/*"
-                              onChange={(e) => handleFileChange(issue._id, e.target.files[0])}
-                              style={styles.fileInput}
-                            />
+                    type="file"
+                    accept="application/pdf,image/jpeg,image/png"
+                    onChange={(e) => handleFileChange(issue._id, e.target.files[0])}
+                    ref={(el) => (fileInputRefs.current[issue._id] = el)} // Assign ref
+                    style={styles.fileInput}
+                  />
                             <button
                               onClick={() => handleAcknowledgeDone(issue._id)}
                               disabled={!uploadedFiles[issue._id]}

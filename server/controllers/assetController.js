@@ -1,12 +1,10 @@
-// asset contoller file for asset management
-
 const Asset = require("../model/Asset");
 const ConfirmedAsset = require("../model/ConfirmedAsset");
 const UpdatesAsset = require("../model/UpdatesAsset");
 const RejectedAsset = require("../model/RejectedAsset");
 const PurchasedPermanent = require("../model/PermanentAsset");
 const PurchasedConsumable = require("../model/ConsumableAsset");
-const DeadStockRegister = require("../model/DeadStockRegister"); // Adjust path
+const DeadStockRegister = require("../model/DeadStockRegister"); 
 const StorePermanent = require("../model/StorePermanent");
 const StoreConsumable = require("../model/StoreConsumable");
 const ReturnedPermanent = require("../model/ReturnedPermanent");
@@ -33,7 +31,6 @@ const PendingAssetUpdate = require("../model/PendingAssetUpdate");
 const TempBuildingUpgrade = require("../model/TempBuildingUpgrade");
 const fs = require("fs").promises;
 const path = require("path");
-
 
 exports.saveMaintenanceTemp = async (req, res) => {
   try {
@@ -1154,13 +1151,15 @@ exports.getAcknowledgedTempIssues = async (req, res) => {
 };
 exports.acknowledgeTempIssue = async (req, res) => {
   try {
-    const { tempIssueId } = req.body;
+    // Multer will throw an error if the file is invalid, so we check req.file first
     if (!req.file) {
-      return res.status(400).json({ message: "Signed PDF is required" });
+      return res.status(400).json({ message: "A valid PDF, JPEG, or PNG file is required" });
     }
 
+    const { tempIssueId } = req.body;
     const signedPdfUrl = `${serverBaseUrl}/uploads/${req.file.filename}`;
     const tempIssue = await TempIssue.findById(tempIssueId);
+
     if (!tempIssue) {
       return res.status(404).json({ message: "Temp issue not found" });
     }
@@ -1172,6 +1171,9 @@ exports.acknowledgeTempIssue = async (req, res) => {
     res.status(200).json({ message: "Receipt acknowledged successfully", signedPdfUrl });
   } catch (error) {
     console.error("Failed to acknowledge temp issue:", error);
+    if (error.message === "Only PDF, JPEG, and PNG files are allowed!") {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: "Failed to acknowledge receipt" });
   }
 };
@@ -1239,6 +1241,7 @@ exports.approveIssue = async (req, res) => {
     res.status(500).json({ message: "Failed to approve issue" });
   }
 };
+
 exports.rejectIssue = async (req, res) => {
   try {
     console.log("enter");
@@ -1275,7 +1278,7 @@ exports.rejectIssue = async (req, res) => {
       issuedTo: tempIssue.issuedTo,
       location: tempIssue.location,
       quantity: tempIssue.quantity,
-      itemIds: tempIssue.issuedIds,
+      issuedIds: tempIssue.issuedIds,
       pdfUrl: tempIssue.pdfUrl,
       signedPdfUrl: tempIssue.signedPdfUrl,
       rejectionRemarks,
@@ -2230,6 +2233,7 @@ exports.rejectService = async (req, res) => {
     res.status(500).json({ message: "Failed to reject service" });
   }
 };
+
 exports.saveServiced = async (req, res) => {
   try {
     const { assetType, assetCategory, itemName, subCategory, itemDescription, itemIds, serviceNo, serviceDate, serviceAmount } = req.body;
@@ -2249,21 +2253,20 @@ exports.saveServiced = async (req, res) => {
     await newTempService.save();
 
     if (assetType === "Permanent") {
-      await ReturnedPermanent.updateOne(
+      await ReturnedPermanent.updateMany( // Changed from updateOne to updateMany
         {
           assetCategory,
           itemName,
           subCategory,
           itemDescription,
-          itemId: { $in: itemIds }
+          itemId: { $in: itemIds }, // Match all documents where itemId is in itemIds array
         },
         {
           $set: {
-
             servicedEntry: "yes",
             servicedRejection: null,
-            servicedRejectionRemarks: null
-          }
+            servicedRejectionRemarks: null,
+          },
         }
       );
     }
@@ -2271,14 +2274,14 @@ exports.saveServiced = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Service request saved for approval",
-      data: newTempService
+      data: newTempService,
     });
   } catch (error) {
     console.error("Failed to save service request:", error);
     res.status(500).json({
       success: false,
       message: "Failed to save service request",
-      error: error.message
+      error: error.message,
     });
   }
 };

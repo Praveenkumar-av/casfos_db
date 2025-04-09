@@ -17,7 +17,7 @@ const AssetStore = () => {
   const [rejectedAction, setRejectedAction] = useState(""); // To track "service" or "disposal"
   const [customSource, setCustomSource] = useState("");
   const [customModeOfPurchase, setCustomModeOfPurchase] = useState("");
-  const [remarks, setRemarks] = useState({}); // For storing remarks for each returned asset
+  const [remarks, setRemarks] = useState({}); 
   const [signedReceipts, setSignedReceipts] = useState({}); // For storing signed receipt URLs
   const [amcPhotoUrls, setAmcPhotoUrls] = useState({});
   const [availableQuantity, setAvailableQuantity] = useState(0);
@@ -1089,18 +1089,26 @@ const AssetStore = () => {
       Swal.fire({ icon: "warning", title: "Warning", text: "Please upload signed receipt first!" });
       return;
     }
-
+  
     if (!asset._id || !asset.assetType || (asset.assetType === "Consumable" && !asset.returnedQuantity)) {
       Swal.fire({ icon: "error", title: "Error", text: "Missing required asset data!" });
       return;
     }
-
+  
     try {
       const status =
         asset.assetType === "Permanent"
-          ? asset.condition === "To Be Serviced" ? "service" : "dispose"
-          : asset.condition === "To Be Exchanged" ? "exchange" : "dispose";
-
+          ? asset.condition === "To Be Serviced"
+            ? "service"
+            : asset.condition === "To Be Disposed"
+            ? "dispose"
+            : "Good" // Map "Good" to "returned" for Permanent
+          : asset.condition === "To Be Exchanged"
+          ? "exchange"
+          : asset.condition === "To Be Disposed"
+          ? "dispose"
+          : "Good"; // Map "Good" to "returned" for Consumable
+  
       await axios.post(`${serverBaseUrl}/api/assets/saveReturnedStatus`, {
         _id: asset._id,
         status,
@@ -1110,8 +1118,7 @@ const AssetStore = () => {
         assetType: asset.assetType,
         ...(asset.assetType === "Consumable" && { returnedQuantity: asset.returnedQuantity }),
       });
-
-      // Do not remove from returnedAssets immediately; wait for approval
+  
       Swal.fire({ icon: "success", title: "Submitted!", text: "Asset condition submitted for approval!" });
     } catch (error) {
       Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save asset condition!" });
@@ -2008,26 +2015,28 @@ const AssetStore = () => {
                         ) : (
                           <p><strong>Returned Quantity:</strong> {asset.returnedQuantity || "N/A"}</p>
                         )}
-                        <div style={styles.conditionSelect}>
-                          <label><strong>Condition:</strong></label>
-                          <select
-                            value={asset.condition}
-                            onChange={(e) => handleConditionChange(index, e.target.value)}
-                            style={styles.select}
-                          >
-                            {asset.assetType === "Permanent" ? (
-                              <>
-                                <option value="To Be Serviced">To Be Serviced</option>
-                                <option value="To Be Disposed">To Be Disposed</option>
-                              </>
-                            ) : (
-                              <>
-                                <option value="To Be Exchanged">To Be Exchanged</option>
-                                <option value="To Be Disposed">To Be Disposed</option>
-                              </>
-                            )}
-                          </select>
-                        </div>
+                       <div style={styles.conditionSelect}>
+  <label><strong>Condition:</strong></label>
+  <select
+    value={asset.condition}
+    onChange={(e) => handleConditionChange(index, e.target.value)}
+    style={styles.select}
+  >
+    {asset.assetType === "Permanent" ? (
+      <>
+        <option value="Good">Good</option>
+        <option value="To Be Serviced">To Be Serviced</option>
+        <option value="To Be Disposed">To Be Disposed</option>
+      </>
+    ) : (
+      <>
+        <option value="Good">Good</option>
+        <option value="To Be Exchanged">To Be Exchanged</option>
+        <option value="To Be Disposed">To Be Disposed</option>
+      </>
+    )}
+  </select>
+</div>
                         <div style={styles.inputGroup}>
                           <label><strong>Remark:</strong></label>
                           <input
@@ -2047,7 +2056,7 @@ const AssetStore = () => {
                             <input
                               type="file"
                               onChange={(e) => handleUploadSignedReceipt(index, e.target.files[0])}
-                              accept="application/pdf"
+                              accept="application/pdf,image/jpeg,image/png"
                               style={styles.fileInput}
                             />
                             {asset.signedPdfUrl && (

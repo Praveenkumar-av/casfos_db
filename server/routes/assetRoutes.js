@@ -53,14 +53,14 @@ router.delete("/rejected-asset/:id", AssetController.deleteRejectedAsset);
 router.post("/storeTempIssue",AssetController.issue);
 router.get("/getTempIssues", AssetController.getTempIssues);
 router.get("/getAcknowledgedTempIssues", AssetController.getAcknowledgedTempIssues);
-router.post("/acknowledgeTempIssue", pdfUpload.single("file"), AssetController.acknowledgeTempIssue);
+router.post("/acknowledgeTempIssue", pdfUpload, AssetController.acknowledgeTempIssue);
 router.post("/approveIssue/:id", AssetController.approveIssue);
 router.post("/rejectIssue/:id", AssetController.rejectIssue);
 router.get("/rejectedassets", AssetController.rejectedassets);
 router.post("/storeReturnedReceipt", AssetController.storeReturnedReceipt);
 
 // Upload the signed receipt PDF
-router.post("/uploadSignedReturnedReceipt", pdfUpload.single("file"), AssetController.uploadSignedReturnedReceipt);
+router.post("/uploadSignedReturnedReceipt", pdfUpload, AssetController.uploadSignedReturnedReceipt);
 router.post("/saveReturnedStatus", AssetController.saveReturnedStatus);
 
 // Fetch assets pending return approval

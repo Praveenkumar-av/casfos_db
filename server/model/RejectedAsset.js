@@ -81,6 +81,8 @@ const rejectedAssetSchema = new mongoose.Schema({
   serviceNo: { type: String },
   serviceDate: { type: Date },
   serviceAmount: { type: Number },
+  itemIds: [{ type: String }],
+
 
   // Fields from TempDisposeAssetSchema
   purchaseValue: { type: Number },

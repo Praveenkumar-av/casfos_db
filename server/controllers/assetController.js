@@ -1,4 +1,4 @@
-// asset contoller file for asset management by nirmal
+// asset contoller file for asset management
 
 const Asset = require("../model/Asset");
 const ConfirmedAsset = require("../model/ConfirmedAsset");

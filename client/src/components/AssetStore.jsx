@@ -535,11 +535,10 @@ const AssetStore = () => {
 
       // Update disposableData.purchaseValue with the average or total of fetched values
       const totalPurchaseValue = Object.values(newPurchaseValues).reduce((sum, val) => sum + val, 0);
-      const averagePurchaseValue = selectedItemIds.length > 0 ? totalPurchaseValue / selectedItemIds.length : 0;
+      const averagePurchaseValue = selectedItemIds.length > 0 ? totalPurchaseValue : 0;
       setDisposableData((prev) => ({ ...prev, purchaseValue: averagePurchaseValue }));
     } catch (error) {
-      console.error("Failed to fetch purchase values:", error);
-      setPurchaseValues((prev) => {
+      console.error("Failed to fetch purchase values:", error);      setPurchaseValues((prev) => {
         const fallback = {};
         selectedItemIds.forEach((itemId) => {
           fallback[itemId] = 0;
@@ -605,7 +604,7 @@ const AssetStore = () => {
       });
       return;
     }
-
+  
     const invalidForms = upgradeForms.filter(form =>
       !form.year ||
       !form.estimate ||
@@ -614,7 +613,7 @@ const AssetStore = () => {
       !form.warrantyPeriod ||
       !form.executionAgency
     );
-
+  
     if (invalidForms.length > 0) {
       Swal.fire({
         icon: "warning",
@@ -623,7 +622,7 @@ const AssetStore = () => {
       });
       return;
     }
-
+  
     const futureDates = upgradeForms.some(form => isFutureDate(form.dateOfCompletion));
     if (futureDates) {
       Swal.fire({
@@ -633,9 +632,9 @@ const AssetStore = () => {
       });
       return;
     }
-
+  
     const subCategoryToSend = selectedSubCategory === "Others" ? buildingData.customSubCategory : selectedSubCategory;
-
+  
     if (!subCategoryToSend) {
       Swal.fire({
         icon: "warning",
@@ -644,28 +643,30 @@ const AssetStore = () => {
       });
       return;
     }
-
+  
     try {
-      await axios.post("http://localhost:3001/api/assets/addBuildingUpgrades", {
+      const response = await axios.post("http://localhost:3001/api/assets/addBuildingUpgrades", {
         subCategory: subCategoryToSend,
         upgrades: upgradeForms,
       });
+      
       if (isEditingRejected && rejectedId && rejectedAction === "buildingupgrade") {
         await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
       }
+      
       Swal.fire({
         icon: "success",
         title: "Success",
         text: "All upgrades added successfully!",
       });
-
-      const response = await axios.post("http://localhost:3001/api/assets/getBuildingUpgrades", {
+  
+      const getResponse = await axios.post("http://localhost:3001/api/assets/getBuildingUpgrades", {
         subCategory: subCategoryToSend,
       });
-      const buildings = response.data.buildings || [];
+      const buildings = getResponse.data.buildings || [];
       const upgrades = buildings.reduce((acc, building) => [...acc, ...building.upgrades], []);
       setBuildingUpgrades(upgrades);
-
+  
       setUpgradeForms([]);
       setSelectedSubCategory("");
       setIsEditingRejected(false);
@@ -673,11 +674,21 @@ const AssetStore = () => {
       window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=buildingupgrade`);
     } catch (error) {
       console.error("Failed to add upgrades:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Failed to add upgrades.",
-      });
+      
+      // Check if the error is due to building not found
+      if (error.response?.status === 404) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Building subcategory not found!",
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Failed to add upgrades.",
+        });
+      }
     }
   };
 

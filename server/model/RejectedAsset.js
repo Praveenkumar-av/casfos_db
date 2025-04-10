@@ -105,6 +105,11 @@ const rejectedAssetSchema = new mongoose.Schema({
   description: { type: String },
   custody: { type: String },
   agency: { type: String },
+  remark: { type: String, required: false },
+
+      assetId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  updatedData: { type: Object, required: true },
+
 
 }, { timestamps: true });
 

@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import "../styles/style.css";
 
 function EntryStaffAssetUpdation() {
+  const [isRejectedUpdate, setIsRejectedUpdate] = useState(false); // New state to track rejected update
   const [permanentAssets, setPermanentAssets] = useState([]);
   const [consumableAssets, setConsumableAssets] = useState([]);
   const [returnedAssets, setReturnedAssets] = useState([]); // New state for returned assets
@@ -62,33 +63,37 @@ useEffect(() => {
   useEffect(() => {
     const handleRejectedUpdate = async () => {
       if (rejectedId && assetType && (permanentAssets.length > 0 || consumableAssets.length > 0)) {
-        console.log("rejectedId:", rejectedId, "assetType:", assetType);
+        setIsRejectedUpdate(true);
         setActiveTab(assetType.toLowerCase());
+
         try {
-          const response = await axios.get(`${serverBaseUrl}/api/assets/rejectedUpdates`);
-          console.log("Pending updates:", response.data);
-          const rejectedUpdate = response.data.find(update => update.assetId === rejectedId && update.status === "rejected");
-          console.log("Rejected update:", rejectedUpdate);
-          if (rejectedUpdate) {
+          // Fetch the rejected asset by rejectedId
+          const rejectedResponse = await axios.get(`${serverBaseUrl}/api/assets/rejected-asset/${rejectedId}`);
+          const rejectedAsset = rejectedResponse.data;
+          console.log(rejectedAsset.data.assetId)
+          if (rejectedAsset) {
             const assetList = assetType === "Permanent" ? permanentAssets : consumableAssets;
-            const asset = assetList.find(a => a._id === rejectedUpdate.assetId);
-            console.log("Found asset:", asset);
-            if (asset) {
-              setEditedAsset(JSON.parse(JSON.stringify(rejectedUpdate.updatedData)));
-              setPopupData(asset);
+            const originalAsset = assetList.find(a => a._id === rejectedAsset.data.assetId.toString());
+
+            if (originalAsset) {
+              // Set the original asset as popupData and updatedData as editedAsset
+              setPopupData(originalAsset);
+              setEditedAsset(rejectedAsset.data.updatedData);
               setEditMode(true);
             } else {
-              console.error("Asset not found in assetList:", rejectedUpdate.assetId);
+              console.error("Original asset not found:", rejectedAsset.assetId);
             }
           } else {
-            console.error("Rejected update not found:", rejectedId);
+            console.error("Rejected asset not found:", rejectedId);
+            await Swal.fire("Error!", "Rejected asset not found.", "error");
           }
         } catch (error) {
-          console.error("Error fetching rejected update:", error);
+          console.error("Error fetching rejected asset:", error);
+          await Swal.fire("Error!", "Failed to load rejected asset data.", "error");
         }
       }
     };
-  
+
     handleRejectedUpdate();
   }, [rejectedId, assetType, permanentAssets, consumableAssets]);
   // Fetch approved returned assets (Permanent and Consumable)
@@ -209,17 +214,21 @@ useEffect(() => {
   const saveChanges = async () => {
     try {
       const endpoint = `${serverBaseUrl}/api/assets/submitForApproval`;
+      console.log(editedAsset._id);
       const response = await axios.post(endpoint, {
         assetId: editedAsset._id,
         assetType: activeTab === "permanent" ? "Permanent" : "Consumable",
         originalData: popupData,
         updatedData: editedAsset,
       });
-  
+
       if (response.status === 200) {
         Swal.fire("Success!", "Asset update submitted for approval", "success");
-        setEditMode(false);
-        setPopupData(null);
+        if (isRejectedUpdate && rejectedId) {
+          // Delete the rejected asset after successful resubmission
+          await axios.delete(`${serverBaseUrl}/api/assets/rejected-asset/${rejectedId}`);
+        }
+        clearRejectedUpdate();
         // Refresh pending updates
         const updatesResponse = await axios.get(`${serverBaseUrl}/api/assets/pendingUpdates`);
         setPendingUpdates(updatesResponse.data.filter(update => update.status === "pending"));
@@ -279,7 +288,12 @@ useEffect(() => {
       }
     });
   };
-
+  const clearRejectedUpdate = () => {
+    setEditMode(false);
+    setPopupData(null);
+    setIsRejectedUpdate(false);
+    window.history.replaceState(null, "", `/entrystaffassetupdation?username=${encodeURIComponent(username)}`);
+  };
   const renderAssetCard = (asset) => {
     const firstItem = asset.items?.[0] || {};
     return (
@@ -390,10 +404,7 @@ useEffect(() => {
           src={url} 
           alt="Preview" 
           style={componentStyles.imagePreview}
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = "https://via.placeholder.com/100?text=Image+Not+Available";
-          }}
+         
         />
         <a href={url} target="_blank" rel="noopener noreferrer" style={componentStyles.imageLink}>
           View Full Image
@@ -843,8 +854,7 @@ useEffect(() => {
                   <button style={componentStyles.saveButton} onClick={saveChanges}>
                     Save Changes
                   </button>
-                  <button style={componentStyles.cancelButton} onClick={() => { setEditMode(false); setPopupData(null); }}>
-                    Cancel
+                  <button style={componentStyles.cancelButton} onClick={clearRejectedUpdate}>                    Cancel
                   </button>
                 </>
               ) : (

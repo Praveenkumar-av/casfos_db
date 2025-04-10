@@ -217,8 +217,8 @@ const AssetEntryStaffDashboard = () => {
           </>
         )}
   
-        {/* Update Button - Placed at the end */}
-        {action.includes("rejected") || action.includes("cancelled") ? (
+
+        {action.includes("rejected") || action.includes("cancelled")? (
           <button
             style={styles.updateButton}
             onClick={() => {
@@ -229,7 +229,12 @@ const AssetEntryStaffDashboard = () => {
               else if (action.includes("return")) tab = "assetreturn";
               else if (action.includes("issue")) tab = "assetissue";
               else if (action.includes("service")) tab = "assetstore";
-              else if (action.includes("updation")) tab = "entrystaffassetupdation";
+              else if (action.includes("updation")) {
+                // Redirect to EntryStaffAssetUpdation with rejectedId and assetType
+                window.location.href = `/entrystaffassetupdation?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
+                return;
+              }              
+
   
               window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
             }}

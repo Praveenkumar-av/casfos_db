@@ -390,7 +390,17 @@ exports.rejectUpdate = async (req, res) => {
       { status: "rejected", rejectionRemarks },
       { new: true }
     );
+    const rejectedAsset = new RejectedAsset({
+      assetType: update.assetType,
+      assetCategory: update.updatedData.assetCategory,
+      rejectionRemarks: rejectionRemarks || "No remarks provided",
+      updatedData: update.updatedData, // Store the entire updatedData object
+      subCategory: update.updatedData.items?.[0]?.subCategory || update.updatedData.subCategory,
+      assetId:update.assetId,
+    });
 
+    // Save the rejected asset
+    await rejectedAsset.save();
     // Store notification
     await storeAssetNotification(
       {
@@ -399,7 +409,9 @@ exports.rejectUpdate = async (req, res) => {
         items: update.updatedData.items,
         subCategory: update.updatedData.items?.[0]?.subCategory,
         rejectionRemarks,
-        assetId: update.assetId, // For redirection
+        assetId: update.assetId,
+        rejectedAssetId: rejectedAsset._id,
+
       },
       "asset updation rejected",
       new Date()
@@ -1949,6 +1961,15 @@ exports.addBuildingUpgrade = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    // Search for the subcategory in the Building collection
+    const buildingExists = await Building.findOne({ 
+      subCategory: subCategory 
+    });
+
+    if (!buildingExists) {
+      return res.status(404).json({ message: "Building subcategory not found" });
+    }
+
     const tempUpgrade = new TempBuildingUpgrade({
       subCategory,
       upgrades
@@ -2713,7 +2734,6 @@ exports.cancelDisposal = async (req, res) => {
           }
         );
       }
-
       const rejectedAsset = new RejectedAsset({
         assetType: asset.assetType,
         assetCategory: asset.assetCategory,
@@ -2728,7 +2748,7 @@ exports.cancelDisposal = async (req, res) => {
         condemnationDate: asset.condemnationDate,
         remark: asset.remark,
         disposalValue: asset.disposalValue,
-        methodOfDisposal: asset.methodOfDisposal, // Add to RejectedAsset
+        methodOfDisposal: asset.methodOfDisposal, 
         rejectionRemarks,
         approved: "no",
       });

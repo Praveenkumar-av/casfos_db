@@ -477,13 +477,16 @@ exports.storeTempAsset = async (req, res) => {
       kmzOrkmlFileUrl
     } = req.body;
 
-    const today = new Date().setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of today
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1); // Set to start of tomorrow
 
     // Required field validation
     if (!assetType) throw new Error("Asset Type is required");
     if (!assetCategory) throw new Error("Asset Category is required");
     if (!entryDate) throw new Error("Entry Date is required");
-    if (new Date(entryDate) > today) throw new Error("Entry Date cannot be in the future");
+    if (new Date(entryDate) >= tomorrow) throw new Error("Entry Date cannot be tomorrow or in the future"); // Modified condition
 
     let assetData = {};
 
@@ -535,7 +538,7 @@ exports.storeTempAsset = async (req, res) => {
     // Other asset categories (Permanent/Consumable items)
     else {
       if (!purchaseDate) throw new Error("Purchase Date is required");
-      if (new Date(purchaseDate) > today) throw new Error("Purchase Date cannot be in the future");
+      if (new Date(purchaseDate) >= today) throw new Error("Purchase Date cannot be in the future");
       if (!supplierName) throw new Error("Supplier Name is required");
       if (!source) throw new Error("Source is required");
       if (!modeOfPurchase) throw new Error("Mode of Purchase is required");
@@ -549,13 +552,13 @@ exports.storeTempAsset = async (req, res) => {
         if (assetType === "Permanent" && !item.subCategory) throw new Error(`Item ${item.itemName || "unknown"}: Sub Category is required`);
         if (!item.itemName) throw new Error("Item Name is required in one or more items");
         if (!item.itemDescription) throw new Error(`Item ${item.itemName}: Item Description is required`);
-        
+
         const quantityReceived = Number(item.quantityReceived);
         const unitPrice = Number(item.unitPrice);
 
         if (!quantityReceived || quantityReceived <= 0) throw new Error(`Item ${item.itemName}: Quantity Received must be greater than 0`);
         if (!unitPrice || unitPrice <= 0) throw new Error(`Item ${item.itemName}: Unit Price must be greater than 0`);
-        
+
         if (assetType === "Permanent" && item.itemIds && item.itemIds.length !== quantityReceived) throw new Error(`Item ${item.itemName}: Number of Item IDs must match Quantity Received`);
         if (assetType === "Permanent" && item.itemIds && item.itemIds.some(id => !id)) throw new Error(`Item ${item.itemName}: All Item IDs must be provided`);
 
@@ -662,7 +665,6 @@ exports.storeTempAsset = async (req, res) => {
     }
   }
 };
-
 
 exports.getAllPermanentAssets = async (req, res) => {
   try {

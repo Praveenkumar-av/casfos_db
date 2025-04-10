@@ -157,88 +157,6 @@ const AssetEntryStaffDashboard = () => {
     return (
       <div style={styles.notificationDetails}>
         <p><strong>Action Time:</strong> {new Date(actionTime).toLocaleString()}</p>
-        {action.includes("asset rejected") && (
-          <button
-            style={styles.updateButton}
-            onClick={() => {
-              window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}`;
-            }}
-          >
-            Update
-          </button>
-        )}
-        {action.includes("issue rejected") && (
-          <button
-            style={styles.updateButton}
-            onClick={() => {
-              window.location.href = `/assetissue?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}`;
-            }}
-          >
-            Update
-          </button>
-        )}
-        {action.includes("building maintenance rejected") && (
-        <button
-          style={styles.updateButton}
-          onClick={() => {
-            window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=service`;
-          }}
-        >
-          Update
-        </button>
-      )}
-        {action === "building disposal cancelled" && ( // Add this new condition
-        
-        <button
-          style={styles.updateButton}
-          onClick={() => {
-            window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=disposable`;
-          }}
-        >
-          Update
-        </button>
-      )}
-        {action.includes("building upgrade rejected") && (
-        <button
-          style={styles.updateButton}
-          onClick={() => {
-            window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=building-upgrade`;
-          }}
-        >
-          Update
-        </button>
-      )}
-        {action.includes("return rejected") && (
-        
-          <button
-            style={styles.updateButton}
-            onClick={() => {
-              window.location.href = `/assetreturn?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}`;
-            }}
-          >
-            Update
-          </button>
-        )}
-        {(action === "service rejected" || action === "asset disposal cancelled") && (
-          <button
-            style={styles.updateButton}
-            onClick={() => {
-              window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}`;
-            }}
-          >
-            Update
-          </button>
-        )}
-        {action.includes("asset updation rejected") && (
-          <button
-            style={styles.updateButton}
-            onClick={() => {
-              window.location.href = `/entrystaffassetupdation?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
-            }}
-          >
-            Update
-          </button>
-        )}
         {action.includes("asset approved") || action.includes("asset rejected") ? (
           <>
             <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
@@ -257,7 +175,7 @@ const AssetEntryStaffDashboard = () => {
             <p><strong>Location:</strong> {location || "N/A"}</p>
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ): action.includes("issue") || action.includes("service") || action.includes("exchange") ? (
+        ) : action.includes("issue") || action.includes("service") || action.includes("exchange") ? (
           <>
             <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
             <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
@@ -273,13 +191,11 @@ const AssetEntryStaffDashboard = () => {
             <p><strong>Condition:</strong> {condition || "N/A"}</p>
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) :action.includes("building disposal cancelled")?(
-<>
-<p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
-{rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
-
-</>
-
+        ) : action.includes("building disposal cancelled") ? (
+          <>
+            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+          </>
         ) : action.includes("asset disposal") ? (
           <>
             <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
@@ -292,19 +208,7 @@ const AssetEntryStaffDashboard = () => {
             <p><strong>Initial Condition:</strong> {condition || "N/A"}</p>
             <p><strong>Changed Condition:</strong> {changedCondition || "N/A"}</p>
           </>
-        ) : action.includes("asset updation approved") || action.includes("asset updation rejected") ? (
-          <>
-            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
-            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
-          </>
-) : action.includes("asset updation approved") || action.includes("asset updation rejected") ? (          <>
-            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
-            <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
-            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
-            <p><strong>Location:</strong> {location || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}          </>
-        ): (
+        ) : (
           <>
             <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || subCategory || "N/A"}</p>
             {quantity && <p><strong>Quantity:</strong> {quantity}</p>}
@@ -312,6 +216,27 @@ const AssetEntryStaffDashboard = () => {
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
         )}
+  
+        {/* Update Button - Placed at the end */}
+        {action.includes("rejected") || action.includes("cancelled") ? (
+          <button
+            style={styles.updateButton}
+            onClick={() => {
+              let tab = "";
+              if (action.includes("building maintenance")) tab = "service";
+              else if (action.includes("building upgrade")) tab = "building-upgrade";
+              else if (action.includes("building disposal")) tab = "disposable";
+              else if (action.includes("return")) tab = "assetreturn";
+              else if (action.includes("issue")) tab = "assetissue";
+              else if (action.includes("service")) tab = "assetstore";
+              else if (action.includes("updation")) tab = "entrystaffassetupdation";
+  
+              window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
+            }}
+          >
+            Update
+          </button>
+        ) : null}
       </div>
     );
   };

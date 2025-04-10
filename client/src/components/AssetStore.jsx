@@ -17,7 +17,7 @@ const AssetStore = () => {
   const [rejectedAction, setRejectedAction] = useState(""); // To track "service" or "disposal"
   const [customSource, setCustomSource] = useState("");
   const [customModeOfPurchase, setCustomModeOfPurchase] = useState("");
-  const [remarks, setRemarks] = useState({}); 
+  const [remarks, setRemarks] = useState({});
   const [signedReceipts, setSignedReceipts] = useState({}); // For storing signed receipt URLs
   const [amcPhotoUrls, setAmcPhotoUrls] = useState({});
   const [availableQuantity, setAvailableQuantity] = useState(0);
@@ -396,12 +396,12 @@ const AssetStore = () => {
         if (assetType === "Permanent" && item.showIdInputs && item.itemIds.some(id => !id)) errors.push(`Item ${index + 1}: All Item IDs must be filled.`);
 
         // AMC and Warranty Date Validation
-        if (item.amcFromDate && isFutureDate(item.amcFromDate)) errors.push(`Item ${index + 1}: AMC From Date cannot be in the future.`);
-        if (item.amcToDate && isFutureDate(item.amcToDate)) errors.push(`Item ${index + 1}: AMC To Date cannot be in the future.`);
+        // if (item.amcFromDate && isFutureDate(item.amcFromDate)) errors.push(`Item ${index + 1}: AMC From Date cannot be in the future.`);
+        // if (item.amcToDate && isFutureDate(item.amcToDate)) errors.push(`Item ${index + 1}: AMC To Date cannot be in the future.`);
         if (item.amcFromDate && item.amcToDate && new Date(item.amcFromDate) > new Date(item.amcToDate)) {
           errors.push(`Item ${index + 1}: AMC From Date cannot be later than AMC To Date.`);
         }
-        if (item.warrantyValidUpto && isFutureDate(item.warrantyValidUpto)) errors.push(`Item ${index + 1}: Warranty Valid Upto cannot be in the future for entry date.`);
+        // if (item.warrantyValidUpto && isFutureDate(item.warrantyValidUpto)) errors.push(`Item ${index + 1}: Warranty Valid Upto cannot be in the future for entry date.`);
       });
     }
 
@@ -1135,26 +1135,26 @@ const AssetStore = () => {
       Swal.fire({ icon: "warning", title: "Warning", text: "Please upload signed receipt first!" });
       return;
     }
-  
+
     if (!asset._id || !asset.assetType || (asset.assetType === "Consumable" && !asset.returnedQuantity)) {
       Swal.fire({ icon: "error", title: "Error", text: "Missing required asset data!" });
       return;
     }
-  
+
     try {
       const status =
         asset.assetType === "Permanent"
           ? asset.condition === "To Be Serviced"
             ? "service"
             : asset.condition === "To Be Disposed"
-            ? "dispose"
-            : "Good" // Map "Good" to "returned" for Permanent
+              ? "dispose"
+              : "Good" // Map "Good" to "returned" for Permanent
           : asset.condition === "To Be Exchanged"
-          ? "exchange"
-          : asset.condition === "To Be Disposed"
-          ? "dispose"
-          : "Good"; // Map "Good" to "returned" for Consumable
-  
+            ? "exchange"
+            : asset.condition === "To Be Disposed"
+              ? "dispose"
+              : "Good"; // Map "Good" to "returned" for Consumable
+
       await axios.post(`${serverBaseUrl}/api/assets/saveReturnedStatus`, {
         _id: asset._id,
         status,
@@ -1164,7 +1164,7 @@ const AssetStore = () => {
         assetType: asset.assetType,
         ...(asset.assetType === "Consumable" && { returnedQuantity: asset.returnedQuantity }),
       });
-  
+
       Swal.fire({ icon: "success", title: "Submitted!", text: "Asset condition submitted for approval!" });
     } catch (error) {
       Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save asset condition!" });
@@ -1757,12 +1757,16 @@ const AssetStore = () => {
                       </div>
                       <div style={styles.inputGroup}>
                         <label>Status:</label>
-                        <input
-                          type="text"
+                        <select
                           value={buildingData.status}
                           onChange={(e) => handleBuildingChange("status", e.target.value)}
                           style={styles.input}
-                        />
+                        >
+                          <option value="">Select Status</option>
+                          <option value="Permanent">Permanent</option>
+                          <option value="Lease">Lease</option>
+                          <option value="Others">Others</option>
+                        </select>
                       </div>
                       <div style={styles.inputGroup}>
                         <label>Date of Construction:</label>
@@ -1784,6 +1788,7 @@ const AssetStore = () => {
                           onChange={(e) =>
                             handleBuildingChange("costOfConstruction", parseFloat(e.target.value) || 0)
                           }
+                          onFocus={(e) => e.target.select()}
                           style={styles.input}
                         />
                       </div>
@@ -1943,6 +1948,7 @@ const AssetStore = () => {
                               type="number"
                               value={item.quantityReceived}
                               onChange={(e) => handleItemChange(index, "quantityReceived", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               style={styles.input}
                             />
                           </div>
@@ -1955,6 +1961,7 @@ const AssetStore = () => {
                               type="number"
                               value={item.unitPrice}
                               onChange={(e) => handleItemChange(index, "unitPrice", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               style={styles.input}
                             />
                           </div>
@@ -1964,6 +1971,7 @@ const AssetStore = () => {
                               type="number"
                               value={item.totalPrice}
                               onChange={(e) => handleItemChange(index, "totalPrice", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               style={styles.input}
                             />
                           </div>
@@ -1986,7 +1994,7 @@ const AssetStore = () => {
                           </div>
                           <div style={styles.inputGroup}>
                             <label>AMC Cost:</label>
-                            <input type="number" value={item.amcCost} onChange={(e) => handleItemChange(index, "amcCost", e.target.value)} style={styles.input} />
+                            <input type="number" value={item.amcCost} onChange={(e) => handleItemChange(index, "amcCost", e.target.value)} onFocus={(e) => e.target.select()} style={styles.input} />
                           </div>
                         </div>
                         <div style={styles.itemRow}>
@@ -2080,28 +2088,28 @@ const AssetStore = () => {
                         ) : (
                           <p><strong>Returned Quantity:</strong> {asset.returnedQuantity || "N/A"}</p>
                         )}
-                       <div style={styles.conditionSelect}>
-  <label><strong>Condition:</strong></label>
-  <select
-    value={asset.condition}
-    onChange={(e) => handleConditionChange(index, e.target.value)}
-    style={styles.select}
-  >
-    {asset.assetType === "Permanent" ? (
-      <>
-        <option value="Good">Good</option>
-        <option value="To Be Serviced">To Be Serviced</option>
-        <option value="To Be Disposed">To Be Disposed</option>
-      </>
-    ) : (
-      <>
-        <option value="Good">Good</option>
-        <option value="To Be Exchanged">To Be Exchanged</option>
-        <option value="To Be Disposed">To Be Disposed</option>
-      </>
-    )}
-  </select>
-</div>
+                        <div style={styles.conditionSelect}>
+                          <label><strong>Condition:</strong></label>
+                          <select
+                            value={asset.condition}
+                            onChange={(e) => handleConditionChange(index, e.target.value)}
+                            style={styles.select}
+                          >
+                            {asset.assetType === "Permanent" ? (
+                              <>
+                                <option value="Good">Good</option>
+                                <option value="To Be Serviced">To Be Serviced</option>
+                                <option value="To Be Disposed">To Be Disposed</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="Good">Good</option>
+                                <option value="To Be Exchanged">To Be Exchanged</option>
+                                <option value="To Be Disposed">To Be Disposed</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
                         <div style={styles.inputGroup}>
                           <label><strong>Remark:</strong></label>
                           <input
@@ -2162,7 +2170,7 @@ const AssetStore = () => {
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Building No:</label><input type="text" value={maintenanceData.buildingNo} onChange={(e) => handleMaintenanceChange("buildingNo", e.target.value)} style={styles.input} /></div>
                       <div style={styles.inputGroup}><label>Year of Maintenance:</label><input type="date" value={maintenanceData.yearOfMaintenance} onChange={(e) => handleMaintenanceChange("yearOfMaintenance", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
-                      <div style={styles.inputGroup}><label>Cost:</label><input type="number" value={maintenanceData.cost} onChange={(e) => handleMaintenanceChange("cost", parseFloat(e.target.value) || 0)} style={styles.input} /></div>
+                      <div style={styles.inputGroup}><label>Cost:</label><input type="number" value={maintenanceData.cost} onChange={(e) => handleMaintenanceChange("cost", parseFloat(e.target.value) || 0)} onFocus={(e) => e.target.select()} style={styles.input} /></div>
                     </div>
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Description:</label><input type="text" value={maintenanceData.description} onChange={(e) => handleMaintenanceChange("description", e.target.value)} style={styles.input} /></div>
@@ -2192,7 +2200,7 @@ const AssetStore = () => {
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Service No:</label><input type="text" value={servicedData.serviceNo} onChange={(e) => handleServicedChange("serviceNo", e.target.value)} style={styles.input} /></div>
                       <div style={styles.inputGroup}><label>Service Date:</label><input type="date" value={servicedData.serviceDate} onChange={(e) => handleServicedChange("serviceDate", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
-                      <div style={styles.inputGroup}><label>Service Amount:</label><input type="number" value={servicedData.serviceAmount} onChange={(e) => handleServicedChange("serviceAmount", parseFloat(e.target.value) || 0)} style={styles.input} /></div>
+                      <div style={styles.inputGroup}><label>Service Amount:</label><input type="number" value={servicedData.serviceAmount} onChange={(e) => handleServicedChange("serviceAmount", parseFloat(e.target.value) || 0)} onFocus={(e) => e.target.select()} style={styles.input} /></div>
                     </div>
                     <div style={styles.inputGroup}>
                       <label>Select Servicable Item IDs:</label>
@@ -2276,6 +2284,7 @@ const AssetStore = () => {
                             value={disposableData.condemnationYear || ""}
                             onChange={(e) => handleDisposableChange("condemnationYear", parseInt(e.target.value) || "")}
                             style={styles.input}
+                            onFocus={(e) => e.target.select()}
                             min="1900"
                             max={new Date().getFullYear()}
                           />
@@ -2370,6 +2379,7 @@ const AssetStore = () => {
                             value={disposableData.demolitionEstimate || ""}
                             onChange={(e) => handleDisposableChange("demolitionEstimate", parseFloat(e.target.value) || "")}
                             style={styles.input}
+                            onFocus={(e) => e.target.select()}
                             min="0"
                           />
                         </div>
@@ -2474,6 +2484,7 @@ const AssetStore = () => {
                             type="number"
                             value={disposableData.quantity}
                             onChange={(e) => handleDisposableChange("quantity", parseInt(e.target.value) || 0)}
+                            onFocus={(e) => e.target.select()}
                             max={availableQuantity}
                             min="0"
                             style={styles.input}
@@ -2496,22 +2507,23 @@ const AssetStore = () => {
                             type="number"
                             value={disposableData.bookValue}
                             onChange={(e) => handleDisposableChange("bookValue", parseFloat(e.target.value) || 0)}
+                            onFocus={(e) => e.target.select()}
                             style={styles.input}
                           />
                         </div>
                         <div style={styles.inputGroup}>
                           <label>Inspection Date:</label>
-                            <input 
-                            type="date" 
-                            value={disposableData.inspectionDate} 
-                            onChange={(e) => handleDisposableChange("inspectionDate", e.target.value)} 
-                            style={styles.input} 
-                            max={new Date().toISOString().split("T")[0]} 
-                            />
+                          <input
+                            type="date"
+                            value={disposableData.inspectionDate}
+                            onChange={(e) => handleDisposableChange("inspectionDate", e.target.value)}
+                            style={styles.input}
+                            max={new Date().toISOString().split("T")[0]}
+                          />
                         </div>
                         <div style={styles.inputGroup}>
                           <label>Condemnation Date:</label>
-                            <input type="date" value={disposableData.condemnationDate} onChange={(e) => handleDisposableChange("condemnationDate", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} />
+                          <input type="date" value={disposableData.condemnationDate} onChange={(e) => handleDisposableChange("condemnationDate", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} />
                         </div>
                       </div>
                       <div style={styles.formRow}>
@@ -2521,6 +2533,7 @@ const AssetStore = () => {
                             type="number"
                             value={disposableData.disposalValue}
                             onChange={(e) => handleDisposableChange("disposalValue", parseFloat(e.target.value) || 0)}
+                            onFocus={(e) => e.target.select()}
                             style={styles.input}
                           />
                         </div>
@@ -2615,6 +2628,7 @@ const AssetStore = () => {
                               type="number"
                               value={form.year}
                               onChange={(e) => handleUpgradeFormChange(index, "year", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               style={styles.input}
                             />
                           </div>
@@ -2624,6 +2638,7 @@ const AssetStore = () => {
                               type="number"
                               value={form.estimate}
                               onChange={(e) => handleUpgradeFormChange(index, "estimate", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               style={styles.input}
                             />
                           </div>
@@ -2633,6 +2648,7 @@ const AssetStore = () => {
                               type="number"
                               value={form.approvedEstimate}
                               onChange={(e) => handleUpgradeFormChange(index, "approvedEstimate", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               style={styles.input}
                             />
                           </div>
@@ -2721,38 +2737,117 @@ const AssetStore = () => {
 };
 
 const styles = {
-  menuBar: { width: "100%", backgroundColor: "#f4f4f4", padding: "10px 0", display: "flex", justifyContent: "center", gap: "20px", position: "fixed", top: "60px", left: "150px", zIndex: 1000, boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" },
-  container: { width: "100%", margin: "80px auto 20px", padding: "20px", borderRadius: "10px", boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)", backgroundColor: "#fff" },
-  tab: { padding: "10px 20px", border: "none", backgroundColor: "#ddd", cursor: "pointer", borderRadius: "5px", fontSize: "16px" },
-  activeTab: { padding: "10px 20px", border: "none", backgroundColor: "#007BFF", color: "#fff", cursor: "pointer", borderRadius: "5px", fontSize: "16px" },
-  formContainer: { display: "flex", flexDirection: "column", gap: "20px" },
-  formRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px" },
-  input: { padding: "8px", borderRadius: "5px", border: "1px solid #ddd", width: "100%" },
-  itemContainer: { border: "1px solid #ddd", padding: "15px", borderRadius: "5px", marginBottom: "20px" },
-  itemRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px", marginBottom: "15px" },
-  inputGroup: { display: "flex", flexDirection: "column" },
-  buttonContainer: { display: "flex", gap: "10px", justifyContent: "flex-start" },
-  button: { padding: "10px 20px", backgroundColor: "#007BFF", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" },
-  usernameContainer: { display: "flex", alignItems: "center", gap: "10px" },
-  userIcon: { fontSize: "30px", color: "#007BFF" },
-  username: { fontWeight: "bold", fontSize: "18px" },
-  checkboxContainer: { display: "flex", flexDirection: "column", maxHeight: "150px", overflowY: "auto", border: "1px solid #ddd", padding: "10px", borderRadius: "5px" },
-  checkboxLabel: { margin: "5px 0" },
-  tab: { padding: "10px 20px", border: "none", backgroundColor: "#ddd", cursor: "pointer", borderRadius: "5px", fontSize: "16px" },
-  activeTab: { padding: "10px 20px", border: "none", backgroundColor: "#007BFF", color: "#fff", cursor: "pointer", borderRadius: "5px", fontSize: "16px" },
-  formContainer: { display: "flex", flexDirection: "column", gap: "20px" },
-  formRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px" },
-  input: { padding: "8px", borderRadius: "5px", border: "1px solid #ddd", width: "100%" },
-  itemContainer: { border: "1px solid #ddd", padding: "15px", borderRadius: "5px", marginBottom: "20px" },
-  itemRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "15px", marginBottom: "15px" },
-  inputGroup: { display: "flex", flexDirection: "column" },
-  buttonContainer: { display: "flex", gap: "10px", justifyContent: "flex-start" },
-  button: { padding: "10px 20px", backgroundColor: "#007BFF", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" },
-  usernameContainer: { display: "flex", alignItems: "center", gap: "10px" },
-  userIcon: { fontSize: "30px", color: "#007BFF" },
-  username: { fontWeight: "bold", fontSize: "18px" },
-  checkboxContainer: { display: "flex", flexDirection: "column", maxHeight: "150px", overflowY: "auto", border: "1px solid #ddd", padding: "10px", borderRadius: "5px" },
-  checkboxLabel: { margin: "5px 0" },
+  menuBar: {
+    width: "100%",
+    backgroundColor: "#f4f4f4",
+    padding: "10px 0",
+    display: "flex",
+    justifyContent: "center",
+    gap: "20px",
+    position: "fixed",
+    top: "60px",
+    left: "150px",
+    zIndex: 1000,
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+  },
+  container: {
+    width: "100%",
+    margin: "80px auto 20px",
+    padding: "20px",
+    borderRadius: "10px",
+    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+    backgroundColor: "#fff",
+  },
+  tab: {
+    padding: "10px 20px",
+    border: "none",
+    backgroundColor: "#ddd",
+    cursor: "pointer",
+    borderRadius: "5px",
+    fontSize: "16px",
+  },
+  activeTab: {
+    padding: "10px 20px",
+    border: "none",
+    backgroundColor: "#007BFF",
+    color: "#fff",
+    cursor: "pointer",
+    borderRadius: "5px",
+    fontSize: "16px",
+  },
+  formContainer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+  },
+  formRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gap: "15px",
+  },
+  input: {
+    padding: "8px",
+    borderRadius: "5px",
+    border: "1px solid #ddd",
+    width: "100%",
+  },
+  itemContainer: {
+    border: "1px solid #ddd",
+    padding: "15px",
+    borderRadius: "5px",
+    marginBottom: "20px",
+  },
+  itemRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gap: "15px",
+    marginBottom: "15px",
+  },
+  inputGroup: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  buttonContainer: {
+    display: "flex",
+    gap: "10px",
+    justifyContent: "flex-start",
+  },
+  button: {
+    padding: "10px 20px",
+    backgroundColor: "#007BFF",
+    color: "#fff",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+  },
+  usernameContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  userIcon: {
+    fontSize: "30px",
+    color: "#007BFF",
+  },
+  username: {
+    fontWeight: "bold",
+    fontSize: "18px",
+  },
+  checkboxContainer: {
+    display: "flex",
+    flexDirection: "column",
+    maxHeight: "150px",
+    overflowY: "auto",
+    border: "1px solid #ddd",
+    padding: "10px",
+    borderRadius: "5px",
+  },
+  checkboxLabel: {
+    margin: "5px 0",
+  },
   cardContainer: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
@@ -2829,11 +2924,27 @@ const styles = {
   },
   tableContainer: {
     marginTop: "20px",
-  }, tableContainer: { marginTop: "20px", overflowX: "auto" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: "600px" },
-  tableHeader: { backgroundColor: "#007BFF", color: "#fff", padding: "10px", textAlign: "left", borderBottom: "2px solid #ddd" },
-  tableRow: { borderBottom: "1px solid #ddd" },
-  tableCell: { padding: "10px", textAlign: "left" },
+    overflowX: "auto",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "600px",
+  },
+  tableHeader: {
+    backgroundColor: "#007BFF",
+    color: "#fff",
+    padding: "10px",
+    textAlign: "left",
+    borderBottom: "2px solid #ddd",
+  },
+  tableRow: {
+    borderBottom: "1px solid #ddd",
+  },
+  tableCell: {
+    padding: "10px",
+    textAlign: "left",
+  },
 };
 
 export default AssetStore;

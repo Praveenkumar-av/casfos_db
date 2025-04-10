@@ -36,6 +36,7 @@ exports.saveMaintenanceTemp = async (req, res) => {
   try {
     const {
       assetType,
+      subCategory,
       assetCategory,
       buildingNo,
       yearOfMaintenance,
@@ -49,6 +50,7 @@ exports.saveMaintenanceTemp = async (req, res) => {
     const newTempMaintenance = new TempBuildingMaintenance({
       assetType,
       assetCategory,
+      subCategory,
       buildingNo,
       yearOfMaintenance,
       cost,
@@ -91,6 +93,7 @@ exports.approveOrRejectMaintenance = async (req, res) => {
       const newMaintenance = new BuildingMaintenance({
         assetType: tempMaintenance.assetType,
         assetCategory: tempMaintenance.assetCategory,
+        subCategory: tempMaintenance.subCategory,
         buildingNo: tempMaintenance.buildingNo,
         yearOfMaintenance: tempMaintenance.yearOfMaintenance,
         cost: tempMaintenance.cost,
@@ -106,7 +109,7 @@ exports.approveOrRejectMaintenance = async (req, res) => {
         {
           assetType: tempMaintenance.assetType,
           assetCategory: tempMaintenance.assetCategory,
-          subCategory: tempMaintenance.buildingNo,
+          subCategory: tempMaintenance.subCategory,
           location: tempMaintenance.custody,
         },
         "building maintenance approved",
@@ -119,7 +122,8 @@ exports.approveOrRejectMaintenance = async (req, res) => {
       const rejectedMaintenance = new RejectedAsset({
         assetType: tempMaintenance.assetType,
         assetCategory: tempMaintenance.assetCategory,
-        subCategory: tempMaintenance.buildingNo,
+        subCategory: tempMaintenance.subCategory,
+        buildingNo: tempMaintenance.buildingNo,
         location: tempMaintenance.custody,
         entryDate: tempMaintenance.createdAt,
         rejectionRemarks: rejectionRemarks || "No remarks provided",
@@ -141,7 +145,7 @@ exports.approveOrRejectMaintenance = async (req, res) => {
         {
           assetType: tempMaintenance.assetType,
           assetCategory: tempMaintenance.assetCategory,
-          subCategory: tempMaintenance.buildingNo,
+          subCategory: tempMaintenance.subCategory,
           location: tempMaintenance.custody,
           rejectionRemarks,
           rejectedAssetId: savedRejected._id,
@@ -2519,6 +2523,7 @@ exports.disposeAsset = async (req, res) => {
       const disposedAssetData = {
         assetType: asset.assetType,
         assetCategory: asset.assetCategory,
+        subCategory:asset.subCategory,
         condemnationYear: asset.condemnationYear,
         certificateObtained: asset.certificateObtained,
         authority: asset.authority,
@@ -3163,6 +3168,7 @@ exports.filterServiceReturn = async (req, res) => {
       serviceNo,
       serviceAmountFrom,
       serviceAmountTo,
+      buildingNo, // New filter for building number
     } = req.body;
 
     let query = {};
@@ -3173,6 +3179,7 @@ exports.filterServiceReturn = async (req, res) => {
     if (location) query.location = { $regex: location, $options: "i" };
 
     let result = [];
+    let buildingMaintenanceResult = [];
 
     if (condition === "InService") {
       query.status = "service";
@@ -3191,11 +3198,7 @@ exports.filterServiceReturn = async (req, res) => {
         servicedRejectionRemarks: asset.servicedRejectionRemarks,
       }));
     } else if (condition === "Serviced") {
-      let serviceQuery = {};
-      if (assetType) serviceQuery.assetType = { $regex: assetType, $options: "i" };
-      if (assetCategory) serviceQuery.assetCategory = { $regex: assetCategory, $options: "i" };
-      if (subCategory) serviceQuery.subCategory = { $regex: subCategory, $options: "i" };
-      if (itemName) serviceQuery.itemName = { $regex: itemName, $options: "i" };
+      let serviceQuery = { ...query };
       if (serviceNo) serviceQuery.serviceNo = { $regex: serviceNo, $options: "i" };
       if (serviceDateFrom || serviceDateTo) {
         serviceQuery.serviceDate = {};
@@ -3263,7 +3266,7 @@ exports.filterServiceReturn = async (req, res) => {
         remark: asset.remark,
       }));
     } else {
-      // All conditions except "dispose"
+      // All conditions except "dispose" (including Serviced)
       const returnedPermanent = await ReturnedPermanent.find({
         ...query,
         status: { $ne: "dispose" },
@@ -3273,6 +3276,7 @@ exports.filterServiceReturn = async (req, res) => {
         status: { $ne: "dispose" },
       });
       const exchangedConsumable = await ExchangedConsumable.find(query);
+      const servicedAssets = await ServicedAsset.find(query);
 
       result = [
         ...returnedPermanent.map((asset) => ({
@@ -3314,16 +3318,57 @@ exports.filterServiceReturn = async (req, res) => {
           exchangeDate: asset.exchangeDate,
           remark: asset.remark,
         })),
+        ...servicedAssets.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory,
+          itemName: asset.itemName,
+          location: "N/A",
+          condition: "Serviced",
+          itemIds: asset.itemIds || [],
+          serviceNo: asset.serviceNo,
+          serviceDate: asset.serviceDate,
+          serviceAmount: asset.serviceAmount,
+        })),
       ];
     }
 
-    res.status(200).json(result);
+    // Fetch building maintenance data if assetCategory is "Building"
+    if (assetCategory === "Building") {
+      let buildingQuery = { assetCategory: "Building" };
+      if (subCategory) buildingQuery.subCategory = { $regex: subCategory, $options: "i" };
+      if (buildingNo) buildingQuery.buildingNo = { $regex: buildingNo, $options: "i" };
+      if (serviceDateFrom || serviceDateTo) {
+        buildingQuery.yearOfMaintenance = {};
+        if (serviceDateFrom) buildingQuery.yearOfMaintenance.$gte = new Date(serviceDateFrom);
+        if (serviceDateTo) buildingQuery.yearOfMaintenance.$lte = new Date(serviceDateTo);
+      }
+      if (serviceAmountFrom || serviceAmountTo) {
+        buildingQuery.cost = {};
+        if (serviceAmountFrom) buildingQuery.cost.$gte = Number(serviceAmountFrom);
+        if (serviceAmountTo) buildingQuery.cost.$lte = Number(serviceAmountTo);
+      }
+
+      const buildingMaintenance = await BuildingMaintenance.find(buildingQuery);
+      buildingMaintenanceResult = buildingMaintenance.map((building) => ({
+        assetType: building.assetType,
+        assetCategory: building.assetCategory,
+        subCategory: building.subCategory,
+        buildingNo: building.buildingNo,
+        yearOfMaintenance: building.yearOfMaintenance,
+        cost: building.cost,
+        description: building.description,
+        custody: building.custody,
+        agency: building.agency,
+      }));
+    }
+
+    res.status(200).json({ serviceReturn: result, buildingMaintenance: buildingMaintenanceResult });
   } catch (error) {
     console.error("Error filtering service/return assets:", error);
     res.status(500).json({ message: "Error filtering service/return assets", error: error.message });
   }
 };
-
 exports.filterDisposal = async (req, res) => {
   try {
     const {
@@ -3378,7 +3423,15 @@ exports.filterDisposal = async (req, res) => {
     }
 
     const assets = await DisposedAsset.find(query);
-    res.status(200).json(assets);
+
+    // Separate building and non-building assets
+    const disposalData = assets.filter((asset) => asset.assetCategory !== "Building");
+    const buildingCondemnationData = assets.filter((asset) => asset.assetCategory === "Building");
+
+    res.status(200).json({
+      disposal: disposalData,
+      buildingCondemnation: buildingCondemnationData,
+    });
   } catch (error) {
     console.error("Error filtering disposal assets:", error);
     res.status(500).json({ message: "Error filtering disposal assets" });

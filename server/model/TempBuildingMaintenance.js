@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const tempBuildingMaintenanceSchema = new mongoose.Schema({
   assetType: { type: String, required: true, enum: ["Permanent"] },
+  subCategory: { type: String },
   assetCategory: { type: String, required: true, default: "Building" },
   buildingNo: { type: String, required: true },
   yearOfMaintenance: { type: Date, required: true },

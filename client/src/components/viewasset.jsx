@@ -12,7 +12,9 @@ const AssetView = () => {
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [buildingCondemnationData, setBuildingCondemnationData] = useState([]); // For building condemnation data
   const [activeTab, setActiveTab] = useState("purchase");
+  const [buildingMaintenanceData, setBuildingMaintenanceData] = useState([]); // For building maintenance data
   const [purchaseFilters, setPurchaseFilters] = useState({
     assetType: "",
     customAssetType: "",
@@ -62,6 +64,7 @@ const AssetView = () => {
     serviceNo: "",
     serviceAmountFrom: "",
     serviceAmountTo: "",
+    buildingNo: "", // New filter for building number
   });
   const [disposalFilters, setDisposalFilters] = useState({
     assetType: "",
@@ -205,6 +208,7 @@ const AssetView = () => {
             assetType: serviceReturnFilters.assetType === "Others" ? serviceReturnFilters.customAssetType : serviceReturnFilters.assetType,
             assetCategory: serviceReturnFilters.assetCategory === "Others" ? serviceReturnFilters.customAssetCategory : serviceReturnFilters.assetCategory,
             subCategory: serviceReturnFilters.subCategory === "Others" ? serviceReturnFilters.customSubCategory : serviceReturnFilters.subCategory,
+            buildingNo: serviceReturnFilters.buildingNo, // Include new filter
           };
           break;
         case "disposal":
@@ -240,10 +244,32 @@ const AssetView = () => {
 
       try {
         const response = await axios.post(`http://localhost:3001${endpoint}`, filters);
-        setTableData(response.data);
-        setMessage(response.data.length === 0 ? "No matching records found." : "");
+        if (activeTab === "serviceReturn") {
+          setTableData(response.data.serviceReturn || []);
+          setBuildingMaintenanceData(response.data.buildingMaintenance || []);
+          setMessage(
+            response.data.serviceReturn.length === 0 && response.data.buildingMaintenance.length === 0
+              ? "No matching records found."
+              : ""
+          );
+        } else if (activeTab === "disposal") {
+          setTableData(response.data.disposal || []);
+          setBuildingCondemnationData(response.data.buildingCondemnation || []);
+          setMessage(
+            response.data.disposal.length === 0 && response.data.buildingCondemnation.length === 0
+              ? "No matching records found."
+              : ""
+          );
+        } else {
+          setTableData(response.data);
+          setBuildingMaintenanceData([]); // Clear building maintenance data for other tabs
+          setBuildingCondemnationData([]); // Clear building condemnation data for other tabs
+          setMessage(response.data.length === 0 ? "No matching records found." : "");
+        }
       } catch (error) {
         setTableData([]);
+        setBuildingMaintenanceData([]);
+        setBuildingCondemnationData([]);
         setMessage("Error fetching data.");
         console.error(error);
       }
@@ -389,38 +415,38 @@ const AssetView = () => {
   const generatePDF = async () => {
     const pdf = new jsPDF("l", "mm", "a3");
     const pageWidth = pdf.internal.pageSize.getWidth();
-
+  
     let logoBase64;
     try {
       logoBase64 = await getBase64ImageFromUrl("images/CASFOS-Coimbatore.jpg");
     } catch (error) {
       console.error("Error loading logo image", error);
     }
-
+  
     const logoWidth = 50;
     const logoHeight = 50;
     const logoX = 10;
     const logoY = 10;
-
+  
     if (logoBase64) {
       pdf.addImage(logoBase64, "PNG", logoX, logoY, logoWidth, logoHeight);
     }
-
+  
     const titleX = pageWidth / 2;
     const titleY = logoY + logoHeight / 2;
-
+  
     pdf.setFontSize(30);
     pdf.setFont("helvetica", "bold");
     pdf.text("Central Academy for State Forest Service", titleX, titleY, { align: "center" });
-
+  
     const currentDateTime = new Date();
     const dateString = currentDateTime.toLocaleDateString();
     const timeString = currentDateTime.toLocaleTimeString();
-
+  
     pdf.setFontSize(17);
     pdf.text(`Date: ${dateString}`, pageWidth - 60, logoY + 20);
     pdf.text(`Time: ${timeString}`, pageWidth - 60, logoY + 30);
-
+  
     const assetReportY = logoY + logoHeight + 20;
     pdf.setFontSize(27);
     pdf.text(
@@ -429,11 +455,9 @@ const AssetView = () => {
       assetReportY,
       { align: "center" }
     );
-    const tableColumn = [];
-    const tableRows = [];
-
+  
     if (activeTab === "purchase") {
-      tableColumn.push([
+      const tableColumn = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -442,11 +466,11 @@ const AssetView = () => {
         "Quantity Received",
         "Overall Price",
         "Details",
-      ]);
-      tableData.forEach((row) => {
+      ];
+      const tableRows = tableData.map((row) => {
         const details = [
           `Bill No: ${row.billNo || "N/A"}`,
-          `Supplier Name: ${row.supplierName || "N/A"}`, // Moved to details
+          `Supplier Name: ${row.supplierName || "N/A"}`,
           `Supplier Address: ${row.supplierAddress || "N/A"}`,
           `Source: ${row.source || "N/A"}`,
           `Mode of Purchase: ${row.modeOfPurchase || "N/A"}`,
@@ -460,8 +484,8 @@ const AssetView = () => {
           `Warranty Valid Upto: ${row.warrantyValidUpto ? new Date(row.warrantyValidUpto).toLocaleDateString() : "N/A"}`,
           `Item IDs: ${(row.itemIds || []).join(", ") || "N/A"}`,
         ].join("\n");
-
-        tableRows.push([
+  
+        return [
           row.assetType,
           row.assetCategory,
           row.subCategory,
@@ -470,22 +494,52 @@ const AssetView = () => {
           row.quantityReceived,
           row.overallPrice,
           details,
-        ]);
+        ];
+      });
+  
+      pdf.setFontSize(14);
+      if (totalCost.serviceCost) {
+        pdf.text(`Total Purchase Cost: ₹${totalCost.serviceCost}`, pageWidth - 60, assetReportY + 10);
+      }
+  
+      pdf.autoTable({
+        startY: totalCost.serviceCost ? assetReportY + 20 : assetReportY + 10,
+        head: [tableColumn],
+        body: tableRows,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: { 7: { cellWidth: 50 } }, // Wider column for "Details"
+        margin: { left: 10, right: 10 },
       });
     } else if (activeTab === "storeIssue" && storeIssueFilters.location === "store") {
-      tableColumn.push(["Asset Category", "Sub Category", "Item Name", "Item Description", "In Stock", "Item IDs"]);
-      tableData.forEach((row) => {
-        tableRows.push([
-          row.assetCategory,
-          row.subCategory,
-          row.itemName,
-          row.itemDescription,
-          row.inStock,
-          row.itemIds?.join(", ") || "",
-        ]);
+      const tableColumn = ["Asset Category", "Sub Category", "Item Name", "Item Description", "In Stock", "Item IDs"];
+      const tableRows = tableData.map((row) => [
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        row.itemDescription,
+        row.inStock,
+        row.itemIds?.join(", ") || "",
+      ]);
+  
+      pdf.autoTable({
+        startY: assetReportY + 10,
+        head: [tableColumn],
+        body: tableRows,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: tableColumn.reduce((acc, col, index) => {
+          acc[index] = { cellWidth: 40 };
+          return acc;
+        }, {}),
+        margin: { left: 10, right: 10 },
       });
     } else if (activeTab === "storeIssue" && storeIssueFilters.location !== "store") {
-      tableColumn.push([
+      const tableColumn = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -495,22 +549,49 @@ const AssetView = () => {
         "Quantity Issued",
         "Issued Date",
         "Issued IDs",
+      ];
+      const tableRows = tableData.map((row) => [
+        row.assetType,
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        row.itemDescription,
+        row.location,
+        row.quantityIssued,
+        row.issuedDate ? new Date(row.issuedDate).toLocaleDateString() : "N/A",
+        row.issuedIds?.join(", ") || "",
       ]);
-      tableData.forEach((row) => {
-        tableRows.push([
-          row.assetType,
-          row.assetCategory,
-          row.subCategory,
-          row.itemName,
-          row.itemDescription,
-          row.location,
-          row.quantityIssued,
-          row.issuedDate ? new Date(row.issuedDate).toLocaleDateString() : "N/A",
-          row.issuedIds?.join(", ") || "",
-        ]);
+  
+      pdf.autoTable({
+        startY: assetReportY + 10,
+        head: [tableColumn],
+        body: tableRows,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: tableColumn.reduce((acc, col, index) => {
+          acc[index] = { cellWidth: 40 };
+          return acc;
+        }, {}),
+        margin: { left: 10, right: 10 },
       });
     } else if (activeTab === "serviceReturn") {
-      tableColumn.push([
+      let startY = assetReportY + 10;
+      if (totalCost.serviceCost || totalCost.maintenanceCost) {
+        pdf.setFontSize(14);
+        pdf.setTextColor(0, 0, 0);
+        if (totalCost.serviceCost) {
+          pdf.text(`Total Service Cost: ₹${totalCost.serviceCost}`, pageWidth - 60, startY);
+          startY += 10;
+        }
+        if (totalCost.maintenanceCost) {
+          pdf.text(`Total Maintenance Cost: ₹${totalCost.maintenanceCost}`, pageWidth - 60, startY);
+          startY += 10;
+        }
+      }
+  
+      const tableColumn = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -520,12 +601,12 @@ const AssetView = () => {
         ...(serviceReturnFilters.condition === "InService"
           ? ["Item ID"]
           : serviceReturnFilters.condition === "Exchanged"
-            ? ["Returned Quantity"]
-            : ["Item IDs", "Service No", "Service Date", "Service Amount"]),
-      ]);
-      tableData.forEach((row) => {
+          ? ["Returned Quantity"]
+          : ["Item IDs", "Service No", "Service Date", "Service Amount"]),
+      ];
+      const tableRows = tableData.map((row) => {
         if (serviceReturnFilters.condition === "InService") {
-          tableRows.push([
+          return [
             row.assetType,
             row.assetCategory,
             row.subCategory,
@@ -533,9 +614,9 @@ const AssetView = () => {
             row.location || "N/A",
             row.condition,
             row.itemId || "N/A",
-          ]);
+          ];
         } else if (serviceReturnFilters.condition === "Exchanged") {
-          tableRows.push([
+          return [
             row.assetType,
             row.assetCategory,
             row.subCategory,
@@ -543,9 +624,9 @@ const AssetView = () => {
             row.location || "N/A",
             row.condition,
             row.returnedQuantity || "N/A",
-          ]);
+          ];
         } else {
-          tableRows.push([
+          return [
             row.assetType,
             row.assetCategory,
             row.subCategory,
@@ -556,11 +637,87 @@ const AssetView = () => {
             row.serviceNo || "N/A",
             row.serviceDate ? new Date(row.serviceDate).toLocaleDateString() : "N/A",
             row.serviceAmount || "N/A",
-          ]);
+          ];
         }
       });
+  
+      pdf.autoTable({
+        startY: startY + 10,
+        head: [tableColumn],
+        body: tableRows,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: tableColumn.reduce((acc, col, index) => {
+          acc[index] = { cellWidth: 40 };
+          return acc;
+        }, {}),
+        margin: { left: 10, right: 10 },
+      });
+  
+      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0) {
+        const buildingTableColumn = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Building No",
+          "Year of Maintenance",
+          "Cost",
+          "Description",
+          "Custody",
+          "Agency",
+        ];
+        const buildingTableRows = buildingMaintenanceData.map((row) => [
+          row.assetType,
+          row.assetCategory,
+          row.subCategory,
+          row.buildingNo,
+          new Date(row.yearOfMaintenance).toLocaleDateString(),
+          row.cost,
+          row.description,
+          row.custody,
+          row.agency,
+        ]);
+  
+        pdf.addPage();
+        pdf.setFontSize(27);
+        pdf.text("Building Maintenance Records", pageWidth / 2, 20, { align: "center" });
+        if (totalCost.maintenanceCost) {
+          pdf.setFontSize(14);
+          pdf.text(`Total Maintenance Cost: ₹${totalCost.maintenanceCost}`, pageWidth - 60, 30);
+        }
+        pdf.autoTable({
+          startY: totalCost.maintenanceCost ? 40 : 30,
+          head: [buildingTableColumn],
+          body: buildingTableRows,
+          theme: "grid",
+          styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+          headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+          alternateRowStyles: { fillColor: [240, 240, 240] },
+          columnStyles: buildingTableColumn.reduce((acc, col, index) => {
+            acc[index] = { cellWidth: 40 };
+            return acc;
+          }, {}),
+          margin: { left: 10, right: 10 },
+        });
+      }
     } else if (activeTab === "disposal") {
-      tableColumn.push([
+      let startY = assetReportY + 10;
+      if (totalCost.serviceCost || totalCost.demolitionEstimate) {
+        pdf.setFontSize(14);
+        pdf.setTextColor(0, 0, 0);
+        if (totalCost.serviceCost) {
+          pdf.text(`Total Disposal Value: ₹${totalCost.serviceCost}`, pageWidth - 60, startY);
+          startY += 10;
+        }
+        if (totalCost.demolitionEstimate) {
+          pdf.text(`Total Demolition Estimate: ₹${totalCost.demolitionEstimate}`, pageWidth - 60, startY);
+          startY += 10;
+        }
+      }
+  
+      const tableColumn = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -572,29 +729,95 @@ const AssetView = () => {
         "Condemnation Date",
         "Remark",
         "Disposal Value",
+      ];
+      const tableRows = tableData.map((row) => [
+        row.assetType,
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        row.itemIds?.join(", ") || "",
+        row.purchaseValue,
+        row.bookValue,
+        new Date(row.inspectionDate).toLocaleDateString(),
+        new Date(row.condemnationDate).toLocaleDateString(),
+        row.remark,
+        row.disposalValue,
       ]);
-      tableData.forEach((row) => {
-        tableRows.push([
+  
+      pdf.autoTable({
+        startY: startY + 10,
+        head: [tableColumn],
+        body: tableRows,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: tableColumn.reduce((acc, col, index) => {
+          acc[index] = { cellWidth: 40 };
+          return acc;
+        }, {}),
+        margin: { left: 10, right: 10 },
+      });
+  
+      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0) {
+        const buildingTableColumn = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Condemnation Year",
+          "Certificate Obtained",
+          "Authority",
+          "Date of Reference",
+          "Agency",
+          "Agency Reference Number",
+          "Date",
+          "Demolition Period",
+          "Demolition Estimate",
+        ];
+        const buildingTableRows = buildingCondemnationData.map((row) => [
           row.assetType,
           row.assetCategory,
           row.subCategory,
-          row.itemName,
-          row.itemIds?.join(", ") || "",
-          row.purchaseValue,
-          row.bookValue,
-          new Date(row.inspectionDate).toLocaleDateString(),
-          new Date(row.condemnationDate).toLocaleDateString(),
-          row.remark,
-          row.disposalValue,
+          row.condemnationYear,
+          row.certificateObtained || "N/A",
+          row.authority || "N/A",
+          row.dateOfReferenceUrl || "N/A",
+          row.agency || "N/A",
+          row.agencyReferenceNumberUrl || "N/A",
+          row.date ? new Date(row.date).toLocaleDateString() : "N/A",
+          row.demolitionPeriod || "N/A",
+          row.demolitionEstimate || "N/A",
         ]);
-      });
+  
+        pdf.addPage();
+        pdf.setFontSize(27);
+        pdf.text("Building Condemnation Records", pageWidth / 2, 20, { align: "center" });
+        if (totalCost.demolitionEstimate) {
+          pdf.setFontSize(14);
+          pdf.text(`Total Demolition Estimate: ₹${totalCost.demolitionEstimate}`, pageWidth - 60, 30);
+        }
+        pdf.autoTable({
+          startY: totalCost.demolitionEstimate ? 40 : 30,
+          head: [buildingTableColumn],
+          body: buildingTableRows,
+          theme: "grid",
+          styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+          headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+          alternateRowStyles: { fillColor: [240, 240, 240] },
+          columnStyles: buildingTableColumn.reduce((acc, col, index) => {
+            acc[index] = { cellWidth: 40 };
+            return acc;
+          }, {}),
+          margin: { left: 10, right: 10 },
+        });
+      }
     } else if (activeTab === "deadStock") {
-      tableColumn.push([
+      const tableColumn = [
         "S.No",
         "Article Type",
         "Article Category",
         "Article Sub Category",
-        "Article Name", // Added
+        "Article Name",
         "No. of Articles Serviceable",
         "No. of Articles Condemned",
         "Balance",
@@ -602,73 +825,48 @@ const AssetView = () => {
         "Reason for Condemnation",
         "Initial",
         "Remarks",
-      ]);
-      tableData.forEach((row, index) => {
+      ];
+      const tableRows = tableData.map((row, index) => {
         const balance = row.overallQuantity - row.servicableQuantity - row.condemnedQuantity;
-        tableRows.push([
-          index + 1, // S.No
+        return [
+          index + 1,
           row.assetType,
           row.assetCategory,
           row.assetSubCategory,
-          row.itemName, // Added
+          row.itemName,
           row.servicableQuantity,
           row.condemnedQuantity,
-          balance >= 0 ? balance : 0, // Ensure balance is non-negative
+          balance >= 0 ? balance : 0,
           row.methodOfDisposal,
           row.remarks || "N/A",
-          "", // Initial (empty)
-          "", // Remarks (empty)
-        ]);
+          "",
+          "",
+        ];
+      });
+  
+      pdf.autoTable({
+        startY: assetReportY + 10,
+        head: [tableColumn],
+        body: tableRows,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
+        headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: tableColumn.reduce((acc, col, index) => {
+          acc[index] = { cellWidth: 40 };
+          return acc;
+        }, {}),
+        margin: { left: 10, right: 10 },
       });
     }
-
-    const columnStyles = tableColumn[0].reduce((acc, col, index) => {
-      acc[index] = { cellWidth: activeTab === "purchase" ? 50 : 40 }; // Increased width for purchase tab
-      return acc;
-    }, {});
-
-    // Calculate total table width
-    const totalTableWidth = tableColumn[0].length * 40; // 11 columns * 40 mm = 440 mm
-    let marginLeft = (pageWidth - totalTableWidth) / 2;
-
-    // Ensure table fits within page width
-    if (totalTableWidth > pageWidth) {
-      const adjustedCellWidth = pageWidth / tableColumn[0].length; // e.g., 420 / 11 ≈ 38.18 mm
-      Object.keys(columnStyles).forEach((key) => {
-        columnStyles[key].cellWidth = adjustedCellWidth;
-      });
-      marginLeft = 0; // No margin if table spans full width
-    } else {
-      marginLeft = Math.max(marginLeft, 10); // Minimum 10 mm margin
-    }
-
-    console.log(`Page Width: ${pageWidth}, Table Width: ${totalTableWidth}, Margin Left: ${marginLeft}`);
-
-    pdf.autoTable({
-      startY: assetReportY + 10,
-      head: tableColumn,
-      body: tableRows,
-      theme: "grid",
-      styles: {
-        fontSize: 10,
-        cellPadding: 4,
-        overflow: "linebreak",
-        halign: "left",
-      },
-      headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
-      alternateRowStyles: { fillColor: [240, 240, 240] },
-      columnStyles,
-      margin: { left: 10, right: 10 },
-    });
+  
     pdf.save(`${activeTab === "deadStock" ? "dead_stock_register" : activeTab}_asset_report.pdf`);
   };
-
   const generateExcel = () => {
-    const headers = [];
-    const data = [];
-
+    const wb = XLSX.utils.book_new();
+  
     if (activeTab === "purchase") {
-      headers.push([
+      const headers = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -677,26 +875,56 @@ const AssetView = () => {
         "Supplier Name",
         "Quantity Received",
         "Overall Price",
+      ];
+      const data = tableData.map((row) => [
+        row.assetType,
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        new Date(row.purchaseDate).toLocaleDateString(),
+        row.supplierName,
+        row.quantityReceived,
+        row.overallPrice,
       ]);
-      tableData.forEach((row) => {
-        data.push([
-          row.assetType,
-          row.assetCategory,
-          row.subCategory,
-          row.itemName,
-          new Date(row.purchaseDate).toLocaleDateString(),
-          row.supplierName,
-          row.quantityReceived,
-          row.overallPrice,
-        ]);
+  
+      const wsData = [];
+      if (totalCost.serviceCost) {
+        wsData.push(["Total Purchase Cost", `₹${totalCost.serviceCost}`]);
+        wsData.push([]); // Empty row for spacing
+      }
+      wsData.push(headers, ...data);
+  
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = headers.map((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+        );
+        return { wch: Math.min(maxLength + 5, 50) };
       });
+      XLSX.utils.book_append_sheet(wb, ws, "Purchase Assets");
     } else if (activeTab === "storeIssue" && storeIssueFilters.location === "store") {
-      headers.push(["Asset Category", "Sub Category", "Item Name", "Item Description", "In Stock", "Item IDs"]);
-      tableData.forEach((row) => {
-        data.push([row.assetCategory, row.subCategory, row.itemName, row.itemDescription, row.inStock, row.itemIds?.join(", ") || ""]);
+      const headers = ["Asset Category", "Sub Category", "Item Name", "Item Description", "In Stock", "Item IDs"];
+      const data = tableData.map((row) => [
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        row.itemDescription,
+        row.inStock,
+        row.itemIds?.join(", ") || "",
+      ]);
+  
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      ws["!cols"] = headers.map((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+        );
+        return { wch: Math.min(maxLength + 5, 50) };
       });
+      XLSX.utils.book_append_sheet(wb, ws, "Store Assets");
     } else if (activeTab === "storeIssue" && storeIssueFilters.location !== "store") {
-      headers.push([
+      const headers = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -706,22 +934,30 @@ const AssetView = () => {
         "Quantity Issued",
         "Issued Date",
         "Issued IDs",
+      ];
+      const data = tableData.map((row) => [
+        row.assetType,
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        row.itemDescription,
+        row.location,
+        row.quantityIssued,
+        row.issuedDate ? new Date(row.issuedDate).toLocaleDateString() : "N/A",
+        row.issuedIds?.join(", ") || "",
       ]);
-      tableData.forEach((row) => {
-        data.push([
-          row.assetType,
-          row.assetCategory,
-          row.subCategory,
-          row.itemName,
-          row.itemDescription,
-          row.location,
-          row.quantityIssued,
-          row.issuedDate ? new Date(row.issuedDate).toLocaleDateString() : "N/A",
-          row.issuedIds?.join(", ") || "",
-        ]);
+  
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      ws["!cols"] = headers.map((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+        );
+        return { wch: Math.min(maxLength + 5, 50) };
       });
+      XLSX.utils.book_append_sheet(wb, ws, "Issued Assets");
     } else if (activeTab === "serviceReturn") {
-      headers.push([
+      const headers = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -731,12 +967,12 @@ const AssetView = () => {
         ...(serviceReturnFilters.condition === "InService"
           ? ["Item ID"]
           : serviceReturnFilters.condition === "Exchanged"
-            ? ["Returned Quantity"]
-            : ["Item IDs", "Service No", "Service Date", "Service Amount"]),
-      ]);
-      tableData.forEach((row) => {
+          ? ["Returned Quantity"]
+          : ["Item IDs", "Service No", "Service Date", "Service Amount"]),
+      ];
+      const data = tableData.map((row) => {
         if (serviceReturnFilters.condition === "InService") {
-          data.push([
+          return [
             row.assetType,
             row.assetCategory,
             row.subCategory,
@@ -744,9 +980,9 @@ const AssetView = () => {
             row.location || "N/A",
             row.condition,
             row.itemId || "N/A",
-          ]);
+          ];
         } else if (serviceReturnFilters.condition === "Exchanged") {
-          data.push([
+          return [
             row.assetType,
             row.assetCategory,
             row.subCategory,
@@ -754,9 +990,9 @@ const AssetView = () => {
             row.location || "N/A",
             row.condition,
             row.returnedQuantity || "N/A",
-          ]);
+          ];
         } else {
-          data.push([
+          return [
             row.assetType,
             row.assetCategory,
             row.subCategory,
@@ -767,11 +1003,75 @@ const AssetView = () => {
             row.serviceNo || "N/A",
             row.serviceDate ? new Date(row.serviceDate).toLocaleDateString() : "N/A",
             row.serviceAmount || "N/A",
-          ]);
+          ];
         }
       });
+  
+      const wsData = [];
+      if (totalCost.serviceCost) {
+        wsData.push(["Total Service Cost", `₹${totalCost.serviceCost}`]);
+      }
+      if (totalCost.maintenanceCost) {
+        wsData.push(["Total Maintenance Cost", `₹${totalCost.maintenanceCost}`]);
+      }
+      if (wsData.length > 0) {
+        wsData.push([]); // Empty row for spacing
+      }
+      wsData.push(headers, ...data);
+  
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = headers.map((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+        );
+        return { wch: Math.min(maxLength + 5, 50) };
+      });
+      XLSX.utils.book_append_sheet(wb, ws, "ServiceReturn Assets");
+  
+      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0) {
+        const buildingHeaders = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Building No",
+          "Year of Maintenance",
+          "Cost",
+          "Description",
+          "Custody",
+          "Agency",
+        ];
+        const buildingData = buildingMaintenanceData.map((row) => [
+          row.assetType,
+          row.assetCategory,
+          row.subCategory,
+          row.buildingNo,
+          new Date(row.yearOfMaintenance).toLocaleDateString(),
+          row.cost,
+          row.description,
+          row.custody,
+          row.agency,
+        ]);
+  
+        const buildingWsData = [];
+        if (totalCost.maintenanceCost) {
+          buildingWsData.push(["Total Maintenance Cost", `₹${totalCost.maintenanceCost}`]);
+          buildingWsData.push([]); // Empty row for spacing
+        }
+        buildingWsData.push(buildingHeaders, ...buildingData);
+  
+        const buildingWs = XLSX.utils.aoa_to_sheet(buildingWsData);
+        buildingWs["!cols"] = buildingHeaders.map((header, index) => {
+          const maxLength = Math.max(
+            header.length,
+            ...buildingData.map((row) => (row[index] ? row[index].toString().length : 0))
+          );
+          return { wch: Math.min(maxLength + 5, 50) };
+        });
+        XLSX.utils.book_append_sheet(wb, buildingWs, "Building Maintenance");
+      }
     } else if (activeTab === "disposal") {
-      headers.push([
+      const headers = [
         "Asset Type",
         "Asset Category",
         "Sub Category",
@@ -783,28 +1083,97 @@ const AssetView = () => {
         "Condemnation Date",
         "Remark",
         "Disposal Value",
+      ];
+      const data = tableData.map((row) => [
+        row.assetType,
+        row.assetCategory,
+        row.subCategory,
+        row.itemName,
+        row.itemIds?.join(", ") || "",
+        row.purchaseValue,
+        row.bookValue,
+        new Date(row.inspectionDate).toLocaleDateString(),
+        new Date(row.condemnationDate).toLocaleDateString(),
+        row.remark,
+        row.disposalValue,
       ]);
-      tableData.forEach((row) => {
-        data.push([
+  
+      const wsData = [];
+      if (totalCost.serviceCost) {
+        wsData.push(["Total Disposal Value", `₹${totalCost.serviceCost}`]);
+      }
+      if (totalCost.demolitionEstimate) {
+        wsData.push(["Total Demolition Estimate", `₹${totalCost.demolitionEstimate}`]);
+      }
+      if (wsData.length > 0) {
+        wsData.push([]); // Empty row for spacing
+      }
+      wsData.push(headers, ...data);
+  
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = headers.map((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+        );
+        return { wch: Math.min(maxLength + 5, 50) };
+      });
+      XLSX.utils.book_append_sheet(wb, ws, "Disposal Assets");
+  
+      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0) {
+        const buildingHeaders = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Condemnation Year",
+          "Certificate Obtained",
+          "Authority",
+          "Date of Reference",
+          "Agency",
+          "Agency Reference Number",
+          "Date",
+          "Demolition Period",
+          "Demolition Estimate",
+        ];
+        const buildingData = buildingCondemnationData.map((row) => [
           row.assetType,
           row.assetCategory,
           row.subCategory,
-          row.itemName,
-          row.itemIds?.join(", ") || "",
-          row.purchaseValue,
-          row.bookValue,
-          new Date(row.inspectionDate).toLocaleDateString(),
-          new Date(row.condemnationDate).toLocaleDateString(),
-          row.remark,
-          row.disposalValue,
+          row.condemnationYear,
+          row.certificateObtained || "N/A",
+          row.authority || "N/A",
+          row.dateOfReferenceUrl || "N/A",
+          row.agency || "N/A",
+          row.agencyReferenceNumberUrl || "N/A",
+          row.date ? new Date(row.date).toLocaleDateString() : "N/A",
+          row.demolitionPeriod || "N/A",
+          row.demolitionEstimate || "N/A",
         ]);
-      });
+  
+        const buildingWsData = [];
+        if (totalCost.demolitionEstimate) {
+          buildingWsData.push(["Total Demolition Estimate", `₹${totalCost.demolitionEstimate}`]);
+          buildingWsData.push([]); // Empty row for spacing
+        }
+        buildingWsData.push(buildingHeaders, ...buildingData);
+  
+        const buildingWs = XLSX.utils.aoa_to_sheet(buildingWsData);
+        buildingWs["!cols"] = buildingHeaders.map((header, index) => {
+          const maxLength = Math.max(
+            header.length,
+            ...buildingData.map((row) => (row[index] ? row[index].toString().length : 0))
+          );
+          return { wch: Math.min(maxLength + 5, 50) };
+        });
+        XLSX.utils.book_append_sheet(wb, buildingWs, "Building Condemnation");
+      }
     } else if (activeTab === "deadStock") {
-      headers.push([
+      const headers = [
         "S.No",
         "Article Type",
         "Article Category",
         "Article Sub Category",
+        "Article Name",
         "No. of Articles Serviceable",
         "No. of Articles Condemned",
         "Balance",
@@ -812,40 +1181,38 @@ const AssetView = () => {
         "Reason for Condemnation",
         "Initial",
         "Remarks",
-      ]);
-      tableData.forEach((row, index) => {
+      ];
+      const data = tableData.map((row, index) => {
         const balance = row.overallQuantity - row.servicableQuantity - row.condemnedQuantity;
-        data.push([
-          index + 1, // S.No
+        return [
+          index + 1,
           row.assetType,
           row.assetCategory,
           row.assetSubCategory,
+          row.itemName,
           row.servicableQuantity,
           row.condemnedQuantity,
-          balance >= 0 ? balance : 0, // Ensure balance is non-negative
+          balance >= 0 ? balance : 0,
           row.methodOfDisposal,
           row.remarks || "N/A",
-          "", // Initial (empty)
-          "", // Remarks (empty)
-        ]);
+          "",
+          "",
+        ];
       });
+  
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      ws["!cols"] = headers.map((header, index) => {
+        const maxLength = Math.max(
+          header.length,
+          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
+        );
+        return { wch: Math.min(maxLength + 5, 50) };
+      });
+      XLSX.utils.book_append_sheet(wb, ws, "DeadStock Assets");
     }
-
-    const ws = XLSX.utils.aoa_to_sheet([headers[0], ...data]);
-    const colWidths = headers[0].map((header, index) => {
-      const maxLength = Math.max(
-        header.length,
-        ...data.map((row) => (row[index] ? row[index].toString().length : 0))
-      );
-      return { wch: Math.min(maxLength + 5, 50) };
-    });
-    ws["!cols"] = colWidths;
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `${activeTab === "deadStock" ? "DeadStock" : activeTab} Assets`);
+  
     XLSX.writeFile(wb, `${activeTab === "deadStock" ? "dead_stock_register" : activeTab}_assets.xlsx`);
   };
-
   const showDetails = (row) => {
     setSelectedDetails(row);
   };
@@ -856,18 +1223,46 @@ const AssetView = () => {
 
   // Calculate total costs
   const calculateTotalCost = () => {
+    let serviceCost = null;
+    let maintenanceCost = null;
+    let demolitionEstimate = null;
+  
     if (activeTab === "purchase") {
-      const total = tableData.reduce((sum, row) => sum + (parseFloat(row.overallPrice) || 0), 0);
-      return total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.overallPrice) || 0), 0);
+      return {
+        serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        maintenanceCost: null,
+        demolitionEstimate: null,
+      };
     } else if (activeTab === "serviceReturn" && serviceReturnFilters.condition !== "InService" && serviceReturnFilters.condition !== "Exchanged") {
-      const total = tableData.reduce((sum, row) => sum + (parseFloat(row.serviceAmount) || 0), 0);
-      return total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.serviceAmount) || 0), 0);
+      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0) {
+        maintenanceCost = buildingMaintenanceData.reduce((sum, row) => sum + (parseFloat(row.cost) || 0), 0);
+      }
+      return {
+        serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        maintenanceCost: maintenanceCost
+          ? maintenanceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : null,
+        demolitionEstimate: null,
+      };
     } else if (activeTab === "disposal") {
-      const total = tableData.reduce((sum, row) => sum + (parseFloat(row.disposalValue) || 0), 0);
-      return total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.disposalValue) || 0), 0);
+      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0) {
+        demolitionEstimate = buildingCondemnationData.reduce((sum, row) => sum + (parseFloat(row.demolitionEstimate) || 0), 0);
+      }
+      return {
+        serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        maintenanceCost: null,
+        demolitionEstimate: demolitionEstimate
+          ? demolitionEstimate.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : null,
+      };
     }
-    return null; // No total cost for deadStock
+    return { serviceCost: null, maintenanceCost: null, demolitionEstimate: null }; // No total cost for other tabs
   };
+  
+  
 
   const totalCost = calculateTotalCost();
 
@@ -1515,6 +1910,15 @@ const AssetView = () => {
                     onChange={(e) => handleFilterChange(setServiceReturnFilters)("serviceAmountTo", e.target.value)}
                   />
                 </div>
+                <div className="admin-asset-filter-item">
+      <label>Building No</label>
+      <input
+        type="text"
+        value={serviceReturnFilters.buildingNo}
+        onChange={(e) => handleFilterChange(setServiceReturnFilters)("buildingNo", e.target.value)}
+        placeholder="Enter Building No"
+      />
+    </div>
                 <button className="admin-asset-btn-clear" onClick={handleClearFilter}>
                   Clear Filter
                 </button>
@@ -1708,18 +2112,34 @@ const AssetView = () => {
                 <button onClick={generateExcel} style={styles.exportButton}>
                   Export to Excel
                 </button>
-                {totalCost && (
-                  <div style={styles.totalCostContainer}>
-                    <span style={styles.totalCostLabel}>
-                      {activeTab === "purchase"
-                        ? "Total Purchase Cost:"
-                        : activeTab === "serviceReturn"
-                          ? "Total Service Cost:"
-                          : "Total Disposal Value:"}
-                    </span>
-                    <span style={styles.totalCostValue}>₹{totalCost}</span>
-                  </div>
-                )}
+                {(totalCost.serviceCost || totalCost.maintenanceCost || totalCost.demolitionEstimate) && (
+        <div style={styles.totalCostContainer}>
+          {totalCost.serviceCost && (
+            <div style={{ marginBottom: totalCost.maintenanceCost || totalCost.demolitionEstimate ? "10px" : "0" }}>
+              <span style={styles.totalCostLabel}>
+                {activeTab === "purchase"
+                  ? "Total Purchase Cost:"
+                  : activeTab === "serviceReturn"
+                  ? "Total Service Cost:"
+                  : "Total Disposal Value:"}
+              </span>
+              <span style={styles.totalCostValue}>₹{totalCost.serviceCost}</span>
+            </div>
+          )}
+          {totalCost.maintenanceCost && (
+            <div style={{ marginBottom: totalCost.demolitionEstimate ? "10px" : "0" }}>
+              <span style={styles.totalCostLabel}>Total Maintenance Cost:</span>
+              <span style={styles.totalCostValue}>₹{totalCost.maintenanceCost}</span>
+            </div>
+          )}
+          {totalCost.demolitionEstimate && (
+            <div>
+              <span style={styles.totalCostLabel}>Total Demolition Estimate:</span>
+              <span style={styles.totalCostValue}>₹{totalCost.demolitionEstimate}</span>
+            </div>
+          )}
+        </div>
+      )}
               </div>
               <table className="admin-asset-table">
                 <thead className="admin-asset-table-header">
@@ -1909,7 +2329,82 @@ const AssetView = () => {
               </table>
             </>
           )}
-
+          {serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0 && (
+  <>
+    <h3 style={{ marginTop: "20px" }}>Building Maintenance Records</h3>
+    <table className="admin-asset-table">
+      <thead className="admin-asset-table-header">
+        <tr>
+          <th>Asset Type</th>
+          <th>Asset Category</th>
+          <th>Sub Category</th>
+          <th>Building No</th>
+          <th>Year of Maintenance</th>
+          <th>Cost</th>
+          <th>Description</th>
+          <th>Custody</th>
+          <th>Agency</th>
+        </tr>
+      </thead>
+      <tbody className="admin-asset-table-body">
+        {buildingMaintenanceData.map((row, index) => (
+          <tr key={index} className="admin-asset-table-row" style={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
+            <td>{row.assetType}</td>
+            <td>{row.assetCategory}</td>
+            <td>{row.subCategory}</td>
+            <td>{row.buildingNo}</td>
+            <td>{new Date(row.yearOfMaintenance).toLocaleDateString()}</td>
+            <td>{row.cost}</td>
+            <td>{row.description}</td>
+            <td>{row.custody}</td>
+            <td>{row.agency}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </>
+)}
+{disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0 && (
+  <>
+    <h3 style={{ marginTop: "20px" }}>Building Condemnation Records</h3>
+    <table className="admin-asset-table">
+      <thead className="admin-asset-table-header">
+        <tr>
+          <th>Asset Type</th>
+          <th>Asset Category</th>
+          <th>Sub Category</th>
+          <th>Condemnation Year</th>
+          <th>Certificate Obtained</th>
+          <th>Authority</th>
+          <th>Date of Reference</th>
+          <th>Agency</th>
+          <th>Agency Reference Number</th>
+          <th>Date</th>
+          <th>Demolition Period</th>
+          <th>Demolition Estimate</th>
+        </tr>
+      </thead>
+      <tbody className="admin-asset-table-body">
+        {buildingCondemnationData.map((row, index) => (
+          <tr key={index} className="admin-asset-table-row" style={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
+            <td>{row.assetType}</td>
+            <td>{row.assetCategory}</td>
+            <td>{row.subCategory}</td>
+            <td>{row.condemnationYear}</td>
+            <td>{row.certificateObtained || "N/A"}</td>
+            <td>{row.authority || "N/A"}</td>
+            <td>{row.dateOfReferenceUrl ? <a href={row.dateOfReferenceUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A"}</td>
+            <td>{row.agency || "N/A"}</td>
+            <td>{row.agencyReferenceNumberUrl ? <a href={row.agencyReferenceNumberUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A"}</td>
+            <td>{row.date ? new Date(row.date).toLocaleDateString() : "N/A"}</td>
+            <td>{row.demolitionPeriod || "N/A"}</td>
+            <td>{row.demolitionEstimate || "N/A"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </>
+)}
           {selectedDetails && activeTab === "purchase" && (
             <div style={styles.popupContainer}>
               <div style={styles.popupContent}>

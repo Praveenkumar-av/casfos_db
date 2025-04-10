@@ -107,8 +107,8 @@ const rejectedAssetSchema = new mongoose.Schema({
   agency: { type: String },
   remark: { type: String, required: false },
 
-      assetId: { type: mongoose.Schema.Types.ObjectId, required: true },
-  updatedData: { type: Object, required: true },
+      assetId: { type: mongoose.Schema.Types.ObjectId },
+  updatedData: { type: Object },
 
 
 }, { timestamps: true });

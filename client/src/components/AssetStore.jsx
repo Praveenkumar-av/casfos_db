@@ -198,7 +198,8 @@ const AssetStore = () => {
             setRejectedAction("maintenance");
             setActiveTab("serviced"); // Ensure this aligns with tab=service from URL
             setMaintenanceData({
-              buildingNo: rejectedAsset.subCategory || rejectedAsset.buildingNo || "", // Use subCategory if buildingNo isn't directly available
+              subCategory: rejectedAsset.subCategory || "", // Populate subcategory
+              buildingNo: rejectedAsset.buildingNo || "",
               yearOfMaintenance: rejectedAsset.yearOfMaintenance
                 ? rejectedAsset.yearOfMaintenance.split("T")[0]
                 : "",
@@ -1184,31 +1185,41 @@ const AssetStore = () => {
   };
   // Serviced/Maintenance Functions
   const handleMaintenanceChange = (field, value) => {
-    setMaintenanceData(prev => ({ ...prev, [field]: value }));
+    setMaintenanceData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmitMaintenance = async () => {
     if (
       assetCategory === "Building" &&
-      (!maintenanceData.buildingNo ||
+      (!maintenanceData.subCategory || // Validate subcategory
+        !maintenanceData.buildingNo ||
         !maintenanceData.yearOfMaintenance ||
         maintenanceData.cost <= 0 ||
         !maintenanceData.description ||
         !maintenanceData.custody ||
         !maintenanceData.agency)
     ) {
-      Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields!" });
+      Swal.fire({
+        icon: "warning",
+        title: "Warning",
+        text: "Please fill all fields!",
+      });
       return;
     }
     if (isFutureDate(maintenanceData.yearOfMaintenance)) {
-      Swal.fire({ icon: "warning", title: "Warning", text: "Year of Maintenance cannot be in the future!" });
+      Swal.fire({
+        icon: "warning",
+        title: "Warning",
+        text: "Year of Maintenance cannot be in the future!",
+      });
       return;
     }
-
+  
     try {
       await axios.post("http://localhost:3001/api/assets/saveMaintenanceTemp", {
         assetType,
         assetCategory,
+        subCategory: maintenanceData.subCategory, // Add subcategory
         buildingNo: maintenanceData.buildingNo,
         yearOfMaintenance: maintenanceData.yearOfMaintenance,
         cost: maintenanceData.cost,
@@ -1217,13 +1228,18 @@ const AssetStore = () => {
         agency: maintenanceData.agency,
         enteredBy: username,
       });
-
+  
       if (isEditingRejected && rejectedId && rejectedAction === "maintenance") {
         await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
       }
-
-      Swal.fire({ icon: "success", title: "Success!", text: "Maintenance submitted for approval!" });
+  
+      Swal.fire({
+        icon: "success",
+        title: "Success!",
+        text: "Maintenance submitted for approval!",
+      });
       setMaintenanceData({
+        subCategory: "", // Reset subcategory
         buildingNo: "",
         yearOfMaintenance: "",
         cost: 0,
@@ -1233,10 +1249,18 @@ const AssetStore = () => {
       });
       setIsEditingRejected(false);
       setRejectedAction("");
-      window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=serviced`);
+      window.history.replaceState(
+        null,
+        "",
+        `/assetstore?username=${encodeURIComponent(username)}&tab=serviced`
+      );
       setActiveTab("serviced");
     } catch (error) {
-      Swal.fire({ icon: "error", title: "Oops...", text: "Failed to submit maintenance for approval!" });
+      Swal.fire({
+        icon: "error",
+        title: "Oops...",
+        text: "Failed to submit maintenance for approval!",
+      });
       console.error(error);
     }
   };
@@ -1337,6 +1361,7 @@ const AssetStore = () => {
       }
 
       try {
+        console.log(disposableData.subCategory)
         await axios.post("http://localhost:3001/api/assets/requestForDisposal", {
           assetType,
           assetCategory,
@@ -2180,14 +2205,30 @@ const AssetStore = () => {
                   <>
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Building No:</label><input type="text" value={maintenanceData.buildingNo} onChange={(e) => handleMaintenanceChange("buildingNo", e.target.value)} style={styles.input} /></div>
+                      <div style={styles.inputGroup}>
+            <label>Building Sub Category:</label>
+            <select
+              value={maintenanceData.subCategory}
+              onChange={(e) => handleMaintenanceChange("subCategory", e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Select Sub Category</option>
+              {subCategoryOptions["Building"].map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
                       <div style={styles.inputGroup}><label>Year of Maintenance:</label><input type="date" value={maintenanceData.yearOfMaintenance} onChange={(e) => handleMaintenanceChange("yearOfMaintenance", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
-                      <div style={styles.inputGroup}><label>Cost:</label><input type="number" value={maintenanceData.cost} onChange={(e) => handleMaintenanceChange("cost", parseFloat(e.target.value) || 0)} onFocus={(e) => e.target.select()} style={styles.input} /></div>
                     </div>
                     <div style={styles.formRow}>
                       <div style={styles.inputGroup}><label>Description:</label><input type="text" value={maintenanceData.description} onChange={(e) => handleMaintenanceChange("description", e.target.value)} style={styles.input} /></div>
                       <div style={styles.inputGroup}><label>Custody:</label><input type="text" value={maintenanceData.custody} onChange={(e) => handleMaintenanceChange("custody", e.target.value)} style={styles.input} /></div>
                       <div style={styles.inputGroup}><label>Agency:</label><input type="text" value={maintenanceData.agency} onChange={(e) => handleMaintenanceChange("agency", e.target.value)} style={styles.input} /></div>
                     </div>
+                    <div style={styles.formRow}>
+
+                    <div style={styles.inputGroup}><label>Cost:</label><input type="number" value={maintenanceData.cost} onChange={(e) => handleMaintenanceChange("cost", parseFloat(e.target.value) || 0)} onFocus={(e) => e.target.select()} style={styles.input} /></div>
+</div>
                     <div style={styles.buttonContainer}><button onClick={handleSubmitMaintenance} style={styles.button}>Submit</button></div>
                   </>
                 ) : (

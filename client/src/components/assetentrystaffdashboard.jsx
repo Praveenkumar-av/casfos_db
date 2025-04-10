@@ -171,7 +171,7 @@ const AssetEntryStaffDashboard = () => {
           <>
             <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
             <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
-            <p><strong>Building No:</strong> {subCategory || "N/A"}</p>
+            <p><strong>Sub Category:</strong> {subCategory || "N/A"}</p>
             <p><strong>Location:</strong> {location || "N/A"}</p>
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>

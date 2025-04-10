@@ -205,13 +205,14 @@ function AssetApproval() {
         <tbody>
           <tr style={componentStyles.evenRow}><td>Asset Type</td><td>{maintenance.assetType || "N/A"}</td></tr>
           <tr style={componentStyles.oddRow}><td>Asset Category</td><td>{maintenance.assetCategory || "N/A"}</td></tr>
+          <tr style={componentStyles.oddRow}><td>Asset Sub Category</td><td>{maintenance.subCategory || "N/A"}</td></tr>
+
           <tr style={componentStyles.evenRow}><td>Building No</td><td>{maintenance.buildingNo || "N/A"}</td></tr>
           <tr style={componentStyles.oddRow}><td>Year of Maintenance</td><td>{formatDate(maintenance.yearOfMaintenance)}</td></tr>
           <tr style={componentStyles.evenRow}><td>Cost</td><td>{maintenance.cost || "N/A"}</td></tr>
           <tr style={componentStyles.oddRow}><td>Description</td><td>{maintenance.description || "N/A"}</td></tr>
           <tr style={componentStyles.evenRow}><td>Custody</td><td>{maintenance.custody || "N/A"}</td></tr>
           <tr style={componentStyles.oddRow}><td>Agency</td><td>{maintenance.agency || "N/A"}</td></tr>
-          <tr style={componentStyles.evenRow}><td>Entered By</td><td>{maintenance.enteredBy || "N/A"}</td></tr>
         </tbody>
       </table>
     );
@@ -1197,13 +1198,13 @@ function AssetApproval() {
             <table style={componentStyles.advancedTable}>
               <thead>
                 <tr>
+                  <th>Sub Catgory</th>
                   <th>Building No</th>
                   <th>Year</th>
                   <th>Cost</th>
                   <th>Description</th>
                   <th>Custody</th>
                   <th>Agency</th>
-                  <th>Entered By</th>
                   <th>Details</th>
                   <th>Action</th>
                 </tr>
@@ -1211,13 +1212,13 @@ function AssetApproval() {
               <tbody>
                 {buildingMaintenance.map((maintenance) => (
                   <tr key={maintenance._id}>
+                    <td>{maintenance.subCategory||"N/A"}</td>
                     <td>{maintenance.buildingNo || "N/A"}</td>
                     <td>{maintenance.yearOfMaintenance ? new Date(maintenance.yearOfMaintenance).toLocaleDateString() : "N/A"}</td>
                     <td>{maintenance.cost || "N/A"}</td>
                     <td>{maintenance.description || "N/A"}</td>
                     <td>{maintenance.custody || "N/A"}</td>
                     <td>{maintenance.agency || "N/A"}</td>
-                    <td>{maintenance.enteredBy || "N/A"}</td>
                     <td><button style={componentStyles.viewButton} onClick={() => setPopupData(maintenance)}>View</button></td>
                     <td style={componentStyles.actionCell}>
                       <button style={componentStyles.approveButton} onClick={() => approveMaintenance(maintenance._id)}>Approve</button>

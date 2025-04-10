@@ -190,8 +190,6 @@ const AssetView = () => {
             subCategory: purchaseFilters.subCategory === "Others" ? purchaseFilters.customSubCategory : purchaseFilters.subCategory,
             source: purchaseFilters.source === "Other" ? purchaseFilters.customSource : purchaseFilters.source,
             modeOfPurchase: purchaseFilters.modeOfPurchase === "Others" ? purchaseFilters.customModeOfPurchase : purchaseFilters.modeOfPurchase,
-            // Only apply itemName filter if assetCategory is not "Building" or "Land"
-            ...(purchaseFilters.assetCategory !== "Building" && purchaseFilters.assetCategory !== "Land" ? { itemName: purchaseFilters.itemName } : {}),
           };
           break;
         case "storeIssue":
@@ -457,101 +455,8 @@ const AssetView = () => {
       assetReportY,
       { align: "center" }
     );
-
-    const tableColumn = [];
-    const tableRows = [];
-
   
     if (activeTab === "purchase") {
-      if (purchaseFilters.assetCategory === "Building") {
-        tableColumn.push([
-          "Asset Type",
-          "Asset Category",
-          "Sub Category",
-          "Building No",
-          "Cost of Construction",
-          "Date of Construction",
-          "Details",
-        ]);
-        tableData.forEach((row) => {
-          const details = [
-            `Type: ${row.type || "N/A"}`,
-            `Plinth Area: ${row.plinthArea || "N/A"}`,
-            `Approved Estimate: ${row.approvedEstimate || "N/A"}`,
-            `Remarks: ${row.remarks || "N/A"}`,
-            `Approved Building Plan URL: ${row.approvedBuildingPlanUrl || "N/A"}`,
-            `KMZ/KML File URL: ${row.kmzOrkmlFileUrl || "N/A"}`,
-          ].join("\n");
-          tableRows.push([
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.buildingNo || "N/A",
-            row.costOfConstruction || "N/A",
-            row.dateOfConstruction ? new Date(row.dateOfConstruction).toLocaleDateString() : "N/A",
-            details,
-          ]);
-        });
-      } else if (purchaseFilters.assetCategory === "Land") {
-        tableColumn.push([
-          "Asset Type",
-          "Asset Category",
-          "Sub Category",
-          "Date of Possession",
-          "Controller/Custody",
-          "Details",
-        ]);
-        tableData.forEach((row) => {
-          const details = [`Details: ${row.details || "N/A"}`].join("\n");
-          tableRows.push([
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.dateOfPossession ? new Date(row.dateOfPossession).toLocaleDateString() : "N/A",
-            row.controllerOrCustody || "N/A",
-            details,
-          ]);
-        });
-      } else {
-        tableColumn.push([
-          "Asset Type",
-          "Asset Category",
-          "Sub Category",
-          "Item Name",
-          "Purchase Date",
-          "Quantity Received",
-          "Total Price",
-          "Details",
-        ]);
-        tableData.forEach((row) => {
-          const details = [
-            `Bill No: ${row.billNo || "N/A"}`,
-            `Supplier Name: ${row.supplierName || "N/A"}`,
-            `Supplier Address: ${row.supplierAddress || "N/A"}`,
-            `Source: ${row.source || "N/A"}`,
-            `Mode of Purchase: ${row.modeOfPurchase || "N/A"}`,
-            `Received By: ${row.receivedBy || "N/A"}`,
-            `Item Description: ${row.itemDescription || "N/A"}`,
-            `Unit Price: ${row.unitPrice || "N/A"}`,
-            `AMC From Date: ${row.amcFromDate ? new Date(row.amcFromDate).toLocaleDateString() : "N/A"}`,
-            `AMC To Date: ${row.amcToDate ? new Date(row.amcToDate).toLocaleDateString() : "N/A"}`,
-            `AMC Cost: ${row.amcCost || "N/A"}`,
-            `Warranty Number: ${row.warrantyNumber || "N/A"}`,
-            `Warranty Valid Upto: ${row.warrantyValidUpto ? new Date(row.warrantyValidUpto).toLocaleDateString() : "N/A"}`,
-            `Item IDs: ${(row.itemIds || []).join(", ") || "N/A"}`,
-          ].join("\n");
-          tableRows.push([
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.itemName || "N/A",
-            row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A",
-            row.quantityReceived || "N/A",
-            row.totalPrice || "N/A",
-            details,
-          ]);
-        });
-      }
       const tableColumn = [
         "Asset Type",
         "Asset Category",
@@ -961,104 +866,6 @@ const AssetView = () => {
     const wb = XLSX.utils.book_new();
   
     if (activeTab === "purchase") {
-      if (purchaseFilters.assetCategory === "Building") {
-        wsData.push([
-          "Asset Type",
-          "Asset Category",
-          "Sub Category",
-          "Building No",
-          "Cost of Construction",
-          "Date of Construction",
-          "Type",
-          "Plinth Area",
-          "Approved Estimate",
-          "Remarks",
-          "Approved Building Plan URL",
-          "KMZ/KML File URL",
-        ]);
-        tableData.forEach((row) => {
-          wsData.push([
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.buildingNo || "N/A",
-            row.costOfConstruction || "N/A",
-            row.dateOfConstruction ? new Date(row.dateOfConstruction).toLocaleDateString() : "N/A",
-            row.type || "N/A",
-            row.plinthArea || "N/A",
-            row.approvedEstimate || "N/A",
-            row.remarks || "N/A",
-            row.approvedBuildingPlanUrl || "N/A",
-            row.kmzOrkmlFileUrl || "N/A",
-          ]);
-        });
-      } else if (purchaseFilters.assetCategory === "Land") {
-        wsData.push([
-          "Asset Type",
-          "Asset Category",
-          "Sub Category",
-          "Date of Possession",
-          "Controller/Custody",
-          "Details",
-        ]);
-        tableData.forEach((row) => {
-          wsData.push([
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.dateOfPossession ? new Date(row.dateOfPossession).toLocaleDateString() : "N/A",
-            row.controllerOrCustody || "N/A",
-            row.details || "N/A",
-          ]);
-        });
-      } else {
-        wsData.push([
-          "Asset Type",
-          "Asset Category",
-          "Sub Category",
-          "Item Name",
-          "Purchase Date",
-          "Supplier Name",
-          "Quantity Received",
-          "Total Price",
-          "Bill No",
-          "Source",
-          "Mode of Purchase",
-          "Received By",
-          "Item Description",
-          "Unit Price",
-          "AMC From Date",
-          "AMC To Date",
-          "AMC Cost",
-          "Warranty Number",
-          "Warranty Valid Upto",
-          "Item IDs",
-        ]);
-        tableData.forEach((row) => {
-          wsData.push([
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.itemName || "N/A",
-            row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A",
-            row.supplierName || "N/A",
-            row.quantityReceived || "N/A",
-            row.totalPrice || "N/A",
-            row.billNo || "N/A",
-            row.source || "N/A",
-            row.modeOfPurchase || "N/A",
-            row.receivedBy || "N/A",
-            row.itemDescription || "N/A",
-            row.unitPrice || "N/A",
-            row.amcFromDate ? new Date(row.amcFromDate).toLocaleDateString() : "N/A",
-            row.amcToDate ? new Date(row.amcToDate).toLocaleDateString() : "N/A",
-            row.amcCost || "N/A",
-            row.warrantyNumber || "N/A",
-            row.warrantyValidUpto ? new Date(row.warrantyValidUpto).toLocaleDateString() : "N/A",
-            (row.itemIds || []).join(", ") || "N/A",
-          ]);
-        });
-      }
       const headers = [
         "Asset Type",
         "Asset Category",
@@ -1421,16 +1228,6 @@ const AssetView = () => {
     let demolitionEstimate = null;
   
     if (activeTab === "purchase") {
-      if (purchaseFilters.assetCategory === "Building") {
-        const total = tableData.reduce((sum, row) => sum + (parseFloat(row.costOfConstruction) || 0), 0);
-        return total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else if (purchaseFilters.assetCategory === "Land") {
-        const total = tableData.reduce((sum, row) => sum + (parseFloat(row.items?.[0]?.totalPrice) || 0), 0);
-        return total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else {
-        const total = tableData.reduce((sum, row) => sum + (parseFloat(row.totalPrice) || 0), 0);
-        return total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      }
       serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.overallPrice) || 0), 0);
       return {
         serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -2347,30 +2144,7 @@ const AssetView = () => {
               <table className="admin-asset-table">
                 <thead className="admin-asset-table-header">
                   <tr>
-                    {activeTab === "purchase" && purchaseFilters.assetCategory === "Building" && (
-                      <>
-                        <th>Asset Type</th>
-                        <th>Sub Category</th>
-                        <th>Building No</th>
-                        <th>Type</th>
-                        <th>Purchase Date</th>
-                        <th>Cost of Construction</th>
-                        <th>Plinth Area</th>
-                        <th>Details</th>
-                      </>
-                    )}
-                    {activeTab === "purchase" && purchaseFilters.assetCategory === "Land" && (
-                      <>
-                        <th>Asset Type</th>
-                        <th>Sub Category</th>
-                        <th>Date of Possession</th>
-                        <th>Controller/Custody</th>
-                        <th>Purchase Date</th>
-                        <th>Total Price</th>
-                        <th>Details</th>
-                      </>
-                    )}
-                    {activeTab === "purchase" && purchaseFilters.assetCategory !== "Building" && purchaseFilters.assetCategory !== "Land" && (
+                    {activeTab === "purchase" && (
                       <>
                         <th>Asset Type</th>
                         <th>Asset Category</th>
@@ -2378,7 +2152,7 @@ const AssetView = () => {
                         <th>Item Name</th>
                         <th>Purchase Date</th>
                         <th>Quantity Received</th>
-                        <th>Total Price</th>
+                        <th>Overall Price</th>
                         <th>Details</th>
                       </>
                     )}
@@ -2460,46 +2234,15 @@ const AssetView = () => {
                 <tbody className="admin-asset-table-body">
                   {tableData.map((row, index) => (
                     <tr key={index} className="admin-asset-table-row" style={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
-                      {activeTab === "purchase" && purchaseFilters.assetCategory === "Building" && (
-                        <>
-                          <td>{row.assetType}</td>
-                          <td>{row.subCategory}</td>
-                          <td>{row.buildingNo || "N/A"}</td>
-                          <td>{row.type || "N/A"}</td>
-                          <td>{row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A"}</td>
-                          <td>{row.costOfConstruction || "N/A"}</td>
-                          <td>{row.plinthArea || "N/A"}</td>
-                          <td>
-                            <button onClick={() => showDetails(row)} style={styles.viewDetailsButton}>
-                              View Details
-                            </button>
-                          </td>
-                        </>
-                      )}
-                      {activeTab === "purchase" && purchaseFilters.assetCategory === "Land" && (
-                        <>
-                          <td>{row.assetType}</td>
-                          <td>{row.subCategory}</td>
-                          <td>{row.dateOfPossession ? new Date(row.dateOfPossession).toLocaleDateString() : "N/A"}</td>
-                          <td>{row.controllerOrCustody || "N/A"}</td>
-                          <td>{row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A"}</td>
-                          <td>{row.items?.[0]?.totalPrice || "N/A"}</td>
-                          <td>
-                            <button onClick={() => showDetails(row)} style={styles.viewDetailsButton}>
-                              View Details
-                            </button>
-                          </td>
-                        </>
-                      )}
-                      {activeTab === "purchase" && purchaseFilters.assetCategory !== "Building" && purchaseFilters.assetCategory !== "Land" && (
+                      {activeTab === "purchase" && (
                         <>
                           <td>{row.assetType}</td>
                           <td>{row.assetCategory}</td>
                           <td>{row.subCategory}</td>
-                          <td>{row.itemName || "N/A"}</td>
-                          <td>{row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A"}</td>
-                          <td>{row.quantityReceived || "N/A"}</td>
-                          <td>{row.totalPrice || "N/A"}</td>
+                          <td>{row.itemName}</td>
+                          <td>{new Date(row.purchaseDate).toLocaleDateString()}</td>
+                          <td>{row.quantityReceived}</td>
+                          <td>{row.overallPrice}</td>
                           <td>
                             <button onClick={() => showDetails(row)} style={styles.viewDetailsButton}>
                               View Details
@@ -2586,8 +2329,6 @@ const AssetView = () => {
               </table>
             </>
           )}
-
-          {selectedDetails && (
           {serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0 && (
   <>
     <h3 style={{ marginTop: "20px" }}>Building Maintenance Records</h3>
@@ -2669,150 +2410,62 @@ const AssetView = () => {
               <div style={styles.popupContent}>
                 <h2>Asset Details</h2>
                 <div style={styles.tableContainer}>
-                  {selectedDetails.assetCategory === "Building" ? (
-                    <>
-                      <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
-                        <tbody>
-                          {[
-                            { label: "Asset Type", value: selectedDetails.assetType },
-                            { label: "Asset Category", value: selectedDetails.assetCategory },
-                            { label: "Sub Category", value: selectedDetails.subCategory },
-                            { label: "Building No", value: selectedDetails.buildingNo || "N/A" },
-                            { label: "Type", value: selectedDetails.type || "N/A" },
-                            { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
-                            { label: "Date of Construction", value: selectedDetails.dateOfConstruction ? new Date(selectedDetails.dateOfConstruction).toLocaleDateString() : "N/A" },
-                            { label: "Cost of Construction", value: selectedDetails.costOfConstruction ? `₹${selectedDetails.costOfConstruction.toLocaleString()}` : "N/A" },
-                            { label: "Plinth Area", value: selectedDetails.plinthArea || "N/A" },
-                            { label: "Approved Estimate", value: selectedDetails.approvedEstimate || "N/A" },
-                            { label: "Remarks", value: selectedDetails.remarks || "N/A" },
-                            { label: "Approved Building Plan", value: selectedDetails.approvedBuildingPlanUrl ? <a href={selectedDetails.approvedBuildingPlanUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                            { label: "KMZ/KML File", value: selectedDetails.kmzOrkmlFileUrl ? <a href={selectedDetails.kmzOrkmlFileUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                            { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
-                            { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
-                          ].map((item, index) => (
-                            <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                              <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
-                              <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {/* Upgrades Table */}
-                      {selectedDetails.upgrades && selectedDetails.upgrades.length > 0 ? (
-                        <div style={{ marginTop: "20px", width: "100%" }}>
-                          <h3 style={{ marginBottom: "10px" }}>Upgrades</h3>
-                          <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable, width: "100%" }}>
-                            <thead>
-                              <tr style={{ backgroundColor: "#007BFF", color: "#fff" }}>
-                                <th style={{ padding: "10px" }}>Year</th>
-                                <th style={{ padding: "10px" }}>Estimate</th>
-                                <th style={{ padding: "10px" }}>Approved Estimate</th>
-                                <th style={{ padding: "10px" }}>Date of Completion</th>
-                                <th style={{ padding: "10px" }}>Warranty Period</th>
-                                <th style={{ padding: "10px" }}>Execution Agency</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedDetails.upgrades.map((upgrade, index) => (
-                                <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.year || "N/A"}</td>
-                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.estimate ? `₹${upgrade.estimate.toLocaleString()}` : "N/A"}</td>
-                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.approvedEstimate ? `₹${upgrade.approvedEstimate.toLocaleString()}` : "N/A"}</td>
-                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.dateOfCompletion ? new Date(upgrade.dateOfCompletion).toLocaleDateString() : "N/A"}</td>
-                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.warrantyPeriod || "N/A"}</td>
-                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.executionAgency || "N/A"}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <p style={{ marginTop: "20px" }}>No upgrades available.</p>
-                      )}
-                    </>
-                  ) : selectedDetails.assetCategory === "Land" ? (
-                    <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
-                      <tbody>
-                        {[
-                          { label: "Asset Type", value: selectedDetails.assetType },
-                          { label: "Asset Category", value: selectedDetails.assetCategory },
-                          { label: "Sub Category", value: selectedDetails.subCategory },
-                          { label: "Location", value: selectedDetails.location || "N/A" },
-                          { label: "Status", value: selectedDetails.status || "N/A" },
-                          { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
-                          { label: "Date of Possession", value: selectedDetails.dateOfPossession ? new Date(selectedDetails.dateOfPossession).toLocaleDateString() : "N/A" },
-                          { label: "Controller/Custody", value: selectedDetails.controllerOrCustody || "N/A" },
-                          { label: "Details", value: selectedDetails.details || "N/A" },
-                          { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
-                          { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
-                        ].map((item, index) => (
-                          <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                            <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
-                            <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <>
-                      <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
-                        <tbody>
-                          {[
-                            { label: "Asset Type", value: selectedDetails.assetType },
-                            { label: "Asset Category", value: selectedDetails.assetCategory },
-                            { label: "Sub Category", value: selectedDetails.subCategory },
-                            { label: "Item Name", value: selectedDetails.itemName },
-                            { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
-                            { label: "Purchase Date", value: selectedDetails.purchaseDate ? new Date(selectedDetails.purchaseDate).toLocaleDateString() : "N/A" },
-                            { label: "Supplier Name", value: selectedDetails.supplierName },
-                            { label: "Supplier Address", value: selectedDetails.supplierAddress || "N/A" },
-                            { label: "Source", value: selectedDetails.source },
-                            { label: "Mode of Purchase", value: selectedDetails.modeOfPurchase },
-                            { label: "Bill No", value: selectedDetails.billNo },
-                            { label: "Received By", value: selectedDetails.receivedBy },
-                            { label: "Bill Photo", value: selectedDetails.billPhotoUrl ? <a href={selectedDetails.billPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                            { label: "Item Description", value: selectedDetails.itemDescription || "N/A" },
-                          ].map((item, index) => (
-                            <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                              <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
-                              <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <table style={tableStyles.advancedTable} className="admin-asset-table">
-                        <tbody>
-                          {[
-                            { label: "Quantity Received", value: selectedDetails.quantityReceived },
-                            { label: "Unit Price", value: selectedDetails.unitPrice },
-                            { label: "Total Price", value: selectedDetails.totalPrice },
-                            { label: "AMC From Date", value: selectedDetails.amcFromDate ? new Date(selectedDetails.amcFromDate).toLocaleDateString() : "N/A" },
-                            { label: "AMC To Date", value: selectedDetails.amcToDate ? new Date(selectedDetails.amcToDate).toLocaleDateString() : "N/A" },
-                            { label: "AMC Cost", value: selectedDetails.amcCost || "N/A" },
-                            { label: "AMC Photo", value: selectedDetails.amcPhotoUrl ? <a href={selectedDetails.amcPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                            { label: "Item Photo", value: selectedDetails.itemPhotoUrl ? <a href={selectedDetails.itemPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                            { label: "Warranty Number", value: selectedDetails.warrantyNumber || "N/A" },
-                            { label: "Warranty Valid Upto", value: selectedDetails.warrantyValidUpto ? new Date(selectedDetails.warrantyValidUpto).toLocaleDateString() : "N/A" },
-                            { label: "Warranty Photo", value: selectedDetails.warrantyPhotoUrl ? <a href={selectedDetails.warrantyPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                            { label: "Item IDs", value: (selectedDetails.itemIds || []).length > 0 ? <span style={tableStyles.itemIdBox}>{selectedDetails.itemIds.join(", ")}</span> : "N/A" },
-                            { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
-                            { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
-                          ].map((item, index) => (
-                            <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                              <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
-                              <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
-                  )}
+                  <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
+                    <tbody>
+                      {[
+                        { label: "Asset Type", value: selectedDetails.assetType },
+                        { label: "Asset Category", value: selectedDetails.assetCategory },
+                        { label: "Sub Category", value: selectedDetails.subCategory },
+                        { label: "Item Name", value: selectedDetails.itemName },
+                        { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
+                        { label: "Purchase Date", value: new Date(selectedDetails.purchaseDate).toLocaleDateString() },
+                        { label: "Supplier Name", value: selectedDetails.supplierName },
+                        { label: "Supplier Address", value: selectedDetails.supplierAddress || "N/A" },
+                        { label: "Source", value: selectedDetails.source },
+                        { label: "Mode of Purchase", value: selectedDetails.modeOfPurchase },
+                        { label: "Bill No", value: selectedDetails.billNo },
+                        { label: "Received By", value: selectedDetails.receivedBy },
+                        { label: "Bill Photo", value: selectedDetails.billPhotoUrl ? <a href={selectedDetails.billPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                        { label: "Item Description", value: selectedDetails.itemDescription || "N/A" },
+                      ].map((item, index) => (
+                        <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                          <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
+                          <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                    <table style={tableStyles.advancedTable} className="admin-asset-table">
+                    <tbody>
+                      {[
+                        { label: "Quantity Received", value: selectedDetails.quantityReceived },
+                        { label: "Unit Price", value: selectedDetails.unitPrice },
+                        { label: "Total Price", value: selectedDetails.overallPrice },
+                        { label: "AMC From Date", value: selectedDetails.amcFromDate ? new Date(selectedDetails.amcFromDate).toLocaleDateString() : "N/A" },
+                        { label: "AMC To Date", value: selectedDetails.amcToDate ? new Date(selectedDetails.amcToDate).toLocaleDateString() : "N/A" },
+                        { label: "AMC Cost", value: selectedDetails.amcCost || "N/A" },
+                        { label: "AMC Photo", value: selectedDetails.amcPhotoUrl ? <a href={selectedDetails.amcPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                        { label: "Item Photo", value: selectedDetails.itemPhotoUrl ? <a href={selectedDetails.itemPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                        { label: "Warranty Number", value: selectedDetails.warrantyNumber || "N/A" },
+                        { label: "Warranty Valid Upto", value: selectedDetails.warrantyValidUpto ? new Date(selectedDetails.warrantyValidUpto).toLocaleDateString() : "N/A" },
+                        { label: "Warranty Photo", value: selectedDetails.warrantyPhotoUrl ? <a href={selectedDetails.warrantyPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                        { label: "Item IDs", value: (selectedDetails.itemIds || []).length > 0 ? <span style={tableStyles.itemIdBox}>{selectedDetails.itemIds.join(", ")}</span> : "N/A" },
+                        { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
+                        { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
+                      ].map((item, index) => (
+                        <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                          <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
+                          <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div style={styles.closeButtonContainer}>
-                  <button onClick={closeDetails} style={styles.closeButton}>
-                    Close
-                  </button>
-                </div>
+              </div>
+              <div style={styles.closeButtonContainer}>
+                <button onClick={closeDetails} style={styles.closeButton}>
+                  Close
+                </button>
               </div>
             </div>
           )}
@@ -2888,8 +2541,9 @@ const styles = {
     left: "250px",
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)", // Changed to slightly dim (30% opacity)
     display: "flex",
+    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
@@ -2899,24 +2553,17 @@ const styles = {
     padding: "20px",
     borderRadius: "10px",
     maxWidth: "900px",
-    maxHeight: "80%", // Increased to accommodate content
-    width: "100%",
-    boxSizing: "border-box",
-    display: "flex",
-    flexDirection: "column",
-    position: "relative", // Added for button positioning
-  },
-  tableContainer: {
-    maxHeight: "calc(80% - 80px)", // Adjust height to leave space for button
-    overflowY: "auto", // Scrollable content
-    width: "100%",
+    maxHeight: "70%",
+    overflowY: "auto",
+    width: "100%", // Ensure it takes full width within maxWidth
+    boxSizing: "border-box", // Include padding in width calculation
+    display: "flex", // Added to stack content and button vertically
+    flexDirection: "column", // Stack vertically
+    alignItems: "center", // Center contents horizontally
   },
   closeButtonContainer: {
-    position: "absolute",
-    bottom: "10px",
-    left: "50%",
-    transform: "translateX(-50%)", // Center horizontally
-    padding: "10px",
+    marginTop: "20px", // Space between content and button
+    textAlign: "center", // Center the button horizontally
   },
   closeButton: {
     padding: "10px 20px",
@@ -2976,11 +2623,11 @@ const styles = {
   oddRow: {
     backgroundColor: "#ffffff",
   },
-  // tableContainer: {
-  //   display: "flex",
-  //   justifyContent: "space-between",
-  //   gap: "20px", // Space between the two tables
-  // },
+  tableContainer: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "20px", // Space between the two tables
+  },
   mainContent: {
     marginLeft: "280px", // Width of the sidebar
     padding: "20px",

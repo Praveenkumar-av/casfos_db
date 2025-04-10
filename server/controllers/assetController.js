@@ -2993,6 +2993,7 @@ exports.filterStoreIssue = async (req, res) => {
     res.status(500).json({ message: "Error filtering store/issue assets" });
   }
 };
+
 exports.filterPurchase = async (req, res) => {
   try {
     const {
@@ -3027,8 +3028,9 @@ exports.filterPurchase = async (req, res) => {
     }
     if (amcDateFrom || amcDateTo) {
       query["items.amcFromDate"] = {};
+      query["items.amcToDate"] = {}; // Fixed: Separate object for amcToDate
       if (amcDateFrom) query["items.amcFromDate"].$gte = new Date(amcDateFrom);
-      if (amcDateTo) query["items.amcToDate"] = { $lte: new Date(amcDateTo) }; // Adjusted to use amcToDate
+      if (amcDateTo) query["items.amcToDate"].$lte = new Date(amcDateTo);
     }
 
     let result = [];
@@ -3037,6 +3039,7 @@ exports.filterPurchase = async (req, res) => {
       const permanentAssets = await Permanent.find(query).lean();
       result = permanentAssets.flatMap((asset) => {
         if (!Array.isArray(asset.items)) {
+          console.warn("Asset with missing or invalid items:", asset);
           return [];
         }
         return asset.items
@@ -3046,6 +3049,7 @@ exports.filterPurchase = async (req, res) => {
             assetCategory: asset.assetCategory,
             subCategory: item.subCategory || "N/A",
             itemName: item.itemName,
+            entryDate: asset.entryDate, // Added
             purchaseDate: asset.purchaseDate,
             supplierName: asset.supplierName,
             supplierAddress: asset.supplierAddress,
@@ -3067,10 +3071,13 @@ exports.filterPurchase = async (req, res) => {
             warrantyValidUpto: item.warrantyValidUpto || null,
             warrantyPhotoUrl: item.warrantyPhotoUrl || null,
             itemIds: item.itemIds || [],
+            createdAt: asset.createdAt, // Added from timestamps
+            updatedAt: asset.updatedAt, // Added from timestamps
           }));
       });
     }
 
+    // Assuming Consumable schema is similar but lacks itemIds (not provided)
     if (!assetType || assetType === "" || assetType === "Consumable") {
       const consumableAssets = await Consumable.find(query).lean();
       result = result.concat(
@@ -3086,6 +3093,7 @@ exports.filterPurchase = async (req, res) => {
               assetCategory: asset.assetCategory,
               subCategory: item.subCategory || "N/A",
               itemName: item.itemName,
+              entryDate: asset.entryDate, // Added (assuming Consumable has this)
               purchaseDate: asset.purchaseDate,
               supplierName: asset.supplierName,
               supplierAddress: asset.supplierAddress,
@@ -3107,6 +3115,8 @@ exports.filterPurchase = async (req, res) => {
               warrantyValidUpto: item.warrantyValidUpto || null,
               warrantyPhotoUrl: item.warrantyPhotoUrl || null,
               itemIds: [], // Consumables typically don't have itemIds
+              createdAt: asset.createdAt, // Added (assuming Consumable has timestamps)
+              updatedAt: asset.updatedAt, // Added (assuming Consumable has timestamps)
             }));
         })
       );
@@ -3115,9 +3125,10 @@ exports.filterPurchase = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error("Error filtering purchase assets:", error);
-    res.status(500).json({ message: "Error filtering purchase assets", error: error.message });
+    res.status(500).json({ message: "Error filtering purchase assets", error: error.stack });
   }
 };
+
 exports.filterServiceReturn = async (req, res) => {
   try {
     const {

@@ -60,11 +60,11 @@ const permanentSchema = new mongoose.Schema({
       amcFromDate: { type: Date, required: false },  // Add this
       amcToDate: { type: Date, required: false },    // Add this
       amcCost: { type: Number, required: false },    // Add this
-      amcPhotoUrl: { type: String, required: false }, 
-        itemPhotoUrl: { type: String },
+      amcPhotoUrl: { type: String, required: false },
+      itemPhotoUrl: { type: String },
       warrantyNumber: { type: String },
-    warrantyValidUpto: { type: Date },
-    warrantyPhotoUrl: { type: String },
+      warrantyValidUpto: { type: Date },
+      warrantyPhotoUrl: { type: String },
       itemIds: [{ type: String }],
     },
   ],

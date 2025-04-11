@@ -1,30 +1,36 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { useLocation } from "react-router-dom";
+import axios from "axios"; // HTTP client for API requests
+import { useLocation } from "react-router-dom"; // For accessing URL parameters
 
+// FacultyVerify component: Allows verification or rejection of unverified faculty records
 const FacultyVerify = () => {
-  const [facultyType, setFacultyType] = useState("");
-  const [name, setName] = useState("");
-  const [yearOfAllotment, setYearOfAllotment] = useState("");
-  const [email, setEmail] = useState("");
-  const [domainKnowledge, setDomainKnowledge] = useState("");
-  const [areaOfExpertise, setAreaOfExpertise] = useState("");
-  const [institution, setInstitution] = useState("");
-  const [status, setStatus] = useState("");
-  const [modulesHandled, setModulesHandled] = useState("");
-  const [majorDomains, setMajorDomains] = useState([]);
-  const [minorDomains, setMinorDomains] = useState([]);
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [tableData, setTableData] = useState([]);
-  const [verifyingStatus, setVerifyingStatus] = useState({});
-  const [selectedFaculty, setSelectedFaculty] = useState(null);
-  const [rejectingFacultyId, setRejectingFacultyId] = useState(null);
-  const [rejectionRemarks, setRejectionRemarks] = useState("");
+  // Filter states
+  const [facultyType, setFacultyType] = useState(""); // Faculty type filter
+  const [name, setName] = useState(""); // Name filter
+  const [yearOfAllotment, setYearOfAllotment] = useState(""); // Year of allotment filter
+  const [email, setEmail] = useState(""); // Email filter
+  const [domainKnowledge, setDomainKnowledge] = useState(""); // Domain knowledge filter
+  const [areaOfExpertise, setAreaOfExpertise] = useState(""); // Areas of expertise filter
+  const [institution, setInstitution] = useState(""); // Institution filter
+  const [status, setStatus] = useState(""); // Status filter
+  const [modulesHandled, setModulesHandled] = useState(""); // Modules handled filter
+  const [majorDomains, setMajorDomains] = useState([]); // Major domains filter
+  const [minorDomains, setMinorDomains] = useState([]); // Minor domains filter
+  const [mobileNumber, setMobileNumber] = useState(""); // Mobile number filter
 
+  // Table and interaction states
+  const [tableData, setTableData] = useState([]); // Filtered unverified faculty data
+  const [verifyingStatus, setVerifyingStatus] = useState({}); // Verification status for each faculty
+  const [selectedFaculty, setSelectedFaculty] = useState(null); // Faculty selected for detailed view
+  const [rejectingFacultyId, setRejectingFacultyId] = useState(null); // ID of faculty being rejected
+  const [rejectionRemarks, setRejectionRemarks] = useState(""); // Remarks for rejection
+
+  // Get username from URL query parameters
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
 
+  // Domain options for major and minor domain filters
   const domainOptions = {
     "Forest & Wildlife": [
       "Silviculture",
@@ -47,7 +53,7 @@ const FacultyVerify = () => {
       "Computer Application, Remote Sensing and GIS in Forestry",
       "Urban Forestry/Recreation Forestry & Land Scaping",
     ],
-    "Environment": [
+    Environment: [
       "Environmental Laws & Management",
       "Climate Change: Adaptation & Mitigation",
       "Wasteland Management",
@@ -60,13 +66,7 @@ const FacultyVerify = () => {
       "Ecosystem Health",
       "Others",
     ],
-    "Disaster Management": [
-      "Forest Fire Management & Damage assessment",
-      "Cyclone",
-      "Flood",
-      "Desertification",
-      "Others",
-    ],
+    "Disaster Management": ["Forest Fire Management & Damage assessment", "Cyclone", "Flood", "Desertification", "Others"],
     "Human Resource Development": [
       "Time Management",
       "Leadership Management",
@@ -79,14 +79,7 @@ const FacultyVerify = () => {
       "Building competencies for personal Excellence",
       "Others",
     ],
-    "Health and Fitness": [
-      "First Aid",
-      "Counselling",
-      "Physical, mental and Social Health",
-      "Stress Management",
-      "Yoga and Meditation",
-      "Others",
-    ],
+    "Health and Fitness": ["First Aid", "Counselling", "Physical, mental and Social Health", "Stress Management", "Yoga and Meditation", "Others"],
     "Ethics and Public Governance": [
       "Public administration, PublicGrievance and Public Finance",
       "Decision Making",
@@ -109,12 +102,7 @@ const FacultyVerify = () => {
       "Cyber Security Laws",
       "Others",
     ],
-    "CCS Rules and Regulation": [
-      "Service Rules and matters",
-      "Conduct Rules",
-      "Disciplinary Proceedings",
-      "Others",
-    ],
+    "CCS Rules and Regulation": ["Service Rules and matters", "Conduct Rules", "Disciplinary Proceedings", "Others"],
     "Media Management": [
       "The Art of Interacting with Print and Electronic Media",
       "Role of Media",
@@ -125,22 +113,23 @@ const FacultyVerify = () => {
     ],
   };
 
+  // Fetch and filter unverified faculties based on filter states
   useEffect(() => {
     const fetchUnverifiedFaculties = async () => {
       try {
         const response = await axios.get("http://localhost:3001/api/faculty/getAllFaculties");
-        const unverifiedFaculties = response.data.filter(faculty => !faculty.verified);
+        const unverifiedFaculties = response.data.filter((faculty) => !faculty.verified);
 
-        const filteredData = unverifiedFaculties.filter(faculty => {
+        const filteredData = unverifiedFaculties.filter((faculty) => {
           return (
             (!facultyType || faculty.facultyType.toLowerCase().includes(facultyType.toLowerCase())) &&
             (!name || faculty.name.toLowerCase().includes(name.toLowerCase())) &&
             (!yearOfAllotment || faculty.yearOfAllotment === yearOfAllotment) &&
             (!email || faculty.email?.toLowerCase().includes(email.toLowerCase())) &&
             (!status || faculty.status === status) &&
-            (!modulesHandled || faculty.modulesHandled?.some(m => m.toLowerCase().includes(modulesHandled.toLowerCase()))) &&
-            (majorDomains.length === 0 || majorDomains.every(md => faculty.majorDomains?.includes(md))) &&
-            (minorDomains.length === 0 || minorDomains.every(md => faculty.minorDomains?.includes(md))) &&
+            (!modulesHandled || faculty.modulesHandled?.some((m) => m.toLowerCase().includes(modulesHandled.toLowerCase()))) &&
+            (majorDomains.length === 0 || majorDomains.every((md) => faculty.majorDomains?.includes(md))) &&
+            (minorDomains.length === 0 || minorDomains.every((md) => faculty.minorDomains?.includes(md))) &&
             (!areaOfExpertise || faculty.areasOfExpertise?.toLowerCase().includes(areaOfExpertise.toLowerCase())) &&
             (!institution || faculty.institution?.toLowerCase().includes(institution.toLowerCase())) &&
             (!mobileNumber || faculty.mobileNumber?.includes(mobileNumber)) &&
@@ -148,11 +137,7 @@ const FacultyVerify = () => {
           );
         });
 
-        if (filteredData.length > 0) {
-          setTableData(filteredData);
-        } else {
-          setTableData([]);
-        }
+        setTableData(filteredData.length > 0 ? filteredData : []);
       } catch (error) {
         setTableData([]);
         console.error("Error fetching unverified faculties:", error);
@@ -175,47 +160,31 @@ const FacultyVerify = () => {
     domainKnowledge,
   ]);
 
+  // Handle faculty verification
   const handleVerifyFaculty = async (facultyId) => {
-    console.log("Verifying faculty with ID:", facultyId);
-    setVerifyingStatus(prev => ({
-      ...prev,
-      [facultyId]: "Verifying..."
-    }));
-
+    setVerifyingStatus((prev) => ({ ...prev, [facultyId]: "Verifying..." }));
     try {
       const response = await axios.put(`http://localhost:3001/api/faculty/verifyFaculty/${facultyId}`);
       if (response.data.success) {
-        setVerifyingStatus(prev => ({
-          ...prev,
-          [facultyId]: "Verified"
-        }));
-        setTableData(prevData => prevData.filter(faculty => faculty._id !== facultyId));
-        setTimeout(() => {
-          setVerifyingStatus(prev => ({
-            ...prev,
-            [facultyId]: ""
-          }));
-        }, 2000);
+        setVerifyingStatus((prev) => ({ ...prev, [facultyId]: "Verified" }));
+        setTableData((prevData) => prevData.filter((faculty) => faculty._id !== facultyId));
+        setTimeout(() => setVerifyingStatus((prev) => ({ ...prev, [facultyId]: "" })), 2000);
       } else {
-        setVerifyingStatus(prev => ({
-          ...prev,
-          [facultyId]: "Failed to Verify"
-        }));
+        setVerifyingStatus((prev) => ({ ...prev, [facultyId]: "Failed to Verify" }));
       }
     } catch (error) {
-      setVerifyingStatus(prev => ({
-        ...prev,
-        [facultyId]: "Failed to Verify"
-      }));
+      setVerifyingStatus((prev) => ({ ...prev, [facultyId]: "Failed to Verify" }));
       console.error("Error verifying faculty:", error);
     }
   };
 
+  // Open rejection popup
   const handleRejectFaculty = (facultyId) => {
     setRejectingFacultyId(facultyId);
     setRejectionRemarks("");
   };
 
+  // Submit rejection with remarks
   const submitRejection = async () => {
     if (!rejectionRemarks.trim()) {
       alert("Please provide rejection remarks");
@@ -224,33 +193,22 @@ const FacultyVerify = () => {
 
     try {
       const response = await axios.post(`http://localhost:3001/api/faculty/rejectFacultyVerification/${rejectingFacultyId}`, {
-        rejectionRemarks
+        rejectionRemarks,
       });
-      
       if (response.data.success) {
-        setTableData(prevData => prevData.filter(faculty => faculty._id !== rejectingFacultyId));
-        setVerifyingStatus(prev => ({
-          ...prev,
-          [rejectingFacultyId]: "Rejected"
-        }));
-        setTimeout(() => {
-          setVerifyingStatus(prev => ({
-            ...prev,
-            [rejectingFacultyId]: ""
-          }));
-        }, 2000);
+        setTableData((prevData) => prevData.filter((faculty) => faculty._id !== rejectingFacultyId));
+        setVerifyingStatus((prev) => ({ ...prev, [rejectingFacultyId]: "Rejected" }));
+        setTimeout(() => setVerifyingStatus((prev) => ({ ...prev, [rejectingFacultyId]: "" })), 2000);
       }
     } catch (error) {
       console.error("Error rejecting faculty:", error);
-      setVerifyingStatus(prev => ({
-        ...prev,
-        [rejectingFacultyId]: "Failed to Reject"
-      }));
+      setVerifyingStatus((prev) => ({ ...prev, [rejectingFacultyId]: "Failed to Reject" }));
     } finally {
       setRejectingFacultyId(null);
     }
   };
 
+  // Render detailed faculty data in popup
   const renderPopupContent = (data) => {
     const renderValue = (value, key) => {
       if (key === "photograph" && typeof value === "string") {
@@ -273,7 +231,7 @@ const FacultyVerify = () => {
               .filter(([subKey]) => subKey !== "_id")
               .map(([subKey, val]) => (
                 <li key={subKey}>
-                  <strong>{subKey.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase())}:</strong> {renderValue(val, subKey)}
+                  <strong>{subKey.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:</strong> {renderValue(val, subKey)}
                 </li>
               ))}
           </ul>
@@ -287,7 +245,7 @@ const FacultyVerify = () => {
       .map(([key, value]) => (
         <tr key={key}>
           <td style={{ fontWeight: "bold", padding: "10px", border: "1px solid #ddd" }}>
-            {key.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase())}:
+            {key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:
           </td>
           <td style={{ padding: "10px", border: "1px solid #ddd" }}>{renderValue(value, key)}</td>
         </tr>
@@ -296,6 +254,7 @@ const FacultyVerify = () => {
     return allFields.length > 0 ? allFields : <tr><td colSpan="2">No additional details available</td></tr>;
   };
 
+  // Clear all filters
   const handleClearFilter = () => {
     setFacultyType("");
     setName("");
@@ -313,14 +272,17 @@ const FacultyVerify = () => {
     setVerifyingStatus({});
   };
 
+  // Open faculty details popup
   const handleViewDetails = (faculty) => {
     setSelectedFaculty(faculty);
   };
 
+  // Close faculty details popup
   const closePopup = () => {
     setSelectedFaculty(null);
   };
 
+  // Styles for popup
   const popupStyles = {
     popup: {
       position: "fixed",
@@ -363,6 +325,7 @@ const FacultyVerify = () => {
     },
   };
 
+  // Styles for filter section
   const filterStyles = {
     filterContainer: {
       padding: "20px",
@@ -415,6 +378,7 @@ const FacultyVerify = () => {
     },
   };
 
+  // Styles for view and verify buttons
   const viewButtonStyles = {
     viewButton: {
       padding: "6px 12px",
@@ -443,6 +407,7 @@ const FacultyVerify = () => {
     },
   };
 
+  // Styles for reject button
   const rejectButtonStyles = {
     rejectButton: {
       padding: "6px 12px",
@@ -459,6 +424,7 @@ const FacultyVerify = () => {
     },
   };
 
+  // General styles
   const styles = {
     usernameContainer: {
       display: "flex",
@@ -488,399 +454,436 @@ const FacultyVerify = () => {
     errorIcon: { fontSize: "14px", color: "#dc3545" },
   };
 
+  // Render the component
   return (
-    <>
-      <div className="asset-view">
-        <meta charSet="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-        <title>CASFOS</title>
+    <div className="asset-view">
+      <meta charSet="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+      <title>CASFOS</title>
 
-        <section id="sidebar">
-          <a href="#" className="brand">
-            <span className="text">SUPER-INTENDENT</span>
-          </a>
-          <ul className="side-menu top">
-            <li><a href={`/superintendentdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
-            <li className="active"><a href={`/facultyverify?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty Verify</span></a></li>
-            <li><a href={`/superintendentfacultyview?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty View</span></a></li>
-          </ul>
-          <ul className="side-menu">
-            <li>
-              <a href="/" className="logout">
-                <i className="bx bxs-log-out-circle" />
-                <span className="text">Logout</span>
-              </a>
-            </li>
-          </ul>
-        </section>
+      <section id="sidebar">
+        <a href="#" className="brand">
+          <span className="text">SUPER-INTENDENT</span>
+        </a>
+        <ul className="side-menu top">
+          <li>
+            <a href={`/superintendentdashboard?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-dashboard" />
+              <span className="text">Home</span>
+            </a>
+          </li>
+          <li className="active">
+            <a href={`/facultyverify?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-doughnut-chart" />
+              <span className="text">Faculty Verify</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/superintendentfacultyview?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-doughnut-chart" />
+              <span className="text">Faculty View</span>
+            </a>
+          </li>
+        </ul>
+        <ul className="side-menu">
+          <li>
+            <a href="/" className="logout">
+              <i className="bx bxs-log-out-circle" />
+              <span className="text">Logout</span>
+            </a>
+          </li>
+        </ul>
+      </section>
 
-        <section id="content">
-          <nav>
-            <i className="bx bx-menu" />
-            <span className="head-title">Dashboard</span>
-            <form action="#">
-              <div className="form-input"></div>
-            </form>
-            <div style={styles.usernameContainer}>
-              <i className="bx bxs-user-circle" style={styles.userIcon}></i>
-              <span style={styles.username}>{username}</span>
+      <section id="content">
+        <nav>
+          <i className="bx bx-menu" />
+          <span className="head-title">Dashboard</span>
+          <form action="#">
+            <div className="form-input"></div>
+          </form>
+          <div style={styles.usernameContainer}>
+            <i className="bx bxs-user-circle" style={styles.userIcon}></i>
+            <span style={styles.username}>{username}</span>
+          </div>
+        </nav>
+
+        <main>
+          <div className="dash-content">
+            <div className="title">
+              <span className="text">Unverified Faculty View with Filters</span>
             </div>
-          </nav>
 
-          <main>
-            <div className="dash-content">
-              <div className="title">
-                <span className="text">Unverified Faculty View with Filters</span>
-              </div>
-              <div style={filterStyles.filterContainer}>
-                <div style={filterStyles.filterGrid}>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="facultyType">Faculty Type:</label>
-                    <select
-                      id="facultyType"
-                      value={facultyType}
-                      onChange={(e) => setFacultyType(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    >
-                      <option value="">Select</option>
-                      <option value="internal">Internal</option>
-                      <option value="external">External</option>
-                      <option value="contract">Contract</option>
-                    </select>
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="name">Name:</label>
-                    <input
-                      id="name"
-                      placeholder="Name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="yearOfAllotment">Year of Allotment:</label>
-                    <input
-                      id="yearOfAllotment"
-                      placeholder="YYYY"
-                      value={yearOfAllotment}
-                      onChange={(e) => setYearOfAllotment(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="email">Email:</label>
-                    <input
-                      id="email"
-                      placeholder="Email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="status">Status:</label>
-                    <select
-                      id="status"
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    >
-                      <option value="">Select</option>
-                      <option value="serving">Serving</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="modulesHandled">Modules Handled:</label>
-                    <input
-                      id="modulesHandled"
-                      placeholder="Module Name"
-                      value={modulesHandled}
-                      onChange={(e) => setModulesHandled(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="majorDomains">Major Domains:</label>
-                    <select
-                      id="majorDomains"
-                      value={majorDomains[0] || ""}
-                      onChange={(e) => setMajorDomains([e.target.value])}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    >
-                      <option value="">Select Major Domain</option>
-                      {Object.keys(domainOptions).map((domain) => (
-                        <option key={domain} value={domain}>
-                          {domain}
+            {/* Filter Section */}
+            <div style={filterStyles.filterContainer}>
+              <div style={filterStyles.filterGrid}>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="facultyType">
+                    Faculty Type:
+                  </label>
+                  <select
+                    id="facultyType"
+                    value={facultyType}
+                    onChange={(e) => setFacultyType(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  >
+                    <option value="">Select</option>
+                    <option value="internal">Internal</option>
+                    <option value="external">External</option>
+                    <option value="contract">Contract</option>
+                  </select>
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="name">
+                    Name:
+                  </label>
+                  <input
+                    id="name"
+                    placeholder="Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="yearOfAllotment">
+                    Year of Allotment:
+                  </label>
+                  <input
+                    id="yearOfAllotment"
+                    placeholder="YYYY"
+                    value={yearOfAllotment}
+                    onChange={(e) => setYearOfAllotment(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="email">
+                    Email:
+                  </label>
+                  <input
+                    id="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="status">
+                    Status:
+                  </label>
+                  <select
+                    id="status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  >
+                    <option value="">Select</option>
+                    <option value="serving">Serving</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="modulesHandled">
+                    Modules Handled:
+                  </label>
+                  <input
+                    id="modulesHandled"
+                    placeholder="Module Name"
+                    value={modulesHandled}
+                    onChange={(e) => setModulesHandled(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="majorDomains">
+                    Major Domains:
+                  </label>
+                  <select
+                    id="majorDomains"
+                    value={majorDomains[0] || ""}
+                    onChange={(e) => setMajorDomains([e.target.value])}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  >
+                    <option value="">Select Major Domain</option>
+                    {Object.keys(domainOptions).map((domain) => (
+                      <option key={domain} value={domain}>
+                        {domain}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="minorDomains">
+                    Minor Domains:
+                  </label>
+                  <select
+                    id="minorDomains"
+                    value={minorDomains[0] || ""}
+                    onChange={(e) => setMinorDomains([e.target.value])}
+                    disabled={!majorDomains[0]}
+                    style={{
+                      ...filterStyles.input,
+                      opacity: !majorDomains[0] ? 0.7 : 1,
+                      cursor: !majorDomains[0] ? "not-allowed" : "pointer",
+                    }}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  >
+                    <option value="">Select Minor Domain</option>
+                    {majorDomains[0] &&
+                      domainOptions[majorDomains[0]]?.map((subDomain) => (
+                        <option key={subDomain} value={subDomain}>
+                          {subDomain}
                         </option>
                       ))}
-                    </select>
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="minorDomains">Minor Domains:</label>
-                    <select
-                      id="minorDomains"
-                      value={minorDomains[0] || ""}
-                      onChange={(e) => setMinorDomains([e.target.value])}
-                      disabled={!majorDomains[0]}
-                      style={{
-                        ...filterStyles.input,
-                        opacity: !majorDomains[0] ? 0.7 : 1,
-                        cursor: !majorDomains[0] ? "not-allowed" : "pointer",
-                      }}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    >
-                      <option value="">Select Minor Domain</option>
-                      {majorDomains[0] &&
-                        domainOptions[majorDomains[0]]?.map((subDomain) => (
-                          <option key={subDomain} value={subDomain}>
-                            {subDomain}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="areaOfExpertise">Areas of Expertise:</label>
-                    <input
-                      id="areaOfExpertise"
-                      placeholder="Areas of Expertise"
-                      value={areaOfExpertise}
-                      onChange={(e) => setAreaOfExpertise(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="institution">Institution:</label>
-                    <input
-                      id="institution"
-                      placeholder="Institution"
-                      value={institution}
-                      onChange={(e) => setInstitution(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="mobileNumber">Mobile Number:</label>
-                    <input
-                      id="mobileNumber"
-                      placeholder="Mobile Number"
-                      value={mobileNumber}
-                      onChange={(e) => setMobileNumber(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
-                  <div style={filterStyles.filterItem}>
-                    <label style={filterStyles.label} htmlFor="domainKnowledge">Domain Knowledge:</label>
-                    <input
-                      id="domainKnowledge"
-                      placeholder="Domain Knowledge"
-                      value={domainKnowledge}
-                      onChange={(e) => setDomainKnowledge(e.target.value)}
-                      style={filterStyles.input}
-                      onFocus={(e) => e.target.style.borderColor = filterStyles.inputFocus.borderColor}
-                      onBlur={(e) => e.target.style.borderColor = "#ddd"}
-                    />
-                  </div>
+                  </select>
                 </div>
-                <div style={filterStyles.buttonContainer}>
-                  <button
-                    style={filterStyles.clearButton}
-                    onClick={handleClearFilter}
-                    onMouseOver={(e) => (e.target.style.backgroundColor = filterStyles.clearButtonHover.backgroundColor)}
-                    onMouseOut={(e) => (e.target.style.backgroundColor = filterStyles.clearButton.backgroundColor)}
-                  >
-                    Clear Filter
-                  </button>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="areaOfExpertise">
+                    Areas of Expertise:
+                  </label>
+                  <input
+                    id="areaOfExpertise"
+                    placeholder="Areas of Expertise"
+                    value={areaOfExpertise}
+                    onChange={(e) => setAreaOfExpertise(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="institution">
+                    Institution:
+                  </label>
+                  <input
+                    id="institution"
+                    placeholder="Institution"
+                    value={institution}
+                    onChange={(e) => setInstitution(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="mobileNumber">
+                    Mobile Number:
+                  </label>
+                  <input
+                    id="mobileNumber"
+                    placeholder="Mobile Number"
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
+                </div>
+                <div style={filterStyles.filterItem}>
+                  <label style={filterStyles.label} htmlFor="domainKnowledge">
+                    Domain Knowledge:
+                  </label>
+                  <input
+                    id="domainKnowledge"
+                    placeholder="Domain Knowledge"
+                    value={domainKnowledge}
+                    onChange={(e) => setDomainKnowledge(e.target.value)}
+                    style={filterStyles.input}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
+                    onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                  />
                 </div>
               </div>
-
-              {tableData.length > 0 ? (
-                <table className="faculty-table" style={{ marginTop: "1rem", width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Name</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Faculty Type</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Status</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Mobile Number</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Email</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Year of Allotment</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Major Domains</th>
-                      <th style={{ padding: "10px", border: "1px solid #ddd" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.map((row, index) => (
-                      <tr key={index}>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.name || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.facultyType || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.status || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.mobileNumber || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.email || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.yearOfAllotment || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.majorDomains?.join(", ") || "-"}</td>
-                        <td style={{ padding: "10px", border: "1px solid #ddd" }}>
-                          <button
-                            style={viewButtonStyles.viewButton}
-                            onClick={() => handleViewDetails(row)}
-                            onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButtonHover.backgroundColor)}
-                            onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)}
-                          >
-                            View
-                          </button>
-                          <button
-                            style={viewButtonStyles.verifyButton}
-                            onClick={() => handleVerifyFaculty(row._id)}
-                            onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.verifyButtonHover.backgroundColor)}
-                            onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.verifyButton.backgroundColor)}
-                            disabled={verifyingStatus[row._id] === "Verifying..."}
-                          >
-                            Verify
-                          </button>
-                          <button
-                            style={rejectButtonStyles.rejectButton}
-                            onClick={() => handleRejectFaculty(row._id)}
-                            onMouseOver={(e) => (e.target.style.backgroundColor = rejectButtonStyles.rejectButtonHover.backgroundColor)}
-                            onMouseOut={(e) => (e.target.style.backgroundColor = rejectButtonStyles.rejectButton.backgroundColor)}
-                            disabled={verifyingStatus[row._id] === "Verifying..."}
-                          >
-                            Reject
-                          </button>
-                          {verifyingStatus[row._id] && (
-                            <div style={styles.verifyingStatus}>
-                              {verifyingStatus[row._id] === "Verifying..." && (
-                                <>
-                                  <i className="bx bx-loader-circle bx-spin" style={styles.loadingIcon}></i>
-                                  <span>Verifying...</span>
-                                </>
-                              )}
-                              {verifyingStatus[row._id] === "Verified" && (
-                                <>
-                                  <i className="bx bx-check-circle" style={styles.successIcon}></i>
-                                  <span>Verified</span>
-                                </>
-                              )}
-                              {verifyingStatus[row._id] === "Rejected" && (
-                                <>
-                                  <i className="bx bx-x-circle" style={styles.errorIcon}></i>
-                                  <span>Rejected</span>
-                                </>
-                              )}
-                              {verifyingStatus[row._id] === "Failed to Verify" && (
-                                <>
-                                  <i className="bx bx-error-circle" style={styles.errorIcon}></i>
-                                  <span>Failed to Verify</span>
-                                </>
-                              )}
-                              {verifyingStatus[row._id] === "Failed to Reject" && (
-                                <>
-                                  <i className="bx bx-error-circle" style={styles.errorIcon}></i>
-                                  <span>Failed to Reject</span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p style={{ color: "red", marginTop: "1rem" }}>No unverified faculty records found matching the criteria.</p>
-              )}
+              <div style={filterStyles.buttonContainer}>
+                <button
+                  style={filterStyles.clearButton}
+                  onClick={handleClearFilter}
+                  onMouseOver={(e) => (e.target.style.backgroundColor = filterStyles.clearButtonHover.backgroundColor)}
+                  onMouseOut={(e) => (e.target.style.backgroundColor = filterStyles.clearButton.backgroundColor)}
+                >
+                  Clear Filter
+                </button>
+              </div>
             </div>
-          </main>
-        </section>
 
-        {selectedFaculty && (
-          <div style={popupStyles.popup}>
-            <div style={popupStyles.popupContent}>
-              <h3 style={popupStyles.popupHeader}>Faculty Details</h3>
-              <table style={popupStyles.table}>
-                <tbody>{renderPopupContent(selectedFaculty)}</tbody>
+            {/* Faculty Table */}
+            {tableData.length > 0 ? (
+              <table className="faculty-table" style={{ marginTop: "1rem", width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Name</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Faculty Type</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Status</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Mobile Number</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Email</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Year of Allotment</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Major Domains</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableData.map((row) => (
+                    <tr key={row._id}>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.name || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.facultyType || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.status || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.mobileNumber || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.email || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.yearOfAllotment || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.majorDomains?.join(", ") || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>
+                        <button
+                          style={viewButtonStyles.viewButton}
+                          onClick={() => handleViewDetails(row)}
+                          onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)}
+                        >
+                          View
+                        </button>
+                        <button
+                          style={viewButtonStyles.verifyButton}
+                          onClick={() => handleVerifyFaculty(row._id)}
+                          onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.verifyButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.verifyButton.backgroundColor)}
+                          disabled={verifyingStatus[row._id] === "Verifying..."}
+                        >
+                          Verify
+                        </button>
+                        <button
+                          style={rejectButtonStyles.rejectButton}
+                          onClick={() => handleRejectFaculty(row._id)}
+                          onMouseOver={(e) => (e.target.style.backgroundColor = rejectButtonStyles.rejectButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = rejectButtonStyles.rejectButton.backgroundColor)}
+                          disabled={verifyingStatus[row._id] === "Verifying..."}
+                        >
+                          Reject
+                        </button>
+                        {verifyingStatus[row._id] && (
+                          <div style={styles.verifyingStatus}>
+                            {verifyingStatus[row._id] === "Verifying..." && (
+                              <>
+                                <i className="bx bx-loader-circle bx-spin" style={styles.loadingIcon}></i>
+                                <span>Verifying...</span>
+                              </>
+                            )}
+                            {verifyingStatus[row._id] === "Verified" && (
+                              <>
+                                <i className="bx bx-check-circle" style={styles.successIcon}></i>
+                                <span>Verified</span>
+                              </>
+                            )}
+                            {verifyingStatus[row._id] === "Rejected" && (
+                              <>
+                                <i className="bx bx-x-circle" style={styles.errorIcon}></i>
+                                <span>Rejected</span>
+                              </>
+                            )}
+                            {verifyingStatus[row._id] === "Failed to Verify" && (
+                              <>
+                                <i className="bx bx-error-circle" style={styles.errorIcon}></i>
+                                <span>Failed to Verify</span>
+                              </>
+                            )}
+                            {verifyingStatus[row._id] === "Failed to Reject" && (
+                              <>
+                                <i className="bx bx-error-circle" style={styles.errorIcon}></i>
+                                <span>Failed to Reject</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
+            ) : (
+              <p style={{ color: "red", marginTop: "1rem" }}>No unverified faculty records found matching the criteria.</p>
+            )}
+          </div>
+        </main>
+      </section>
+
+      {/* Faculty Details Popup */}
+      {selectedFaculty && (
+        <div style={popupStyles.popup}>
+          <div style={popupStyles.popupContent}>
+            <h3 style={popupStyles.popupHeader}>Faculty Details</h3>
+            <table style={popupStyles.table}>
+              <tbody>{renderPopupContent(selectedFaculty)}</tbody>
+            </table>
+            <button
+              style={popupStyles.closeButton}
+              onClick={closePopup}
+              onMouseOver={(e) => (e.target.style.backgroundColor = "#c82333")}
+              onMouseOut={(e) => (e.target.style.backgroundColor = "#dc3545")}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Remarks Popup */}
+      {rejectingFacultyId && (
+        <div style={popupStyles.popup}>
+          <div style={popupStyles.popupContent}>
+            <h3 style={popupStyles.popupHeader}>Rejection Remarks</h3>
+            <textarea
+              value={rejectionRemarks}
+              onChange={(e) => setRejectionRemarks(e.target.value)}
+              placeholder="Enter rejection remarks here..."
+              style={{
+                width: "100%",
+                minHeight: "100px",
+                padding: "10px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+                marginBottom: "15px",
+                resize: "vertical",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button
-                style={popupStyles.closeButton}
-                onClick={closePopup}
-                onMouseOver={(e) => (e.target.style.backgroundColor = "#c82333")}
-                onMouseOut={(e) => (e.target.style.backgroundColor = "#dc3545")}
+                style={{ ...popupStyles.closeButton, backgroundColor: "#6c757d" }}
+                onClick={() => setRejectingFacultyId(null)}
+                onMouseOver={(e) => (e.target.style.backgroundColor = "#5a6268")}
+                onMouseOut={(e) => (e.target.style.backgroundColor = "#6c757d")}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                style={{ ...popupStyles.closeButton, backgroundColor: "#28a745" }}
+                onClick={submitRejection}
+                onMouseOver={(e) => (e.target.style.backgroundColor = "#218738")}
+                onMouseOut={(e) => (e.target.style.backgroundColor = "#28a745")}
+              >
+                Submit
               </button>
             </div>
           </div>
-        )}
-
-        {rejectingFacultyId && (
-          <div style={popupStyles.popup}>
-            <div style={popupStyles.popupContent}>
-              <h3 style={popupStyles.popupHeader}>Rejection Remarks</h3>
-              <textarea
-                value={rejectionRemarks}
-                onChange={(e) => setRejectionRemarks(e.target.value)}
-                placeholder="Enter rejection remarks here..."
-                style={{
-                  width: "100%",
-                  minHeight: "100px",
-                  padding: "10px",
-                  border: "1px solid #ddd",
-                  borderRadius: "4px",
-                  marginBottom: "15px",
-                  resize: "vertical"
-                }}
-              />
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-                <button
-                  style={{
-                    ...popupStyles.closeButton,
-                    backgroundColor: "#6c757d",
-                  }}
-                  onClick={() => setRejectingFacultyId(null)}
-                  onMouseOver={(e) => (e.target.style.backgroundColor = "#5a6268")}
-                  onMouseOut={(e) => (e.target.style.backgroundColor = "#6c757d")}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={{
-                    ...popupStyles.closeButton,
-                    backgroundColor: "#28a745",
-                  }}
-                  onClick={submitRejection}
-                  onMouseOver={(e) => (e.target.style.backgroundColor = "#218738")}
-                  onMouseOut={(e) => (e.target.style.backgroundColor = "#28a745")}
-                >
-                  Submit
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+    </div>
   );
 };
 

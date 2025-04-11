@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { act, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import "../styles/style.css";
 import "../styles/viewAsset.css";
@@ -12,6 +12,7 @@ const AssetView = () => {
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [buildingCondemnationData, setBuildingCondemnationData] = useState([]); // For building condemnation data
   const [activeTab, setActiveTab] = useState("purchase");
   const [buildingMaintenanceData, setBuildingMaintenanceData] = useState([]); // For building maintenance data
@@ -64,7 +65,7 @@ const AssetView = () => {
     serviceNo: "",
     serviceAmountFrom: "",
     serviceAmountTo: "",
-    buildingNo: "", // New filter for building number
+    buildingNo: "",
   });
   const [disposalFilters, setDisposalFilters] = useState({
     assetType: "",
@@ -116,6 +117,48 @@ const AssetView = () => {
     "Land",
     "ICT Goods",
   ];
+  const handleSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  
+    const sortedData = [...tableData].sort((a, b) => {
+      let aValue = a[key];
+      let bValue = b[key];
+  
+      // Handle date fields
+      if (key === "purchaseDate" || key === "issuedDate" || key === "serviceDate" || key === "inspectionDate" || key === "condemnationDate" || key === "dateOfConstruction" || key === "dateOfPossession") {
+        aValue = aValue ? new Date(aValue) : null;
+        bValue = bValue ? new Date(bValue) : null;
+      }
+  
+      // Handle numeric fields
+      if (["quantityReceived", "inStock", "quantityIssued", "serviceAmount", "purchaseValue", "bookValue", "disposalValue", "costOfConstruction", "servicableQuantity", "condemnedQuantity"].includes(key)) {
+        aValue = parseFloat(aValue) || 0;
+        bValue = parseFloat(bValue) || 0;
+      }
+  
+      // Handle arrays (e.g., itemIds, issuedIds)
+      if (Array.isArray(aValue) && Array.isArray(bValue)) {
+        aValue = aValue.join(", ");
+        bValue = bValue.join(", ");
+      }
+  
+      // Handle null or undefined values
+      if (!aValue && !bValue) return 0;
+      if (!aValue) return direction === "asc" ? 1 : -1;
+      if (!bValue) return direction === "asc" ? -1 : 1;
+  
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return direction === "asc" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+      }
+      return direction === "asc" ? aValue - bValue : bValue - aValue;
+    });
+  
+    setTableData(sortedData);
+  };
   const consumableAssetOptions = [
     "",
     "Stationery",
@@ -179,7 +222,10 @@ const AssetView = () => {
     const fetchData = async () => {
       let endpoint = "";
       let filters = {};
-
+      if (["purchase", "storeIssue", "deadStock"].includes(activeTab)) {
+        setBuildingMaintenanceData([]);
+        setBuildingCondemnationData([]);
+      }
       switch (activeTab) {
         case "purchase":
           endpoint = "/api/assets/filterPurchase";
@@ -190,6 +236,7 @@ const AssetView = () => {
             subCategory: purchaseFilters.subCategory === "Others" ? purchaseFilters.customSubCategory : purchaseFilters.subCategory,
             source: purchaseFilters.source === "Other" ? purchaseFilters.customSource : purchaseFilters.source,
             modeOfPurchase: purchaseFilters.modeOfPurchase === "Others" ? purchaseFilters.customModeOfPurchase : purchaseFilters.modeOfPurchase,
+            ...(purchaseFilters.assetCategory !== "Building" && purchaseFilters.assetCategory !== "Land" ? { itemName: purchaseFilters.itemName } : {}),
           };
           break;
         case "storeIssue":
@@ -262,8 +309,6 @@ const AssetView = () => {
           );
         } else {
           setTableData(response.data);
-          setBuildingMaintenanceData([]); // Clear building maintenance data for other tabs
-          setBuildingCondemnationData([]); // Clear building condemnation data for other tabs
           setMessage(response.data.length === 0 ? "No matching records found." : "");
         }
       } catch (error) {
@@ -345,6 +390,7 @@ const AssetView = () => {
           serviceNo: "",
           serviceAmountFrom: "",
           serviceAmountTo: "",
+          buildingNo: ""
         });
         break;
       case "disposal":
@@ -413,8 +459,9 @@ const AssetView = () => {
   };
 
   const generatePDF = async () => {
-    const pdf = new jsPDF("l", "mm", "a3");
+    const pdf = new jsPDF("l", "mm", "a3"); // Landscape A3 size (420mm x 297mm)
     const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = { left: 10, right: 10 }; // Define margins to constrain content
   
     let logoBase64;
     try {
@@ -425,7 +472,7 @@ const AssetView = () => {
   
     const logoWidth = 50;
     const logoHeight = 50;
-    const logoX = 10;
+    const logoX = margin.left;
     const logoY = 10;
   
     if (logoBase64) {
@@ -456,89 +503,148 @@ const AssetView = () => {
       { align: "center" }
     );
   
+    let startY = assetReportY + 10;
+  
     if (activeTab === "purchase") {
-      const tableColumn = [
-        "Asset Type",
-        "Asset Category",
-        "Sub Category",
-        "Item Name",
-        "Purchase Date",
-        "Quantity Received",
-        "Overall Price",
-        "Details",
-      ];
-      const tableRows = tableData.map((row) => {
-        const details = [
-          `Bill No: ${row.billNo || "N/A"}`,
-          `Supplier Name: ${row.supplierName || "N/A"}`,
-          `Supplier Address: ${row.supplierAddress || "N/A"}`,
-          `Source: ${row.source || "N/A"}`,
-          `Mode of Purchase: ${row.modeOfPurchase || "N/A"}`,
-          `Received By: ${row.receivedBy || "N/A"}`,
-          `Item Description: ${row.itemDescription || "N/A"}`,
-          `Unit Price: ${row.unitPrice || "N/A"}`,
-          `AMC From Date: ${row.amcFromDate ? new Date(row.amcFromDate).toLocaleDateString() : "N/A"}`,
-          `AMC To Date: ${row.amcToDate ? new Date(row.amcToDate).toLocaleDateString() : "N/A"}`,
-          `AMC Cost: ${row.amcCost || "N/A"}`,
-          `Warranty Number: ${row.warrantyNumber || "N/A"}`,
-          `Warranty Valid Upto: ${row.warrantyValidUpto ? new Date(row.warrantyValidUpto).toLocaleDateString() : "N/A"}`,
-          `Item IDs: ${(row.itemIds || []).join(", ") || "N/A"}`,
-        ].join("\n");
+      if (!tableData || !Array.isArray(tableData) || !purchaseFilters) {
+        console.error("Required data for 'purchase' tab is missing");
+        return;
+      }
+      let tableColumn = [];
+      let tableRows = [];
   
-        return [
-          row.assetType,
-          row.assetCategory,
-          row.subCategory,
-          row.itemName,
-          new Date(row.purchaseDate).toLocaleDateString(),
-          row.quantityReceived,
-          row.overallPrice,
-          details,
+      if (purchaseFilters.assetCategory === "Building") {
+        tableColumn = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Building No",
+          "Cost of Construction",
+          "Date of Construction",
+          "Details",
         ];
-      });
-  
-      pdf.setFontSize(14);
-      if (totalCost.serviceCost) {
-        pdf.text(`Total Purchase Cost: ₹${totalCost.serviceCost}`, pageWidth - 60, assetReportY + 10);
+        tableRows = tableData.map((row) => {
+          const details = [
+            `Type: ${row.type || "N/A"}`,
+            `Plinth Area: ${row.plinthArea || "N/A"}`,
+            `Approved Estimate: ${row.approvedEstimate || "N/A"}`,
+            `Remarks: ${row.remarks || "N/A"}`,
+            `Approved Building Plan URL: ${row.approvedBuildingPlanUrl || "N/A"}`,
+            `KMZ/KML File URL: ${row.kmzOrkmlFileUrl || "N/A"}`,
+          ].join("\n");
+          return [
+            row.assetType || "N/A",
+            row.assetCategory || "N/A",
+            row.subCategory || "N/A",
+            row.buildingNo || "N/A",
+            row.costOfConstruction || "N/A",
+            row.dateOfConstruction ? new Date(row.dateOfConstruction).toLocaleDateString() : "N/A",
+            details,
+          ];
+        });
+      } else if (purchaseFilters.assetCategory === "Land") {
+        tableColumn = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Date of Possession",
+          "Controller/Custody",
+          "Details",
+        ];
+        tableRows = tableData.map((row) => {
+          const details = [`Details: ${row.details || "N/A"}`].join("\n");
+          return [
+            row.assetType || "N/A",
+            row.assetCategory || "N/A",
+            row.subCategory || "N/A",
+            row.dateOfPossession ? new Date(row.dateOfPossession).toLocaleDateString() : "N/A",
+            row.controllerOrCustody || "N/A",
+            details,
+          ];
+        });
+      } else {
+        tableColumn = [
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Item Name",
+          "Purchase Date",
+          "Quantity Received",
+          "Total Price",
+          "Details",
+        ];
+        tableRows = tableData.map((row) => {
+          const details = [
+            `Bill No: ${row.billNo || "N/A"}`,
+            `Supplier Name: ${row.supplierName || "N/A"}`,
+            `Supplier Address: ${row.supplierAddress || "N/A"}`,
+            `Source: ${row.source || "N/A"}`,
+            `Mode of Purchase: ${row.modeOfPurchase || "N/A"}`,
+            `Received By: ${row.receivedBy || "N/A"}`,
+            `Item Description: ${row.itemDescription || "N/A"}`,
+            `Unit Price: ${row.unitPrice || "N/A"}`,
+            `AMC From Date: ${row.amcFromDate ? new Date(row.amcFromDate).toLocaleDateString() : "N/A"}`,
+            `AMC To Date: ${row.amcToDate ? new Date(row.amcToDate).toLocaleDateString() : "N/A"}`,
+            `AMC Cost: ${row.amcCost || "N/A"}`,
+            `Warranty Number: ${row.warrantyNumber || "N/A"}`,
+            `Warranty Valid Upto: ${row.warrantyValidUpto ? new Date(row.warrantyValidUpto).toLocaleDateString() : "N/A"}`,
+            `Item IDs: ${(row.itemIds || []).join(", ") || "N/A"}`,
+          ].join("\n");
+          return [
+            row.assetType || "N/A",
+            row.assetCategory || "N/A",
+            row.subCategory || "N/A",
+            row.itemName || "N/A",
+            row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A",
+            row.quantityReceived || "N/A",
+            row.totalPrice || "N/A",
+            details,
+          ];
+        });
       }
   
       pdf.autoTable({
-        startY: totalCost.serviceCost ? assetReportY + 20 : assetReportY + 10,
+        startY,
         head: [tableColumn],
         body: tableRows,
         theme: "grid",
         styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
         headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: { 7: { cellWidth: 50 } }, // Wider column for "Details"
-        margin: { left: 10, right: 10 },
+        margin: margin,
       });
-    } else if (activeTab === "storeIssue" && storeIssueFilters.location === "store") {
+      startY = pdf.lastAutoTable.finalY; // Update startY
+    } else if (activeTab === "storeIssue" && storeIssueFilters?.location === "store") {
+      if (!tableData || !Array.isArray(tableData) || !storeIssueFilters) {
+        console.error("Required data for 'storeIssue' tab (store) is missing");
+        return;
+      }
       const tableColumn = ["Asset Category", "Sub Category", "Item Name", "Item Description", "In Stock", "Item IDs"];
       const tableRows = tableData.map((row) => [
-        row.assetCategory,
-        row.subCategory,
-        row.itemName,
-        row.itemDescription,
-        row.inStock,
-        row.itemIds?.join(", ") || "",
+        row.assetCategory || "N/A",
+        row.subCategory || "N/A",
+        row.itemName || "N/A",
+        row.itemDescription || "N/A",
+        row.inStock || "N/A",
+        row.itemIds?.join(", ") || "N/A",
       ]);
   
       pdf.autoTable({
-        startY: assetReportY + 10,
+        startY,
         head: [tableColumn],
         body: tableRows,
         theme: "grid",
         styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
         headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: tableColumn.reduce((acc, col, index) => {
-          acc[index] = { cellWidth: 40 };
-          return acc;
-        }, {}),
-        margin: { left: 10, right: 10 },
+        margin: margin,
       });
-    } else if (activeTab === "storeIssue" && storeIssueFilters.location !== "store") {
+      startY = pdf.lastAutoTable.finalY;
+    } else if (activeTab === "storeIssue" && storeIssueFilters?.location !== "store") {
+      if (!tableData || !Array.isArray(tableData) || !storeIssueFilters) {
+        console.error("Required data for 'storeIssue' tab (non-store) is missing");
+        return;
+      }
       const tableColumn = [
         "Asset Type",
         "Asset Category",
@@ -551,33 +657,33 @@ const AssetView = () => {
         "Issued IDs",
       ];
       const tableRows = tableData.map((row) => [
-        row.assetType,
-        row.assetCategory,
-        row.subCategory,
-        row.itemName,
-        row.itemDescription,
-        row.location,
-        row.quantityIssued,
+        row.assetType || "N/A",
+        row.assetCategory || "N/A",
+        row.subCategory || "N/A",
+        row.itemName || "N/A",
+        row.itemDescription || "N/A",
+        row.location || "N/A",
+        row.quantityIssued || "N/A",
         row.issuedDate ? new Date(row.issuedDate).toLocaleDateString() : "N/A",
-        row.issuedIds?.join(", ") || "",
+        row.issuedIds?.join(", ") || "N/A",
       ]);
   
       pdf.autoTable({
-        startY: assetReportY + 10,
+        startY,
         head: [tableColumn],
         body: tableRows,
         theme: "grid",
         styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
         headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: tableColumn.reduce((acc, col, index) => {
-          acc[index] = { cellWidth: 40 };
-          return acc;
-        }, {}),
-        margin: { left: 10, right: 10 },
+        margin: margin,
       });
+      startY = pdf.lastAutoTable.finalY;
     } else if (activeTab === "serviceReturn") {
-      let startY = assetReportY + 10;
+      if (!tableData || !Array.isArray(tableData) || !serviceReturnFilters || !totalCost) {
+        console.error("Required data for 'serviceReturn' tab is missing");
+        return;
+      }
       if (totalCost.serviceCost || totalCost.maintenanceCost) {
         pdf.setFontSize(14);
         pdf.setTextColor(0, 0, 0);
@@ -607,32 +713,32 @@ const AssetView = () => {
       const tableRows = tableData.map((row) => {
         if (serviceReturnFilters.condition === "InService") {
           return [
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.itemName,
+            row.assetType || "N/A",
+            row.assetCategory || "N/A",
+            row.subCategory || "N/A",
+            row.itemName || "N/A",
             row.location || "N/A",
-            row.condition,
+            row.condition || "N/A",
             row.itemId || "N/A",
           ];
         } else if (serviceReturnFilters.condition === "Exchanged") {
           return [
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.itemName,
+            row.assetType || "N/A",
+            row.assetCategory || "N/A",
+            row.subCategory || "N/A",
+            row.itemName || "N/A",
             row.location || "N/A",
-            row.condition,
+            row.condition || "N/A",
             row.returnedQuantity || "N/A",
           ];
         } else {
           return [
-            row.assetType,
-            row.assetCategory,
-            row.subCategory,
-            row.itemName,
+            row.assetType || "N/A",
+            row.assetCategory || "N/A",
+            row.subCategory || "N/A",
+            row.itemName || "N/A",
             row.location || "N/A",
-            row.condition,
+            row.condition || "N/A",
             (row.itemIds || []).join(", ") || "N/A",
             row.serviceNo || "N/A",
             row.serviceDate ? new Date(row.serviceDate).toLocaleDateString() : "N/A",
@@ -649,14 +755,20 @@ const AssetView = () => {
         styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
         headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: tableColumn.reduce((acc, col, index) => {
-          acc[index] = { cellWidth: 40 };
-          return acc;
-        }, {}),
-        margin: { left: 10, right: 10 },
+        margin: margin,
       });
+      startY = pdf.lastAutoTable.finalY;
   
-      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0) {
+      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData?.length > 0) {
+        pdf.addPage();
+        pdf.setFontSize(27);
+        pdf.text("Building Maintenance Records", pageWidth / 2, 20, { align: "center" });
+        startY = totalCost.maintenanceCost ? 40 : 30;
+        if (totalCost.maintenanceCost) {
+          pdf.setFontSize(14);
+          pdf.text(`Total Maintenance Cost: ₹${totalCost.maintenanceCost}`, pageWidth - 60, 30);
+        }
+  
         const buildingTableColumn = [
           "Asset Type",
           "Asset Category",
@@ -669,41 +781,34 @@ const AssetView = () => {
           "Agency",
         ];
         const buildingTableRows = buildingMaintenanceData.map((row) => [
-          row.assetType,
-          row.assetCategory,
-          row.subCategory,
-          row.buildingNo,
-          new Date(row.yearOfMaintenance).toLocaleDateString(),
-          row.cost,
-          row.description,
-          row.custody,
-          row.agency,
+          row.assetType || "N/A",
+          row.assetCategory || "N/A",
+          row.subCategory || "N/A",
+          row.buildingNo || "N/A",
+          row.yearOfMaintenance ? new Date(row.yearOfMaintenance).toLocaleDateString() : "N/A",
+          row.cost || "N/A",
+          row.description || "N/A",
+          row.custody || "N/A",
+          row.agency || "N/A",
         ]);
   
-        pdf.addPage();
-        pdf.setFontSize(27);
-        pdf.text("Building Maintenance Records", pageWidth / 2, 20, { align: "center" });
-        if (totalCost.maintenanceCost) {
-          pdf.setFontSize(14);
-          pdf.text(`Total Maintenance Cost: ₹${totalCost.maintenanceCost}`, pageWidth - 60, 30);
-        }
         pdf.autoTable({
-          startY: totalCost.maintenanceCost ? 40 : 30,
+          startY,
           head: [buildingTableColumn],
           body: buildingTableRows,
           theme: "grid",
           styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
           headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
           alternateRowStyles: { fillColor: [240, 240, 240] },
-          columnStyles: buildingTableColumn.reduce((acc, col, index) => {
-            acc[index] = { cellWidth: 40 };
-            return acc;
-          }, {}),
-          margin: { left: 10, right: 10 },
+          margin: margin,
         });
+        startY = pdf.lastAutoTable.finalY;
       }
     } else if (activeTab === "disposal") {
-      let startY = assetReportY + 10;
+      if (!tableData || !Array.isArray(tableData) || !disposalFilters || !totalCost) {
+        console.error("Required data for 'disposal' tab is missing");
+        return;
+      }
       if (totalCost.serviceCost || totalCost.demolitionEstimate) {
         pdf.setFontSize(14);
         pdf.setTextColor(0, 0, 0);
@@ -731,17 +836,17 @@ const AssetView = () => {
         "Disposal Value",
       ];
       const tableRows = tableData.map((row) => [
-        row.assetType,
-        row.assetCategory,
-        row.subCategory,
-        row.itemName,
-        row.itemIds?.join(", ") || "",
-        row.purchaseValue,
-        row.bookValue,
-        new Date(row.inspectionDate).toLocaleDateString(),
-        new Date(row.condemnationDate).toLocaleDateString(),
-        row.remark,
-        row.disposalValue,
+        row.assetType || "N/A",
+        row.assetCategory || "N/A",
+        row.subCategory || "N/A",
+        row.itemName || "N/A",
+        row.itemIds?.join(", ") || "N/A",
+        row.purchaseValue || "N/A",
+        row.bookValue || "N/A",
+        row.inspectionDate ? new Date(row.inspectionDate).toLocaleDateString() : "N/A",
+        row.condemnationDate ? new Date(row.condemnationDate).toLocaleDateString() : "N/A",
+        row.remark || "N/A",
+        row.disposalValue || "N/A",
       ]);
   
       pdf.autoTable({
@@ -752,14 +857,20 @@ const AssetView = () => {
         styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
         headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: tableColumn.reduce((acc, col, index) => {
-          acc[index] = { cellWidth: 40 };
-          return acc;
-        }, {}),
-        margin: { left: 10, right: 10 },
+        margin: margin,
       });
+      startY = pdf.lastAutoTable.finalY;
   
-      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0) {
+      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData?.length > 0) {
+        pdf.addPage();
+        pdf.setFontSize(27);
+        pdf.text("Building Condemnation Records", pageWidth / 2, 20, { align: "center" });
+        startY = totalCost.demolitionEstimate ? 40 : 30;
+        if (totalCost.demolitionEstimate) {
+          pdf.setFontSize(14);
+          pdf.text(`Total Demolition Estimate: ₹${totalCost.demolitionEstimate}`, pageWidth - 60, 30);
+        }
+  
         const buildingTableColumn = [
           "Asset Type",
           "Asset Category",
@@ -775,10 +886,10 @@ const AssetView = () => {
           "Demolition Estimate",
         ];
         const buildingTableRows = buildingCondemnationData.map((row) => [
-          row.assetType,
-          row.assetCategory,
-          row.subCategory,
-          row.condemnationYear,
+          row.assetType || "N/A",
+          row.assetCategory || "N/A",
+          row.subCategory || "N/A",
+          row.condemnationYear || "N/A",
           row.certificateObtained || "N/A",
           row.authority || "N/A",
           row.dateOfReferenceUrl || "N/A",
@@ -789,29 +900,23 @@ const AssetView = () => {
           row.demolitionEstimate || "N/A",
         ]);
   
-        pdf.addPage();
-        pdf.setFontSize(27);
-        pdf.text("Building Condemnation Records", pageWidth / 2, 20, { align: "center" });
-        if (totalCost.demolitionEstimate) {
-          pdf.setFontSize(14);
-          pdf.text(`Total Demolition Estimate: ₹${totalCost.demolitionEstimate}`, pageWidth - 60, 30);
-        }
         pdf.autoTable({
-          startY: totalCost.demolitionEstimate ? 40 : 30,
+          startY,
           head: [buildingTableColumn],
           body: buildingTableRows,
           theme: "grid",
           styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
           headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
           alternateRowStyles: { fillColor: [240, 240, 240] },
-          columnStyles: buildingTableColumn.reduce((acc, col, index) => {
-            acc[index] = { cellWidth: 40 };
-            return acc;
-          }, {}),
-          margin: { left: 10, right: 10 },
+          margin: margin,
         });
+        startY = pdf.lastAutoTable.finalY;
       }
     } else if (activeTab === "deadStock") {
+      if (!tableData || !Array.isArray(tableData)) {
+        console.error("Required data for 'deadStock' tab is missing");
+        return;
+      }
       const tableColumn = [
         "S.No",
         "Article Type",
@@ -827,83 +932,74 @@ const AssetView = () => {
         "Remarks",
       ];
       const tableRows = tableData.map((row, index) => {
-        const balance = row.overallQuantity - row.servicableQuantity - row.condemnedQuantity;
+        const balance = (row.overallQuantity || 0) - (row.servicableQuantity || 0) - (row.condemnedQuantity || 0);
         return [
           index + 1,
-          row.assetType,
-          row.assetCategory,
-          row.assetSubCategory,
-          row.itemName,
-          row.servicableQuantity,
-          row.condemnedQuantity,
+          row.assetType || "N/A",
+          row.assetCategory || "N/A",
+          row.assetSubCategory || "N/A",
+          row.itemName || "N/A",
+          row.servicableQuantity || "N/A",
+          row.condemnedQuantity || "N/A",
           balance >= 0 ? balance : 0,
-          row.methodOfDisposal,
+          row.methodOfDisposal || "N/A",
           row.remarks || "N/A",
-          "",
-          "",
+       
         ];
       });
   
       pdf.autoTable({
-        startY: assetReportY + 10,
+        startY,
         head: [tableColumn],
         body: tableRows,
         theme: "grid",
         styles: { fontSize: 10, cellPadding: 4, overflow: "linebreak", halign: "left" },
         headStyles: { fillColor: [22, 160, 133], textColor: [255, 255, 255], fontSize: 12 },
         alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: tableColumn.reduce((acc, col, index) => {
-          acc[index] = { cellWidth: 40 };
-          return acc;
-        }, {}),
-        margin: { left: 10, right: 10 },
+        margin: margin,
       });
+      startY = pdf.lastAutoTable.finalY;
     }
   
     pdf.save(`${activeTab === "deadStock" ? "dead_stock_register" : activeTab}_asset_report.pdf`);
   };
+
   const generateExcel = () => {
     const wb = XLSX.utils.book_new();
   
     if (activeTab === "purchase") {
-      const headers = [
-        "Asset Type",
-        "Asset Category",
-        "Sub Category",
-        "Item Name",
-        "Purchase Date",
-        "Supplier Name",
-        "Quantity Received",
-        "Overall Price",
-      ];
-      const data = tableData.map((row) => [
-        row.assetType,
-        row.assetCategory,
-        row.subCategory,
-        row.itemName,
-        new Date(row.purchaseDate).toLocaleDateString(),
-        row.supplierName,
-        row.quantityReceived,
-        row.overallPrice,
-      ]);
-  
-      const wsData = [];
-      if (totalCost.serviceCost) {
-        wsData.push(["Total Purchase Cost", `₹${totalCost.serviceCost}`]);
-        wsData.push([]); // Empty row for spacing
-      }
-      wsData.push(headers, ...data);
-  
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      ws["!cols"] = headers.map((header, index) => {
-        const maxLength = Math.max(
-          header.length,
-          ...data.map((row) => (row[index] ? row[index].toString().length : 0))
-        );
-        return { wch: Math.min(maxLength + 5, 50) };
-      });
-      XLSX.utils.book_append_sheet(wb, ws, "Purchase Assets");
-    } else if (activeTab === "storeIssue" && storeIssueFilters.location === "store") {
+      if (purchaseFilters.assetCategory === "Building") {
+        wsData.push([
+          "Asset Type",
+          "Asset Category",
+          "Sub Category",
+          "Building No",
+          "Cost of Construction",
+          "Date of Construction",
+          "Type",
+          "Plinth Area",
+          "Approved Estimate",
+          "Remarks",
+          "Approved Building Plan URL",
+          "KMZ/KML File URL",
+        ]);
+        tableData.forEach((row) => {
+          wsData.push([
+            row.assetType,
+            row.assetCategory,
+            row.subCategory,
+            row.buildingNo || "N/A",
+            row.costOfConstruction || "N/A",
+            row.dateOfConstruction ? new Date(row.dateOfConstruction).toLocaleDateString() : "N/A",
+            row.type || "N/A",
+            row.plinthArea || "N/A",
+            row.approvedEstimate || "N/A",
+            row.remarks || "N/A",
+            row.approvedBuildingPlanUrl || "N/A",
+            row.kmzOrkmlFileUrl || "N/A",
+          ]);
+        });
+      } }else if (activeTab === "storeIssue" && storeIssueFilters.location === "store") {
       const headers = ["Asset Category", "Sub Category", "Item Name", "Item Description", "In Stock", "Item IDs"];
       const data = tableData.map((row) => [
         row.assetCategory,
@@ -1223,45 +1319,81 @@ const AssetView = () => {
 
   // Calculate total costs
   const calculateTotalCost = () => {
-    let serviceCost = null;
-    let maintenanceCost = null;
-    let demolitionEstimate = null;
+    let serviceCost = 0;
+    let maintenanceCost = 0;
+    let demolitionEstimate = 0;
+    let purchaseCost = 0;
+    let disposalValue = 0;
+    let storeIssueValue = 0;
   
     if (activeTab === "purchase") {
-      serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.overallPrice) || 0), 0);
-      return {
-        serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        maintenanceCost: null,
-        demolitionEstimate: null,
-      };
-    } else if (activeTab === "serviceReturn" && serviceReturnFilters.condition !== "InService" && serviceReturnFilters.condition !== "Exchanged") {
-      serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.serviceAmount) || 0), 0);
-      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData.length > 0) {
+      purchaseCost = tableData.reduce((sum, row) => {
+        // Only include costOfConstruction if "Building" is explicitly selected
+        if (purchaseFilters.assetCategory === "Building" && row.assetCategory === "Building") {
+          return sum + (parseFloat(row.costOfConstruction) || 0);
+        }
+        // Include totalPrice for Land if "Land" is selected
+        else if (purchaseFilters.assetCategory === "Land" && row.assetCategory === "Land") {
+          return sum + (parseFloat(row.items?.[0]?.totalPrice) || 0);
+        }
+        // Include totalPrice for other categories only if not Building or Land, or if no specific category is filtered
+        else if (
+          purchaseFilters.assetCategory !== "Building" && 
+          purchaseFilters.assetCategory !== "Land" && 
+          row.assetCategory !== "Building" && 
+          row.assetCategory !== "Land"
+        ) {
+          return sum + (parseFloat(row.totalPrice) || 0);
+        }
+        return sum; // If none of the conditions match, don't add anything
+      }, 0);
+    }else if (activeTab === "serviceReturn") {
+      if (serviceReturnFilters.condition !== "InService" && serviceReturnFilters.condition !== "Exchanged") {
+        serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.serviceAmount) || 0), 0);
+      }
+      if (serviceReturnFilters.assetCategory === "Building") {
         maintenanceCost = buildingMaintenanceData.reduce((sum, row) => sum + (parseFloat(row.cost) || 0), 0);
       }
-      return {
-        serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        maintenanceCost: maintenanceCost
-          ? maintenanceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : null,
-        demolitionEstimate: null,
-      };
     } else if (activeTab === "disposal") {
-      serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.disposalValue) || 0), 0);
-      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0) {
+      disposalValue = tableData.reduce((sum, row) => sum + (parseFloat(row.disposalValue) || 0), 0);
+      if (disposalFilters.assetCategory === "Building") {
         demolitionEstimate = buildingCondemnationData.reduce((sum, row) => sum + (parseFloat(row.demolitionEstimate) || 0), 0);
       }
-      return {
-        serviceCost: serviceCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        maintenanceCost: null,
-        demolitionEstimate: demolitionEstimate
-          ? demolitionEstimate.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : null,
-      };
+    } else if (activeTab === "storeIssue" && storeIssueFilters.location !== "store") {
+      storeIssueValue = tableData.reduce((sum, row) => {
+        const quantity = parseFloat(row.quantityIssued) || 0;
+        const unitPrice = parseFloat(row.unitPrice) || 0;
+        return sum + (quantity * unitPrice);
+      }, 0);
     }
-    return { serviceCost: null, maintenanceCost: null, demolitionEstimate: null }; // No total cost for other tabs
-  };
   
+    return {
+      purchaseCost: purchaseCost > 0 ? purchaseCost.toLocaleString("en-IN", { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }) : null,
+      serviceCost: serviceCost > 0 ? serviceCost.toLocaleString("en-IN", { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }) : null,
+      maintenanceCost: maintenanceCost > 0 ? maintenanceCost.toLocaleString("en-IN", { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }) : null,
+      demolitionEstimate: demolitionEstimate > 0 ? demolitionEstimate.toLocaleString("en-IN", { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }) : null,
+      disposalValue: disposalValue > 0 ? disposalValue.toLocaleString("en-IN", { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }) : null,
+      storeIssueValue: storeIssueValue > 0 ? storeIssueValue.toLocaleString("en-IN", { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      }) : null,
+    };
+  };
   
 
   const totalCost = calculateTotalCost();
@@ -1270,50 +1402,21 @@ const AssetView = () => {
     <div className="admin-asset-view">
       <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
       <section id="sidebar">
-        <a href="#" className="brand">
-          <span className="text">ASSET ENTRY STAFF</span>
-        </a>
-        <ul className="side-menu top">
-          <li>
-            <a href={`/assetentrystaffdashboard?username=${encodeURIComponent(username)}`}>
-              <i className="bx bxs-dashboard" />
-              <span className="text">Home</span>
-            </a>
-          </li>
-          <li>
-            <a href={`/assetstore?username=${encodeURIComponent(username)}`}>
-              <i className="bx bxs-shopping-bag-alt" />
-              <span className="text">Asset Store</span>
-            </a>
-          </li>
-          <li>
-            <a href={`/assetissue?username=${encodeURIComponent(username)}`}>
-              <i className="bx bxs-package" />
-              <span className="text">Asset Issue</span>
-            </a>
-          </li>
-          <li>
-            <a href={`/assetreturn?username=${encodeURIComponent(username)}`}>
-              <i className="bx bxs-reply" />
-              <span className="text">Asset Return</span>
-            </a>
-          </li>
-          <li className="active">
-            <a href={`/viewasset?username=${encodeURIComponent(username)}`}>
-              <i className="bx bxs-doughnut-chart" />
-              <span className="text">Asset View</span>
-            </a>
-          </li>
-        </ul>
-        <ul className="side-menu">
-          <li>
-            <a href="/" className="logout">
-              <i className="bx bxs-log-out-circle" />
-              <span className="text">Logout</span>
-            </a>
-          </li>
-        </ul>
-      </section>
+          <a href="#" className="brand">
+            <span className="text">STOREKEEPER</span>
+          </a>
+          <ul className="side-menu top">
+            <li ><a href={`/assetentrystaffdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
+            <li ><a href={`/assetstore?username=${encodeURIComponent(username)}`}><i className="bx bxs-shopping-bag-alt" /><span className="text">Asset Store</span></a></li>
+            <li><a href={`/assetissue?username=${encodeURIComponent(username)}`}><i className="bx bxs-package" /><span className="text">Asset Issue</span></a></li>
+            <li><a href={`/assetreturn?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Return</span></a></li>
+            <li><a href={`/entrystaffassetupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Updation</span></a></li>
+            <li className="active"><a href={`/viewasset?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Asset View</span></a></li>
+          </ul>
+          <ul className="side-menu">
+            <li><a href="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
+          </ul>
+        </section>
 
       <main style={styles.mainContent}>
         <div className="dash-content">
@@ -2112,137 +2215,346 @@ const AssetView = () => {
                 <button onClick={generateExcel} style={styles.exportButton}>
                   Export to Excel
                 </button>
-                {(totalCost.serviceCost || totalCost.maintenanceCost || totalCost.demolitionEstimate) && (
-        <div style={styles.totalCostContainer}>
-          {totalCost.serviceCost && (
-            <div style={{ marginBottom: totalCost.maintenanceCost || totalCost.demolitionEstimate ? "10px" : "0" }}>
-              <span style={styles.totalCostLabel}>
-                {activeTab === "purchase"
-                  ? "Total Purchase Cost:"
-                  : activeTab === "serviceReturn"
-                  ? "Total Service Cost:"
-                  : "Total Disposal Value:"}
-              </span>
-              <span style={styles.totalCostValue}>₹{totalCost.serviceCost}</span>
-            </div>
-          )}
-          {totalCost.maintenanceCost && (
-            <div style={{ marginBottom: totalCost.demolitionEstimate ? "10px" : "0" }}>
-              <span style={styles.totalCostLabel}>Total Maintenance Cost:</span>
-              <span style={styles.totalCostValue}>₹{totalCost.maintenanceCost}</span>
-            </div>
-          )}
-          {totalCost.demolitionEstimate && (
-            <div>
-              <span style={styles.totalCostLabel}>Total Demolition Estimate:</span>
-              <span style={styles.totalCostValue}>₹{totalCost.demolitionEstimate}</span>
-            </div>
-          )}
-        </div>
-      )}
+                {(totalCost.purchaseCost || 
+  (activeTab === "serviceReturn" && totalCost.serviceCost) || 
+  (activeTab === "serviceReturn" && totalCost.maintenanceCost) || 
+  (activeTab === "disposal" && totalCost.demolitionEstimate) || 
+  (activeTab === "disposal" && totalCost.disposalValue) || 
+  totalCost.storeIssueValue) && (
+  <div style={styles.totalCostContainer}>
+    {totalCost.purchaseCost && activeTab === "purchase" && purchaseFilters.assetCategory !== "Building" && (
+      <div style={{ marginBottom: "10px" }}>
+        <span style={styles.totalCostLabel}>Total Purchase Cost:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.purchaseCost}</span>
+      </div>
+    )}
+    {totalCost.purchaseCost && activeTab === "purchase" && purchaseFilters.assetCategory === "Building" && (
+      <div style={{ marginBottom: "10px" }}>
+        <span style={styles.totalCostLabel}>Total Construction Cost:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.purchaseCost}</span>
+      </div>
+    )}
+    {totalCost.serviceCost && activeTab === "serviceReturn" && (
+      <div style={{ marginBottom: "10px" }}>
+        <span style={styles.totalCostLabel}>Total Service Cost:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.serviceCost}</span>
+      </div>
+    )}
+    {totalCost.maintenanceCost && activeTab === "serviceReturn" && serviceReturnFilters.assetCategory ==="Building" (
+      <div style={{ marginBottom: "10px" }}>
+        <span style={styles.totalCostLabel}>Total Maintenance Cost:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.maintenanceCost}</span>
+      </div>
+    )}
+    {totalCost.demolitionEstimate && activeTab === "disposal" && (
+      <div style={{ marginBottom: "10px" }}>
+        <span style={styles.totalCostLabel}>Total Demolition Estimate:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.demolitionEstimate}</span>
+      </div>
+    )}
+    {totalCost.disposalValue && activeTab === "disposal" && (
+      <div>
+        <span style={styles.totalCostLabel}>Total Disposal Value:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.disposalValue}</span>
+      </div>
+    )}
+    {totalCost.storeIssueValue && activeTab === "storeIssue" && (
+      <div>
+        <span style={styles.totalCostLabel}>Total Store Issue Value:</span>
+        <span style={styles.totalCostValue}>₹{totalCost.storeIssueValue}</span>
+      </div>
+    )}
+  </div>
+)}
               </div>
               <table className="admin-asset-table">
-                <thead className="admin-asset-table-header">
-                  <tr>
-                    {activeTab === "purchase" && (
-                      <>
-                        <th>Asset Type</th>
-                        <th>Asset Category</th>
-                        <th>Sub Category</th>
-                        <th>Item Name</th>
-                        <th>Purchase Date</th>
-                        <th>Quantity Received</th>
-                        <th>Overall Price</th>
-                        <th>Details</th>
-                      </>
-                    )}
-                    {activeTab === "deadStock" && (
-                      <>
-                        <th>Article Type</th>
-                        <th>Article Category</th>
-                        <th>Article Sub Category</th>
-                        <th>Article Name</th>
-                        <th>No. of Articles Serviceable</th>
-                        <th>No. of Articles Condemned</th>
-                        <th>Balance</th>
-                        <th>Method of Disposal</th>
-                        <th>Reason for Condemnation</th>
-                      </>
-                    )}
-                    {activeTab === "storeIssue" && storeIssueFilters.location === "store" && (
-                      <>
-                        <th>Asset Category</th>
-                        <th>Sub Category</th>
-                        <th>Item Name</th>
-                        <th>Item Description</th>
-                        <th>In Stock</th>
-                        <th>Item IDs</th>
-                      </>
-                    )}
-                    {activeTab === "storeIssue" && storeIssueFilters.location !== "store" && (
-                      <>
-                        <th>Asset Type</th>
-                        <th>Asset Category</th>
-                        <th>Sub Category</th>
-                        <th>Item Name</th>
-                        <th>Item Description</th>
-                        <th>Location</th>
-                        <th>Quantity Issued</th>
-                        <th>Issued Date</th>
-                        <th>Issued IDs</th>
-                      </>
-                    )}
-                    {activeTab === "serviceReturn" && (
-                      <>
-                        <th>Asset Type</th>
-                        <th>Asset Category</th>
-                        <th>Sub Category</th>
-                        <th>Item Name</th>
-                        <th>Location</th>
-                        <th>Condition</th>
-                        {serviceReturnFilters.condition === "InService" ? (
-                          <th>Item ID</th>
-                        ) : serviceReturnFilters.condition === "Exchanged" ? (
-                          <th>Returned Quantity</th>
-                        ) : (
-                          <>
-                            <th>Item IDs</th>
-                            <th>Service No</th>
-                            <th>Service Date</th>
-                            <th>Service Amount</th>
-                          </>
-                        )}
-                      </>
-                    )}
-                    {activeTab === "disposal" && (
-                      <>
-                        <th>Asset Type</th>
-                        <th>Asset Category</th>
-                        <th>Sub Category</th>
-                        <th>Item Name</th>
-                        <th>Item IDs</th>
-                        <th>Purchase Value</th>
-                        <th>Book Value</th>
-                        <th>Inspection Date</th>
-                        <th>Condemnation Date</th>
-                        <th>Remark</th>
-                        <th>Disposal Value</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
+              <thead className="admin-asset-table-header">
+  <tr>
+    {activeTab === "purchase" && purchaseFilters.assetCategory === "Building" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Asset Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("buildingNo")}>
+          Building No {sortConfig.key === "buildingNo" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("type")}>
+          Type {sortConfig.key === "type" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("purchaseDate")}>
+          Purchase Date {sortConfig.key === "purchaseDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("costOfConstruction")}>
+          Cost of Construction {sortConfig.key === "costOfConstruction" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("plinthArea")}>
+          Plinth Area {sortConfig.key === "plinthArea" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th>Details</th>
+      </>
+    )}
+    {activeTab === "purchase" && purchaseFilters.assetCategory === "Land" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Asset Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("dateOfPossession")}>
+          Date of Possession {sortConfig.key === "dateOfPossession" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("controllerOrCustody")}>
+          Controller/Custody {sortConfig.key === "controllerOrCustody" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("purchaseDate")}>
+          Purchase Date {sortConfig.key === "purchaseDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("totalPrice")}>
+          Total Price {sortConfig.key === "totalPrice" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th>Details</th>
+      </>
+    )}
+    {activeTab === "purchase" && purchaseFilters.assetCategory !== "Building" && purchaseFilters.assetCategory !== "Land" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Asset Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("assetCategory")}>
+          Asset Category {sortConfig.key === "assetCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemName")}>
+          Item Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("purchaseDate")}>
+          Purchase Date {sortConfig.key === "purchaseDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("quantityReceived")}>
+          Quantity Received {sortConfig.key === "quantityReceived" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("totalPrice")}>
+          Total Price {sortConfig.key === "totalPrice" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th>Details</th>
+      </>
+    )}
+    {activeTab === "deadStock" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Article Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("assetCategory")}>
+          Article Category {sortConfig.key === "assetCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("assetSubCategory")}>
+          Article Sub Category {sortConfig.key === "assetSubCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemName")}>
+          Article Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("servicableQuantity")}>
+          No. of Articles Serviceable {sortConfig.key === "servicableQuantity" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("condemnedQuantity")}>
+          No. of Articles Condemned {sortConfig.key === "condemnedQuantity" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th>Balance</th>
+        <th onClick={() => handleSort("methodOfDisposal")}>
+          Method of Disposal {sortConfig.key === "methodOfDisposal" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("remarks")}>
+          Reason for Condemnation {sortConfig.key === "remarks" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+      </>
+    )}
+    {activeTab === "storeIssue" && storeIssueFilters.location === "store" && (
+      <>
+        <th onClick={() => handleSort("assetCategory")}>
+          Asset Category {sortConfig.key === "assetCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemName")}>
+          Item Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemDescription")}>
+          Item Description {sortConfig.key === "itemDescription" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("inStock")}>
+          In Stock {sortConfig.key === "inStock" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemIds")}>
+          Item IDs {sortConfig.key === "itemIds" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+      </>
+    )}
+    {activeTab === "storeIssue" && storeIssueFilters.location !== "store" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Asset Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("assetCategory")}>
+          Asset Category {sortConfig.key === "assetCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemName")}>
+          Item Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemDescription")}>
+          Item Description {sortConfig.key === "itemDescription" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("location")}>
+          Location {sortConfig.key === "location" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("quantityIssued")}>
+          Quantity Issued {sortConfig.key === "quantityIssued" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("issuedDate")}>
+          Issued Date {sortConfig.key === "issuedDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("issuedIds")}>
+          Issued IDs {sortConfig.key === "issuedIds" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+      </>
+    )}
+    {activeTab === "serviceReturn" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Asset Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("assetCategory")}>
+          Asset Category {sortConfig.key === "assetCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemName")}>
+          Item Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("location")}>
+          Location {sortConfig.key === "location" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("condition")}>
+          Condition {sortConfig.key === "condition" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        {serviceReturnFilters.condition === "InService" ? (
+          <th onClick={() => handleSort("itemId")}>
+            Item ID {sortConfig.key === "itemId" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+          </th>
+        ) : serviceReturnFilters.condition === "Exchanged" ? (
+          <th onClick={() => handleSort("returnedQuantity")}>
+            Returned Quantity {sortConfig.key === "returnedQuantity" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+          </th>
+        ) : (
+          <>
+            <th onClick={() => handleSort("itemIds")}>
+              Item IDs {sortConfig.key === "itemIds" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+            </th>
+            <th onClick={() => handleSort("serviceNo")}>
+              Service No {sortConfig.key === "serviceNo" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+            </th>
+            <th onClick={() => handleSort("serviceDate")}>
+              Service Date {sortConfig.key === "serviceDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+            </th>
+            <th onClick={() => handleSort("serviceAmount")}>
+              Service Amount {sortConfig.key === "serviceAmount" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+            </th>
+          </>
+        )}
+      </>
+    )}
+    {activeTab === "disposal" && (
+      <>
+        <th onClick={() => handleSort("assetType")}>
+          Asset Type {sortConfig.key === "assetType" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("assetCategory")}>
+          Asset Category {sortConfig.key === "assetCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("subCategory")}>
+          Sub Category {sortConfig.key === "subCategory" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemName")}>
+          Item Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("itemIds")}>
+          Item IDs {sortConfig.key === "itemIds" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("purchaseValue")}>
+          Purchase Value {sortConfig.key === "purchaseValue" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("bookValue")}>
+          Book Value {sortConfig.key === "bookValue" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("inspectionDate")}>
+          Inspection Date {sortConfig.key === "inspectionDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("condemnationDate")}>
+          Condemnation Date {sortConfig.key === "condemnationDate" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("remark")}>
+          Remark {sortConfig.key === "remark" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+        <th onClick={() => handleSort("disposalValue")}>
+          Disposal Value {sortConfig.key === "disposalValue" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+        </th>
+      </>
+    )}
+  </tr>
+</thead>
                 <tbody className="admin-asset-table-body">
                   {tableData.map((row, index) => (
                     <tr key={index} className="admin-asset-table-row" style={index % 2 === 0 ? styles.evenRow : styles.oddRow}>
-                      {activeTab === "purchase" && (
+                      {activeTab === "purchase" && purchaseFilters.assetCategory === "Building" && (
+                        <>
+                          <td>{row.assetType}</td>
+                          <td>{row.subCategory}</td>
+                          <td>{row.buildingNo || "N/A"}</td>
+                          <td>{row.type || "N/A"}</td>
+                          <td>{row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A"}</td>
+                          <td>{row.costOfConstruction || "N/A"}</td>
+                          <td>{row.plinthArea || "N/A"}</td>
+                          <td>
+                            <button onClick={() => showDetails(row)} style={styles.viewDetailsButton}>
+                              View Details
+                            </button>
+                          </td>
+                        </>
+                      )}
+                      {activeTab === "purchase" && purchaseFilters.assetCategory === "Land" && (
+                        <>
+                          <td>{row.assetType}</td>
+                          <td>{row.subCategory}</td>
+                          <td>{row.dateOfPossession ? new Date(row.dateOfPossession).toLocaleDateString() : "N/A"}</td>
+                          <td>{row.controllerOrCustody || "N/A"}</td>
+                          <td>{row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A"}</td>
+                          <td>{row.items?.[0]?.totalPrice || "N/A"}</td>
+                          <td>
+                            <button onClick={() => showDetails(row)} style={styles.viewDetailsButton}>
+                              View Details
+                            </button>
+                          </td>
+                        </>
+                      )}
+                      {activeTab === "purchase" && purchaseFilters.assetCategory !== "Building" && purchaseFilters.assetCategory !== "Land" && (
                         <>
                           <td>{row.assetType}</td>
                           <td>{row.assetCategory}</td>
                           <td>{row.subCategory}</td>
-                          <td>{row.itemName}</td>
-                          <td>{new Date(row.purchaseDate).toLocaleDateString()}</td>
-                          <td>{row.quantityReceived}</td>
-                          <td>{row.overallPrice}</td>
+                          <td>{row.itemName || "N/A"}</td>
+                          <td>{row.purchaseDate ? new Date(row.purchaseDate).toLocaleDateString() : "N/A"}</td>
+                          <td>{row.quantityReceived || "N/A"}</td>
+                          <td>{row.totalPrice || "N/A"}</td>
                           <td>
                             <button onClick={() => showDetails(row)} style={styles.viewDetailsButton}>
                               View Details
@@ -2364,7 +2676,7 @@ const AssetView = () => {
     </table>
   </>
 )}
-{disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0 && (
+{disposalFilters.assetCategory === "Building" && buildingCondemnationData.length > 0 && activeTab==="disposal" && (
   <>
     <h3 style={{ marginTop: "20px" }}>Building Condemnation Records</h3>
     <table className="admin-asset-table">
@@ -2405,67 +2717,154 @@ const AssetView = () => {
     </table>
   </>
 )}
-          {selectedDetails && activeTab === "purchase" && (
+          {selectedDetails && (
             <div style={styles.popupContainer}>
               <div style={styles.popupContent}>
                 <h2>Asset Details</h2>
                 <div style={styles.tableContainer}>
-                  <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
-                    <tbody>
-                      {[
-                        { label: "Asset Type", value: selectedDetails.assetType },
-                        { label: "Asset Category", value: selectedDetails.assetCategory },
-                        { label: "Sub Category", value: selectedDetails.subCategory },
-                        { label: "Item Name", value: selectedDetails.itemName },
-                        { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
-                        { label: "Purchase Date", value: new Date(selectedDetails.purchaseDate).toLocaleDateString() },
-                        { label: "Supplier Name", value: selectedDetails.supplierName },
-                        { label: "Supplier Address", value: selectedDetails.supplierAddress || "N/A" },
-                        { label: "Source", value: selectedDetails.source },
-                        { label: "Mode of Purchase", value: selectedDetails.modeOfPurchase },
-                        { label: "Bill No", value: selectedDetails.billNo },
-                        { label: "Received By", value: selectedDetails.receivedBy },
-                        { label: "Bill Photo", value: selectedDetails.billPhotoUrl ? <a href={selectedDetails.billPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                        { label: "Item Description", value: selectedDetails.itemDescription || "N/A" },
-                      ].map((item, index) => (
-                        <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                          <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
-                          <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                    <table style={tableStyles.advancedTable} className="admin-asset-table">
-                    <tbody>
-                      {[
-                        { label: "Quantity Received", value: selectedDetails.quantityReceived },
-                        { label: "Unit Price", value: selectedDetails.unitPrice },
-                        { label: "Total Price", value: selectedDetails.overallPrice },
-                        { label: "AMC From Date", value: selectedDetails.amcFromDate ? new Date(selectedDetails.amcFromDate).toLocaleDateString() : "N/A" },
-                        { label: "AMC To Date", value: selectedDetails.amcToDate ? new Date(selectedDetails.amcToDate).toLocaleDateString() : "N/A" },
-                        { label: "AMC Cost", value: selectedDetails.amcCost || "N/A" },
-                        { label: "AMC Photo", value: selectedDetails.amcPhotoUrl ? <a href={selectedDetails.amcPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                        { label: "Item Photo", value: selectedDetails.itemPhotoUrl ? <a href={selectedDetails.itemPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                        { label: "Warranty Number", value: selectedDetails.warrantyNumber || "N/A" },
-                        { label: "Warranty Valid Upto", value: selectedDetails.warrantyValidUpto ? new Date(selectedDetails.warrantyValidUpto).toLocaleDateString() : "N/A" },
-                        { label: "Warranty Photo", value: selectedDetails.warrantyPhotoUrl ? <a href={selectedDetails.warrantyPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
-                        { label: "Item IDs", value: (selectedDetails.itemIds || []).length > 0 ? <span style={tableStyles.itemIdBox}>{selectedDetails.itemIds.join(", ")}</span> : "N/A" },
-                        { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
-                        { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
-                      ].map((item, index) => (
-                        <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
-                          <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
-                          <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {selectedDetails.assetCategory === "Building" ? (
+                    <>
+                      <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
+                        <tbody>
+                          {[
+                            { label: "Asset Type", value: selectedDetails.assetType },
+                            { label: "Asset Category", value: selectedDetails.assetCategory },
+                            { label: "Sub Category", value: selectedDetails.subCategory },
+                            { label: "Building No", value: selectedDetails.buildingNo || "N/A" },
+                            { label: "Type", value: selectedDetails.type || "N/A" },
+                            { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
+                            { label: "Date of Construction", value: selectedDetails.dateOfConstruction ? new Date(selectedDetails.dateOfConstruction).toLocaleDateString() : "N/A" },
+                            { label: "Cost of Construction", value: selectedDetails.costOfConstruction ? `₹${selectedDetails.costOfConstruction.toLocaleString()}` : "N/A" },
+                            { label: "Plinth Area", value: selectedDetails.plinthArea || "N/A" },
+                            { label: "Approved Estimate", value: selectedDetails.approvedEstimate || "N/A" },
+                            { label: "Remarks", value: selectedDetails.remarks || "N/A" },
+                            { label: "Approved Building Plan", value: selectedDetails.approvedBuildingPlanUrl ? <a href={selectedDetails.approvedBuildingPlanUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                            { label: "KMZ/KML File", value: selectedDetails.kmzOrkmlFileUrl ? <a href={selectedDetails.kmzOrkmlFileUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                      
+                          ].map((item, index) => (
+                            <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                              <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
+                              <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {/* Upgrades Table */}
+                      {selectedDetails.upgrades && selectedDetails.upgrades.length > 0 ? (
+                        <div style={{ marginTop: "20px", width: "100%" }}>
+                          <h3 style={{ marginBottom: "10px" }}>Upgrades</h3>
+                          <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable, width: "100%" }}>
+                            <thead>
+                              <tr style={{ backgroundColor: "#007BFF", color: "#fff" }}>
+                                <th style={{ padding: "10px" }}>Year</th>
+                                <th style={{ padding: "10px" }}>Estimate</th>
+                                <th style={{ padding: "10px" }}>Approved Estimate</th>
+                                <th style={{ padding: "10px" }}>Date of Completion</th>
+                                <th style={{ padding: "10px" }}>Warranty Period</th>
+                                <th style={{ padding: "10px" }}>Execution Agency</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedDetails.upgrades.map((upgrade, index) => (
+                                <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.year || "N/A"}</td>
+                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.estimate ? `₹${upgrade.estimate.toLocaleString()}` : "N/A"}</td>
+                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.approvedEstimate ? `₹${upgrade.approvedEstimate.toLocaleString()}` : "N/A"}</td>
+                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.dateOfCompletion ? new Date(upgrade.dateOfCompletion).toLocaleDateString() : "N/A"}</td>
+                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.warrantyPeriod || "N/A"}</td>
+                                  <td style={{ padding: "10px", borderBottom: "1px solid #ddd" }}>{upgrade.executionAgency || "N/A"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p style={{ marginTop: "20px" }}>No upgrades available.</p>
+                      )}
+                    </>
+                  ) : selectedDetails.assetCategory === "Land" ? (
+                    <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
+                      <tbody>
+                        {[
+                          { label: "Asset Type", value: selectedDetails.assetType },
+                          { label: "Asset Category", value: selectedDetails.assetCategory },
+                          { label: "Sub Category", value: selectedDetails.subCategory },
+                          { label: "Location", value: selectedDetails.location || "N/A" },
+                          { label: "Status", value: selectedDetails.status || "N/A" },
+                          { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
+                          { label: "Date of Possession", value: selectedDetails.dateOfPossession ? new Date(selectedDetails.dateOfPossession).toLocaleDateString() : "N/A" },
+                          { label: "Controller/Custody", value: selectedDetails.controllerOrCustody || "N/A" },
+                          { label: "Details", value: selectedDetails.details || "N/A" },
+                          { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
+                          { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
+                        ].map((item, index) => (
+                          <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                            <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
+                            <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <>
+                      <table style={{ ...styles.detailsTable, ...tableStyles.detailsTable }}>
+                        <tbody>
+                          {[
+                            { label: "Asset Type", value: selectedDetails.assetType },
+                            { label: "Asset Category", value: selectedDetails.assetCategory },
+                            { label: "Sub Category", value: selectedDetails.subCategory },
+                            { label: "Item Name", value: selectedDetails.itemName },
+                            { label: "Entry Date", value: selectedDetails.entryDate ? new Date(selectedDetails.entryDate).toLocaleDateString() : "N/A" },
+                            { label: "Purchase Date", value: selectedDetails.purchaseDate ? new Date(selectedDetails.purchaseDate).toLocaleDateString() : "N/A" },
+                            { label: "Supplier Name", value: selectedDetails.supplierName },
+                            { label: "Supplier Address", value: selectedDetails.supplierAddress || "N/A" },
+                            { label: "Source", value: selectedDetails.source },
+                            { label: "Mode of Purchase", value: selectedDetails.modeOfPurchase },
+                            { label: "Bill No", value: selectedDetails.billNo },
+                            { label: "Received By", value: selectedDetails.receivedBy },
+                            { label: "Bill Photo", value: selectedDetails.billPhotoUrl ? <a href={selectedDetails.billPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                            { label: "Item Description", value: selectedDetails.itemDescription || "N/A" },
+                          ].map((item, index) => (
+                            <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                              <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
+                              <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <table style={tableStyles.advancedTable} className="admin-asset-table">
+                        <tbody>
+                          {[
+                            { label: "Quantity Received", value: selectedDetails.quantityReceived },
+                            { label: "Unit Price", value: selectedDetails.unitPrice },
+                            { label: "Total Price", value: selectedDetails.totalPrice },
+                            { label: "AMC From Date", value: selectedDetails.amcFromDate ? new Date(selectedDetails.amcFromDate).toLocaleDateString() : "N/A" },
+                            { label: "AMC To Date", value: selectedDetails.amcToDate ? new Date(selectedDetails.amcToDate).toLocaleDateString() : "N/A" },
+                            { label: "AMC Cost", value: selectedDetails.amcCost || "N/A" },
+                            { label: "AMC Photo", value: selectedDetails.amcPhotoUrl ? <a href={selectedDetails.amcPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                            { label: "Item Photo", value: selectedDetails.itemPhotoUrl ? <a href={selectedDetails.itemPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                            { label: "Warranty Number", value: selectedDetails.warrantyNumber || "N/A" },
+                            { label: "Warranty Valid Upto", value: selectedDetails.warrantyValidUpto ? new Date(selectedDetails.warrantyValidUpto).toLocaleDateString() : "N/A" },
+                            { label: "Warranty Photo", value: selectedDetails.warrantyPhotoUrl ? <a href={selectedDetails.warrantyPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
+                            { label: "Item IDs", value: (selectedDetails.itemIds || []).length > 0 ? <span style={tableStyles.itemIdBox}>{selectedDetails.itemIds.join(", ")}</span> : "N/A" },
+                            { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
+                            { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
+                          ].map((item, index) => (
+                            <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
+                              <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
+                              <td style={{ width: "60%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
                 </div>
-              </div>
-              <div style={styles.closeButtonContainer}>
-                <button onClick={closeDetails} style={styles.closeButton}>
-                  Close
-                </button>
+                <div style={styles.closeButtonContainer}>
+                  <button onClick={closeDetails} style={styles.closeButton}>
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -2541,9 +2940,8 @@ const styles = {
     left: "250px",
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)", // Changed to slightly dim (30% opacity)
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     display: "flex",
-    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
@@ -2553,17 +2951,24 @@ const styles = {
     padding: "20px",
     borderRadius: "10px",
     maxWidth: "900px",
-    maxHeight: "70%",
-    overflowY: "auto",
-    width: "100%", // Ensure it takes full width within maxWidth
-    boxSizing: "border-box", // Include padding in width calculation
-    display: "flex", // Added to stack content and button vertically
-    flexDirection: "column", // Stack vertically
-    alignItems: "center", // Center contents horizontally
+    maxHeight: "80%", // Increased to accommodate content
+    width: "100%",
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    position: "relative", // Added for button positioning
+  },
+  tableContainer: {
+    maxHeight: "calc(80% - 80px)", // Adjust height to leave space for button
+    overflowY: "auto", // Scrollable content
+    width: "100%",
   },
   closeButtonContainer: {
-    marginTop: "20px", // Space between content and button
-    textAlign: "center", // Center the button horizontally
+    position: "absolute",
+    bottom: "10px",
+    left: "50%",
+    transform: "translateX(-50%)", // Center horizontally
+    padding: "10px",
   },
   closeButton: {
     padding: "10px 20px",
@@ -2623,11 +3028,11 @@ const styles = {
   oddRow: {
     backgroundColor: "#ffffff",
   },
-  tableContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "20px", // Space between the two tables
-  },
+  // tableContainer: {
+  //   display: "flex",
+  //   justifyContent: "space-between",
+  //   gap: "20px", // Space between the two tables
+  // },
   mainContent: {
     marginLeft: "280px", // Width of the sidebar
     padding: "20px",
@@ -2664,6 +3069,8 @@ const tableStyles = {
     maxWidth: "100%",
     wordBreak: "break-word",
   },
+  
 };
+
 
 export default AssetView;

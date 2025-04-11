@@ -502,7 +502,7 @@ const AssetEntryStaffDashboard = () => {
 
         <section id="sidebar">
           <a href="#" className="brand">
-            <span className="text">ASSET ENTRY STAFF</span>
+            <span className="text">STOREKEEPER</span>
           </a>
           <ul className="side-menu top">
             <li className="active"><a href={`/assetentrystaffdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>

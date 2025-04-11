@@ -166,46 +166,72 @@ exports.approveOrRejectMaintenance = async (req, res) => {
     res.status(500).json({ message: "Failed to process approval/rejection" });
   }
 };
+
 exports.updateDeadStockQuantities = async (req, res) => {
   try {
     const deadStockItems = await DeadStockRegister.find();
 
     for (const item of deadStockItems) {
       let servicableQuantity = 0;
+      let overallQuantity = 0;
 
       if (item.assetType === "Permanent") {
-        // Count total itemIds from ReturnedPermanent
-     
-
-        // Count serviceable items (e.g., approved and not disposed)
-        const serviceablePermanent = await ReturnedPermanent.find({
-          itemName: item.itemName,
-          itemDescription: item.itemDescription,
-          approved: "yes",
-          status:"service",
+        // Calculate overall quantity from Permanent model (case-insensitive)
+        const permanentAssets = await Permanent.find({
+          "items.itemName": { $regex: new RegExp(`^${item.itemName}$`, "i") },
+          "items.itemDescription": { $regex: new RegExp(`^${item.itemDescription}$`, "i") },
         });
-        console.log("hi",serviceablePermanent);
+        console.log(permanentAssets);
+        overallQuantity = permanentAssets.reduce((sum, asset) => {
+          const matchingItems = asset.items.filter(
+            (i) =>
+              i.itemName.toLowerCase() === item.itemName.toLowerCase() &&
+              i.itemDescription.toLowerCase() === item.itemDescription.toLowerCase()
+          );
+          return sum + matchingItems.reduce((subSum, i) => subSum + (i.quantityReceived || 0), 0);
+        }, 0);
+
+        // Calculate serviceable quantity from ReturnedPermanent (case-insensitive)
+        const serviceablePermanent = await ReturnedPermanent.find({
+          itemName: { $regex: new RegExp(`^${item.itemName}$`, "i") },
+          itemDescription: { $regex: new RegExp(`^${item.itemDescription}$`, "i") },
+          approved: "yes",
+          status: "service",
+        });
         servicableQuantity = serviceablePermanent.length; // Number of serviceable documents
       } else if (item.assetType === "Consumable") {
-        // Sum returnQuantity from ReturnedConsumable
+        // Calculate overall quantity from Consumable model (case-insensitive)
+        const consumableAssets = await Consumable.find({
+          "items.itemName": { $regex: new RegExp(`^${item.itemName}$`, "i") },
+          "items.itemDescription": { $regex: new RegExp(`^${item.itemDescription}$`, "i") },
+        });
 
+        overallQuantity = consumableAssets.reduce((sum, asset) => {
+          const matchingItems = asset.items.filter(
+            (i) =>
+              i.itemName.toLowerCase() === item.itemName.toLowerCase() &&
+              i.itemDescription.toLowerCase() === item.itemDescription.toLowerCase()
+          );
+          return sum + matchingItems.reduce((subSum, i) => subSum + (i.quantityReceived || 0), 0);
+        }, 0);
 
-        // Sum serviceable quantity (e.g., approved and not disposed)
+        // Calculate serviceable quantity from ReturnedConsumable (case-insensitive)
         const serviceableConsumable = await ReturnedConsumable.find({
-          itemName: item.itemName,
-          itemDescription: item.itemDescription,
+          itemName: { $regex: new RegExp(`^${item.itemName}$`, "i") },
+          itemDescription: { $regex: new RegExp(`^${item.itemDescription}$`, "i") },
           approved: "yes",
-          status:"service",
+          status: "service",
         });
         servicableQuantity = serviceableConsumable.reduce((sum, doc) => sum + (doc.returnQuantity || 0), 0);
       }
 
-      // Update the DeadStockRegister document
+      // Update the DeadStockRegister document with both quantities
       await DeadStockRegister.updateOne(
         { _id: item._id },
         {
           $set: {
             servicableQuantity,
+            overallQuantity,
           },
         }
       );
@@ -1907,6 +1933,7 @@ exports.return = async (req, res) => {
         });
         await newReturned.save();
       }
+      console.log("savre")
     } else {
       // For Consumable, create a single ReturnedConsumable document with quantity
       const newReturned = new ReturnedModel({
@@ -2001,7 +2028,7 @@ exports.getBuildingUpgrades = async (req, res) => {
 exports.getReturnedAssets = async (req, res) => {
   try {
     const { assetType, assetCategory, status } = req.body;
-
+    console.log("wnjwben");
     if (!["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ message: "Invalid assetType. Must be 'Permanent' or 'Consumable'." });
     }
@@ -2012,7 +2039,7 @@ exports.getReturnedAssets = async (req, res) => {
     if (!returnedAssets || returnedAssets.length === 0) {
       return res.status(400).json({ message: "No returned assets found" });
     }
-
+    console.log("returned");
     res.status(200).json(returnedAssets);
   } catch (error) {
     console.error("Failed to fetch returned assets:", error);
@@ -3018,7 +3045,6 @@ exports.filterStoreIssue = async (req, res) => {
     res.status(500).json({ message: "Error filtering store/issue assets" });
   }
 };
-
 exports.filterPurchase = async (req, res) => {
   try {
     const {
@@ -3057,174 +3083,172 @@ exports.filterPurchase = async (req, res) => {
       if (purchaseDateTo) query.purchaseDate.$lte = new Date(purchaseDateTo);
     }
 
-    // Query Building model
-    if (!assetType || assetType === "Permanent" || assetType === "") {
-      if (!assetCategory || assetCategory === "Building") {
-        const buildingQuery = { ...query };
-        if (purchaseDateFrom || purchaseDateTo) {
-          // Map purchaseDate to dateOfConstruction for Buildings
-          delete buildingQuery.purchaseDate;
-          buildingQuery.dateOfConstruction = {};
-          if (purchaseDateFrom) buildingQuery.dateOfConstruction.$gte = new Date(purchaseDateFrom);
-          if (purchaseDateTo) buildingQuery.dateOfConstruction.$lte = new Date(purchaseDateTo);
-        }
-
-        const buildingAssets = await Building.find(buildingQuery).lean();
-        result = result.concat(
-          buildingAssets.map((asset) => ({
-            assetType: asset.assetType,
-            assetCategory: asset.assetCategory,
-            subCategory: asset.subCategory || "N/A",
-            itemName: asset.buildingNo || "Building", // Use buildingNo as itemName for frontend consistency
-            entryDate: asset.entryDate,
-            purchaseDate: asset.dateOfConstruction || asset.entryDate, // Fallback to entryDate if no construction date
-            supplierName: "N/A", // Buildings don't have supplier info
-            supplierAddress: "N/A",
-            source: "N/A",
-            modeOfPurchase: "N/A",
-            billNo: "N/A",
-            receivedBy: "N/A",
-            billPhotoUrl: asset.approvedBuildingPlanUrl || "N/A",
-            itemDescription: asset.remarks || asset.type || "N/A",
-            quantityReceived: 1, // Buildings are singular
-            unitPrice: asset.costOfConstruction || 0,
-            totalPrice: asset.costOfConstruction || 0,
-            amcFromDate: null,
-            amcToDate: null,
-            amcCost: null,
-            amcPhotoUrl: "N/A",
-            itemPhotoUrl: asset.kmzOrkmlFileUrl || "N/A",
-            warrantyNumber: "N/A",
-            warrantyValidUpto: null,
-            warrantyPhotoUrl: "N/A",
-            itemIds: [], // Buildings don't have itemIds
-            createdAt: asset.createdAt,
-            updatedAt: asset.updatedAt,
-            // Building-specific fields
-            buildingNo: asset.buildingNo || "N/A",
-            type: asset.type || "N/A",
-            plinthArea: asset.plinthArea || "N/A",
-            costOfConstruction: asset.costOfConstruction || 0,
-            approvedEstimate: asset.approvedEstimate || "N/A",
-            dateOfConstruction: asset.dateOfConstruction || null,
-            remarks: asset.remarks || "N/A",
-            approvedBuildingPlanUrl: asset.approvedBuildingPlanUrl || "N/A",
-            kmzOrkmlFileUrl: asset.kmzOrkmlFileUrl || "N/A",
-            upgrades: asset.upgrades || [], // Include upgrades array
-          }))
-        );
+    // Query Building model only if assetCategory is explicitly "Building"
+    if (assetCategory === "Building") {
+      const buildingQuery = { ...query };
+      if (purchaseDateFrom || purchaseDateTo) {
+        // Map purchaseDate to dateOfConstruction for Buildings
+        delete buildingQuery.purchaseDate;
+        buildingQuery.dateOfConstruction = {};
+        if (purchaseDateFrom) buildingQuery.dateOfConstruction.$gte = new Date(purchaseDateFrom);
+        if (purchaseDateTo) buildingQuery.dateOfConstruction.$lte = new Date(purchaseDateTo);
       }
 
-      // Query Land model
-      if (!assetCategory || assetCategory === "Land") {
-        const landQuery = { ...query };
-        if (purchaseDateFrom || purchaseDateTo) {
-          // Map purchaseDate to dateOfPossession for Land
-          delete landQuery.purchaseDate;
-          landQuery.dateOfPossession = {};
-          if (purchaseDateFrom) landQuery.dateOfPossession.$gte = new Date(purchaseDateFrom);
-          if (purchaseDateTo) landQuery.dateOfPossession.$lte = new Date(purchaseDateTo);
-        }
-
-        const landAssets = await Land.find(landQuery).lean();
-        result = result.concat(
-          landAssets.map((asset) => ({
-            assetType: asset.assetType,
-            assetCategory: asset.assetCategory,
-            subCategory: asset.subCategory || "N/A",
-            itemName: asset.location || "Land Parcel", // Use location as itemName for frontend consistency
-            entryDate: asset.entryDate,
-            purchaseDate: asset.dateOfPossession || asset.entryDate, // Fallback to entryDate if no possession date
-            supplierName: "N/A", // Land doesn't have supplier info
-            supplierAddress: "N/A",
-            source: "N/A",
-            modeOfPurchase: "N/A",
-            billNo: "N/A",
-            receivedBy: "N/A",
-            billPhotoUrl: "N/A",
-            itemDescription: asset.details || "N/A",
-            quantityReceived: 1, // Land is singular
-            unitPrice: 0, // No cost in current Land schema
-            totalPrice: 0,
-            amcFromDate: null,
-            amcToDate: null,
-            amcCost: null,
-            amcPhotoUrl: "N/A",
-            itemPhotoUrl: "N/A",
-            warrantyNumber: "N/A",
-            warrantyValidUpto: null,
-            warrantyPhotoUrl: "N/A",
-            itemIds: [], // Land doesn't have itemIds
-            createdAt: asset.createdAt,
-            updatedAt: asset.updatedAt,
-            // Land-specific fields
-            dateOfPossession: asset.dateOfPossession || null,
-            controllerOrCustody: asset.controllerOrCustody || "N/A",
-            details: asset.details || "N/A",
-            location: asset.location || "N/A",
-            status: asset.status || "N/A",
-          }))
-        );
-      }
-
-      // Query Permanent model (excluding Building and Land)
-      if (!assetCategory || (assetCategory !== "Building" && assetCategory !== "Land")) {
-        const permanentQuery = { ...query };
-        if (itemName) permanentQuery["items.itemName"] = { $regex: itemName, $options: "i" };
-        if (subCategory) permanentQuery["items.subCategory"] = { $regex: subCategory, $options: "i" };
-        if (amcDateFrom || amcDateTo) {
-          permanentQuery["items.amcFromDate"] = {};
-          permanentQuery["items.amcToDate"] = {};
-          if (amcDateFrom) permanentQuery["items.amcFromDate"].$gte = new Date(amcDateFrom);
-          if (amcDateTo) permanentQuery["items.amcToDate"].$lte = new Date(amcDateTo);
-        }
-
-        const permanentAssets = await Permanent.find(permanentQuery).lean();
-        result = result.concat(
-          permanentAssets.flatMap((asset) => {
-            if (!Array.isArray(asset.items)) {
-              console.warn("Permanent asset with missing or invalid items:", asset);
-              return [];
-            }
-            return asset.items
-              .filter((item) => !itemName || item.itemName.match(new RegExp(itemName, "i")))
-              .map((item) => ({
-                assetType: asset.assetType,
-                assetCategory: asset.assetCategory,
-                subCategory: item.subCategory || "N/A",
-                itemName: item.itemName,
-                entryDate: asset.entryDate,
-                purchaseDate: asset.purchaseDate,
-                supplierName: asset.supplierName || "N/A",
-                supplierAddress: asset.supplierAddress || "N/A",
-                source: asset.source || "N/A",
-                modeOfPurchase: asset.modeOfPurchase || "N/A",
-                billNo: asset.billNo || "N/A",
-                receivedBy: asset.receivedBy || "N/A",
-                billPhotoUrl: asset.billPhotoUrl || "N/A",
-                itemDescription: item.itemDescription || "N/A",
-                quantityReceived: item.quantityReceived || 0,
-                unitPrice: item.unitPrice || 0,
-                totalPrice: item.totalPrice || item.quantityReceived * item.unitPrice || 0,
-                amcFromDate: item.amcFromDate || null,
-                amcToDate: item.amcToDate || null,
-                amcCost: item.amcCost || null,
-                amcPhotoUrl: item.amcPhotoUrl || "N/A",
-                itemPhotoUrl: item.itemPhotoUrl || "N/A",
-                warrantyNumber: item.warrantyNumber || "N/A",
-                warrantyValidUpto: item.warrantyValidUpto || null,
-                warrantyPhotoUrl: item.warrantyPhotoUrl || "N/A",
-                itemIds: item.itemIds || [],
-                createdAt: asset.createdAt,
-                updatedAt: asset.updatedAt,
-              }));
-          })
-        );
-      }
+      const buildingAssets = await Building.find(buildingQuery).lean();
+      result = result.concat(
+        buildingAssets.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory || "N/A",
+          itemName: asset.buildingNo || "Building",
+          entryDate: asset.entryDate,
+          purchaseDate: asset.dateOfConstruction || asset.entryDate,
+          supplierName: "N/A",
+          supplierAddress: "N/A",
+          source: "N/A",
+          modeOfPurchase: "N/A",
+          billNo: "N/A",
+          receivedBy: "N/A",
+          billPhotoUrl: asset.approvedBuildingPlanUrl || "N/A",
+          itemDescription: asset.remarks || asset.type || "N/A",
+          quantityReceived: 1,
+          unitPrice: asset.costOfConstruction || 0,
+          totalPrice: asset.costOfConstruction || 0,
+          amcFromDate: null,
+          amcToDate: null,
+          amcCost: null,
+          amcPhotoUrl: "N/A",
+          itemPhotoUrl: asset.kmzOrkmlFileUrl || "N/A",
+          warrantyNumber: "N/A",
+          warrantyValidUpto: null,
+          warrantyPhotoUrl: "N/A",
+          itemIds: [],
+          createdAt: asset.createdAt,
+          updatedAt: asset.updatedAt,
+          // Building-specific fields
+          buildingNo: asset.buildingNo || "N/A",
+          type: asset.type || "N/A",
+          plinthArea: asset.plinthArea || "N/A",
+          costOfConstruction: asset.costOfConstruction || 0,
+          approvedEstimate: asset.approvedEstimate || "N/A",
+          dateOfConstruction: asset.dateOfConstruction || null,
+          remarks: asset.remarks || "N/A",
+          approvedBuildingPlanUrl: asset.approvedBuildingPlanUrl || "N/A",
+          kmzOrkmlFileUrl: asset.kmzOrkmlFileUrl || "N/A",
+          upgrades: asset.upgrades || [],
+        }))
+      );
     }
 
-    // Query Consumable model
-    if (!assetType || assetType === "Consumable" || assetType === "") {
+    // Query Land model only if assetCategory is explicitly "Land"
+    if (assetCategory === "Land") {
+      const landQuery = { ...query };
+      if (purchaseDateFrom || purchaseDateTo) {
+        // Map purchaseDate to dateOfPossession for Land
+        delete landQuery.purchaseDate;
+        landQuery.dateOfPossession = {};
+        if (purchaseDateFrom) landQuery.dateOfPossession.$gte = new Date(purchaseDateFrom);
+        if (purchaseDateTo) landQuery.dateOfPossession.$lte = new Date(purchaseDateTo);
+      }
+
+      const landAssets = await Land.find(landQuery).lean();
+      result = result.concat(
+        landAssets.map((asset) => ({
+          assetType: asset.assetType,
+          assetCategory: asset.assetCategory,
+          subCategory: asset.subCategory || "N/A",
+          itemName: asset.location || "Land Parcel",
+          entryDate: asset.entryDate,
+          purchaseDate: asset.dateOfPossession || asset.entryDate,
+          supplierName: "N/A",
+          supplierAddress: "N/A",
+          source: "N/A",
+          modeOfPurchase: "N/A",
+          billNo: "N/A",
+          receivedBy: "N/A",
+          billPhotoUrl: "N/A",
+          itemDescription: asset.details || "N/A",
+          quantityReceived: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          amcFromDate: null,
+          amcToDate: null,
+          amcCost: null,
+          amcPhotoUrl: "N/A",
+          itemPhotoUrl: "N/A",
+          warrantyNumber: "N/A",
+          warrantyValidUpto: null,
+          warrantyPhotoUrl: "N/A",
+          itemIds: [],
+          createdAt: asset.createdAt,
+          updatedAt: asset.updatedAt,
+          // Land-specific fields
+          dateOfPossession: asset.dateOfPossession || null,
+          controllerOrCustody: asset.controllerOrCustody || "N/A",
+          details: asset.details || "N/A",
+          location: asset.location || "N/A",
+          status: asset.status || "N/A",
+        }))
+      );
+    }
+
+    // Query Permanent model only if assetCategory is not "Building" or "Land" or if no assetCategory is specified
+    if (!assetCategory || (assetCategory !== "Building" && assetCategory !== "Land")) {
+      const permanentQuery = { ...query };
+      if (itemName) permanentQuery["items.itemName"] = { $regex: itemName, $options: "i" };
+      if (subCategory) permanentQuery["items.subCategory"] = { $regex: subCategory, $options: "i" };
+      if (amcDateFrom || amcDateTo) {
+        permanentQuery["items.amcFromDate"] = {};
+        permanentQuery["items.amcToDate"] = {};
+        if (amcDateFrom) permanentQuery["items.amcFromDate"].$gte = new Date(amcDateFrom);
+        if (amcDateTo) permanentQuery["items.amcToDate"].$lte = new Date(amcDateTo);
+      }
+
+      const permanentAssets = await Permanent.find(permanentQuery).lean();
+      result = result.concat(
+        permanentAssets.flatMap((asset) => {
+          if (!Array.isArray(asset.items)) {
+            console.warn("Permanent asset with missing or invalid items:", asset);
+            return [];
+          }
+          return asset.items
+            .filter((item) => !itemName || item.itemName.match(new RegExp(itemName, "i")))
+            .map((item) => ({
+              assetType: asset.assetType,
+              assetCategory: asset.assetCategory,
+              subCategory: item.subCategory || "N/A",
+              itemName: item.itemName,
+              entryDate: asset.entryDate,
+              purchaseDate: asset.purchaseDate,
+              supplierName: asset.supplierName || "N/A",
+              supplierAddress: asset.supplierAddress || "N/A",
+              source: asset.source || "N/A",
+              modeOfPurchase: asset.modeOfPurchase || "N/A",
+              billNo: asset.billNo || "N/A",
+              receivedBy: asset.receivedBy || "N/A",
+              billPhotoUrl: asset.billPhotoUrl || "N/A",
+              itemDescription: item.itemDescription || "N/A",
+              quantityReceived: item.quantityReceived || 0,
+              unitPrice: item.unitPrice || 0,
+              totalPrice: item.totalPrice || item.quantityReceived * item.unitPrice || 0,
+              amcFromDate: item.amcFromDate || null,
+              amcToDate: item.amcToDate || null,
+              amcCost: item.amcCost || null,
+              amcPhotoUrl: item.amcPhotoUrl || "N/A",
+              itemPhotoUrl: item.itemPhotoUrl || "N/A",
+              warrantyNumber: item.warrantyNumber || "N/A",
+              warrantyValidUpto: item.warrantyValidUpto || null,
+              warrantyPhotoUrl: item.warrantyPhotoUrl || "N/A",
+              itemIds: item.itemIds || [],
+              createdAt: asset.createdAt,
+              updatedAt: asset.updatedAt,
+            }));
+        })
+      );
+    }
+
+    // Query Consumable model only if assetCategory is not "Building" or "Land" or if no assetCategory is specified
+    if (!assetCategory || (assetCategory !== "Building" && assetCategory !== "Land")) {
       const consumableQuery = { ...query };
       if (itemName) consumableQuery["items.itemName"] = { $regex: itemName, $options: "i" };
       if (subCategory) consumableQuery["items.subCategory"] = { $regex: subCategory, $options: "i" };
@@ -3270,7 +3294,7 @@ exports.filterPurchase = async (req, res) => {
               warrantyNumber: item.warrantyNumber || "N/A",
               warrantyValidUpto: item.warrantyValidUpto || null,
               warrantyPhotoUrl: item.warrantyPhotoUrl || "N/A",
-              itemIds: [], // Consumable doesn't have itemIds by default
+              itemIds: [],
               createdAt: asset.createdAt,
               updatedAt: asset.updatedAt,
             }));

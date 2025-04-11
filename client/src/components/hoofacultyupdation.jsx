@@ -1,28 +1,31 @@
 import React, { useEffect, useState } from "react";
-import "../styles/style.css";
-import axios from "axios";
-import { useLocation, useNavigate } from "react-router-dom";
-import "../styles/viewFaculty.css";
+import "../styles/style.css"; // General styles
+import axios from "axios"; // HTTP client for API requests
+import { useLocation, useNavigate } from "react-router-dom"; // For navigation and URL parameters
+import "../styles/viewFaculty.css"; // Component-specific styles
 
+// FacultyUpdation component: Allows Head of Office to filter, view, update, and delete faculty records
 const FacultyUpdation = () => {
-  const [facultyType, setFacultyType] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [yearOfAllotment, setYearOfAllotment] = useState("");
-  const [status, setStatus] = useState("");
-  const [modulesHandled, setModulesHandled] = useState("");
-  const [majorDomains, setMajorDomains] = useState([]);
-  const [minorDomains, setMinorDomains] = useState([]);
-  const [areasOfExpertise, setAreasOfExpertise] = useState("");
-  const [institution, setInstitution] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [tableData, setTableData] = useState([]);
-  const [totalFaculties, setTotalFaculties] = useState(0);
-  const [message, setMessage] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // Faculty ID for confirmation
-  const [deleteStatus, setDeleteStatus] = useState({}); // Track deletion status per faculty
+  // State definitions for filters and faculty data
+  const [facultyType, setFacultyType] = useState(""); // Faculty type filter
+  const [name, setName] = useState(""); // Name filter
+  const [email, setEmail] = useState(""); // Email filter
+  const [yearOfAllotment, setYearOfAllotment] = useState(""); // Year of allotment filter
+  const [status, setStatus] = useState(""); // Status filter
+  const [modulesHandled, setModulesHandled] = useState(""); // Modules handled filter
+  const [majorDomains, setMajorDomains] = useState([]); // Major domains filter
+  const [minorDomains, setMinorDomains] = useState([]); // Minor domains filter
+  const [areasOfExpertise, setAreasOfExpertise] = useState(""); // Areas of expertise filter
+  const [institution, setInstitution] = useState(""); // Institution filter
+  const [mobileNumber, setMobileNumber] = useState(""); // Mobile number filter
+  const [tableData, setTableData] = useState([]); // Filtered faculty data for table
+  const [totalFaculties, setTotalFaculties] = useState(0); // Total number of filtered faculties
+  const [message, setMessage] = useState(""); // Message for no records found
+  const [selectedFaculty, setSelectedFaculty] = useState(null); // Faculty selected for detailed view
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // Faculty ID for delete confirmation
+  const [deleteStatus, setDeleteStatus] = useState({}); // Deletion status per faculty
 
+  // Domain options for major and minor domains dropdowns
   const domainOptions = {
     "Forest & Wildlife": [
       "Silviculture",
@@ -58,13 +61,7 @@ const FacultyUpdation = () => {
       "Ecosystem Health",
       "Others",
     ],
-    "Disaster Management": [
-      "Forest Fire Management & Damage assessment",
-      "Cyclone",
-      "Flood",
-      "Desertification",
-      "Others",
-    ],
+    "Disaster Management": ["Forest Fire Management & Damage assessment", "Cyclone", "Flood", "Desertification", "Others"],
     "Human Resource Development": [
       "Time Management",
       "Leadership Management",
@@ -77,14 +74,7 @@ const FacultyUpdation = () => {
       "Building competencies for personal Excellence",
       "Others",
     ],
-    "Health and Fitness": [
-      "First Aid",
-      "Counselling",
-      "Physical, mental and Social Health",
-      "Stress Management",
-      "Yoga and Meditation",
-      "Others",
-    ],
+    "Health and Fitness": ["First Aid", "Counselling", "Physical, mental and Social Health", "Stress Management", "Yoga and Meditation", "Others"],
     "Ethics and Public Governance": [
       "Public administration, Public Grievance and Public Finance",
       "Decision Making",
@@ -107,12 +97,7 @@ const FacultyUpdation = () => {
       "Cyber Security Laws",
       "Others",
     ],
-    "CCS Rules and Regulation": [
-      "Service Rules and matters",
-      "Conduct Rules",
-      "Disciplinary Proceedings",
-      "Others",
-    ],
+    "CCS Rules and Regulation": ["Service Rules and matters", "Conduct Rules", "Disciplinary Proceedings", "Others"],
     "Media Management": [
       "The Art of Interacting with Print and Electronic Media",
       "Role of Media",
@@ -123,11 +108,13 @@ const FacultyUpdation = () => {
     ],
   };
 
+  // Navigation and username extraction
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
 
+  // Navigate to update page with faculty data
   const handleUpdateDetails = async (facultyId) => {
     try {
       const response = await axios.get(`http://localhost:3001/api/faculty/search/${facultyId}`);
@@ -140,12 +127,14 @@ const FacultyUpdation = () => {
     }
   };
 
+  // Initiate faculty deletion with confirmation
   const handleDeleteFaculty = (facultyId) => {
-    setDeleteConfirmation(facultyId); // Show confirmation popup
+    setDeleteConfirmation(facultyId);
   };
 
+  // Confirm and perform faculty deletion
   const confirmDelete = async (facultyId) => {
-    setDeleteConfirmation(null); // Close confirmation popup
+    setDeleteConfirmation(null);
     setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Deleting..." }));
 
     try {
@@ -156,7 +145,7 @@ const FacultyUpdation = () => {
         setTotalFaculties((prev) => prev - 1);
         setTimeout(() => {
           setDeleteStatus((prev) => ({ ...prev, [facultyId]: "" }));
-        }, 2000); // Clear status after 2 seconds
+        }, 2000);
       } else {
         setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Failed to Delete" }));
       }
@@ -166,10 +155,12 @@ const FacultyUpdation = () => {
     }
   };
 
+  // Cancel deletion
   const cancelDelete = () => {
-    setDeleteConfirmation(null); // Close confirmation popup
+    setDeleteConfirmation(null);
   };
 
+  // Apply filters and fetch faculty data
   const handleApplyFilter = async () => {
     try {
       const response = await axios.post("http://localhost:3001/api/faculty/filterFaculties", {
@@ -197,37 +188,21 @@ const FacultyUpdation = () => {
     }
   };
 
+  // Fetch data on mount and when filters change
   useEffect(() => {
-    handleApplyFilter(); // Fetch all faculties initially
+    handleApplyFilter();
   }, []);
 
   useEffect(() => {
     handleApplyFilter();
-  }, [
-    facultyType,
-    name,
-    email,
-    yearOfAllotment,
-    status,
-    modulesHandled,
-    majorDomains,
-    minorDomains,
-    areasOfExpertise,
-    institution,
-    mobileNumber,
-  ]);
+  }, [facultyType, name, email, yearOfAllotment, status, modulesHandled, majorDomains, minorDomains, areasOfExpertise, institution, mobileNumber]);
 
+  // Render faculty details in popup
   const renderPopupContent = (data) => {
     const renderValue = (value, key) => {
       if (key === "photograph" && typeof value === "string") {
         const imageUrl = `http://localhost:3001/uploads/${value.split("\\").pop()}`;
-        return (
-          <img
-            src={imageUrl}
-            alt="Photograph"
-            style={{ width: "100px", height: "100px", objectFit: "cover" }}
-          />
-        );
+        return <img src={imageUrl} alt="Photograph" style={{ width: "100px", height: "100px", objectFit: "cover" }} />;
       }
       if (Array.isArray(value)) {
         return (
@@ -242,13 +217,11 @@ const FacultyUpdation = () => {
         return (
           <ul>
             {Object.entries(value)
-              .filter(([key]) => key !== "_id")
-              .map(([key, val]) => (
-                <li key={key}>
-                  <strong>
-                    {key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:
-                  </strong>{" "}
-                  {renderValue(val, key)}
+              .filter(([subKey]) => subKey !== "_id")
+              .map(([subKey, val]) => (
+                <li key={subKey}>
+                  <strong>{subKey.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:</strong>{" "}
+                  {renderValue(val, subKey)}
                 </li>
               ))}
           </ul>
@@ -269,6 +242,7 @@ const FacultyUpdation = () => {
       ));
   };
 
+  // Clear all filters
   const handleClearFilter = () => {
     setFacultyType("");
     setName("");
@@ -284,14 +258,17 @@ const FacultyUpdation = () => {
     handleApplyFilter();
   };
 
+  // Open faculty details popup
   const handleViewDetails = (faculty) => {
     setSelectedFaculty(faculty);
   };
 
+  // Close faculty details popup
   const closePopup = () => {
     setSelectedFaculty(null);
   };
 
+  // Inline styles for filter section
   const filterStyles = {
     filterContainer: {
       padding: "20px",
@@ -344,6 +321,7 @@ const FacultyUpdation = () => {
     },
   };
 
+  // Inline styles for view/update buttons
   const viewButtonStyles = {
     viewButton: {
       padding: "6px 12px",
@@ -359,6 +337,7 @@ const FacultyUpdation = () => {
     },
   };
 
+  // Inline styles for delete buttons
   const deleteButtonStyles = {
     deleteButton: {
       padding: "6px 12px",
@@ -382,6 +361,7 @@ const FacultyUpdation = () => {
     },
   };
 
+  // Inline styles for popups
   const popupStyles = {
     popup: {
       position: "fixed",
@@ -421,6 +401,7 @@ const FacultyUpdation = () => {
     },
   };
 
+  // Inline styles for delete confirmation popup
   const confirmationStyles = {
     confirmationPopup: {
       position: "fixed",
@@ -478,6 +459,7 @@ const FacultyUpdation = () => {
     },
   };
 
+  // General inline styles
   const styles = {
     usernameContainer: {
       display: "flex",
@@ -511,12 +493,13 @@ const FacultyUpdation = () => {
     errorIcon: { fontSize: "14px", color: "#dc3545" },
   };
 
+  // Render the component
   return (
     <div className="faculty-view">
+      {/* Meta tags and stylesheets */}
       <meta charSet="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
-      <link rel="stylesheet" href="style.css" />
       <title>CASFOS</title>
       <style>
         {`
@@ -531,6 +514,7 @@ const FacultyUpdation = () => {
         `}
       </style>
 
+      {/* Sidebar */}
       <section id="sidebar">
         <a href="#" className="brand">
           <span className="text">HEAD OF OFFICE</span>
@@ -577,6 +561,7 @@ const FacultyUpdation = () => {
         </ul>
       </section>
 
+      {/* Main content */}
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
@@ -606,9 +591,7 @@ const FacultyUpdation = () => {
                     value={facultyType}
                     onChange={(e) => setFacultyType(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select</option>
@@ -627,9 +610,7 @@ const FacultyUpdation = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -643,9 +624,7 @@ const FacultyUpdation = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -659,9 +638,7 @@ const FacultyUpdation = () => {
                     value={yearOfAllotment}
                     onChange={(e) => setYearOfAllotment(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -674,9 +651,7 @@ const FacultyUpdation = () => {
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select</option>
@@ -694,9 +669,7 @@ const FacultyUpdation = () => {
                     value={modulesHandled}
                     onChange={(e) => setModulesHandled(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -709,9 +682,7 @@ const FacultyUpdation = () => {
                     value={majorDomains[0] || ""}
                     onChange={(e) => setMajorDomains([e.target.value])}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select Major Domain</option>
@@ -736,9 +707,7 @@ const FacultyUpdation = () => {
                       opacity: !majorDomains[0] ? 0.7 : 1,
                       cursor: !majorDomains[0] ? "not-allowed" : "pointer",
                     }}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select Minor Domain</option>
@@ -760,9 +729,7 @@ const FacultyUpdation = () => {
                     value={areasOfExpertise}
                     onChange={(e) => setAreasOfExpertise(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -776,9 +743,7 @@ const FacultyUpdation = () => {
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -792,9 +757,7 @@ const FacultyUpdation = () => {
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -803,115 +766,92 @@ const FacultyUpdation = () => {
                 <button
                   style={filterStyles.clearButton}
                   onClick={handleClearFilter}
-                  onMouseOver={(e) =>
-                    (e.target.style.backgroundColor = filterStyles.clearButtonHover.backgroundColor)
-                  }
-                  onMouseOut={(e) =>
-                    (e.target.style.backgroundColor = filterStyles.clearButton.backgroundColor)
-                  }
+                  onMouseOver={(e) => (e.target.style.backgroundColor = filterStyles.clearButtonHover.backgroundColor)}
+                  onMouseOut={(e) => (e.target.style.backgroundColor = filterStyles.clearButton.backgroundColor)}
                 >
                   Clear Filter
                 </button>
               </div>
             </div>
 
+            {/* Display message if no records found */}
             {message && <p style={{ color: "red", marginTop: "1rem" }}>{message}</p>}
+
+            {/* Faculty table */}
             {tableData.length > 0 && (
-              <table className="faculty-table" style={{ marginTop: "1rem" }}>
+              <table className="faculty-table" style={{ marginTop: "1rem", width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Photograph</th>
-                    <th>Faculty Type</th>
-                    <th>Mobile Number</th>
-                    <th>Email</th>
-                    <th>Year of Allotment</th>
-                    <th>View</th>
-                    <th>Update</th>
-                    <th>Delete</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Name</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Photograph</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Faculty Type</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Mobile Number</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Email</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Year of Allotment</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>View</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Update</th>
+                    <th style={{ padding: "10px", border: "1px solid #ddd" }}>Delete</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData.map((row, index) => (
-                    <tr key={index}>
-                      <td>{row.name}</td>
-                      <td>
+                  {tableData.map((row) => (
+                    <tr key={row._id}>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.name || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>
                         {row.photograph ? (
                           <img
                             src={`http://localhost:3001/uploads/${row.photograph.split("\\").pop()}`}
                             alt="Photograph"
-                            style={{
-                              width: "50px",
-                              height: "50px",
-                              borderRadius: "5px",
-                              objectFit: "cover",
-                            }}
+                            style={{ width: "50px", height: "50px", borderRadius: "5px", objectFit: "cover" }}
                           />
                         ) : (
                           "No Image"
                         )}
                       </td>
-                      <td>{row.facultyType}</td>
-                      <td>{row.mobileNumber}</td>
-                      <td>{row.email}</td>
-                      <td>{row.yearOfAllotment}</td>
-                      <td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.facultyType || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.mobileNumber || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.email || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>{row.yearOfAllotment || "-"}</td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>
                         <button
                           style={viewButtonStyles.viewButton}
                           onClick={() => handleViewDetails(row)}
-                          onMouseOver={(e) =>
-                            (e.target.style.backgroundColor =
-                              viewButtonStyles.viewButtonHover.backgroundColor)
-                          }
-                          onMouseOut={(e) =>
-                            (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)
-                          }
+                          onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)}
                         >
                           View
                         </button>
                       </td>
-                      <td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>
                         <button
                           style={viewButtonStyles.viewButton}
                           onClick={() => handleUpdateDetails(row._id)}
-                          onMouseOver={(e) =>
-                            (e.target.style.backgroundColor =
-                              viewButtonStyles.viewButtonHover.backgroundColor)
-                          }
-                          onMouseOut={(e) =>
-                            (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)
-                          }
+                          onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)}
                         >
                           Update
                         </button>
                       </td>
-                      <td>
+                      <td style={{ padding: "10px", border: "1px solid #ddd" }}>
                         <button
                           style={{
                             ...deleteButtonStyles.deleteButton,
-                            ...(deleteStatus[row._id] === "Deleting..."
-                              ? deleteButtonStyles.deleteButtonDisabled
-                              : {}),
+                            ...(deleteStatus[row._id] === "Deleting..." ? deleteButtonStyles.deleteButtonDisabled : {}),
                           }}
                           onClick={() => handleDeleteFaculty(row._id)}
                           onMouseOver={(e) =>
                             deleteStatus[row._id] !== "Deleting..." &&
-                            (e.target.style.backgroundColor =
-                              deleteButtonStyles.deleteButtonHover.backgroundColor)
+                            (e.target.style.backgroundColor = deleteButtonStyles.deleteButtonHover.backgroundColor)
                           }
                           onMouseOut={(e) =>
                             deleteStatus[row._id] !== "Deleting..." &&
-                            (e.target.style.backgroundColor =
-                              deleteButtonStyles.deleteButton.backgroundColor)
+                            (e.target.style.backgroundColor = deleteButtonStyles.deleteButton.backgroundColor)
                           }
                           disabled={deleteStatus[row._id] === "Deleting..."}
                         >
                           {deleteStatus[row._id] === "Deleting..." && (
                             <>
-                              <i
-                                className="bx bx-loader-circle bx-spin"
-                                style={styles.loadingIcon}
-                              ></i>
+                              <i className="bx bx-loader-circle bx-spin" style={styles.loadingIcon}></i>
                               Deleting...
                             </>
                           )}
@@ -938,6 +878,8 @@ const FacultyUpdation = () => {
           </div>
         </main>
       </section>
+
+      {/* Faculty Details Popup */}
       {selectedFaculty && (
         <div style={popupStyles.popup}>
           <div style={popupStyles.popupContent}>
@@ -956,35 +898,26 @@ const FacultyUpdation = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Popup */}
       {deleteConfirmation && (
         <div style={confirmationStyles.confirmationPopup}>
           <div style={confirmationStyles.confirmationContent}>
-            <p style={confirmationStyles.confirmationText}>
-              Are you sure you want to delete this faculty?
-            </p>
+            <p style={confirmationStyles.confirmationText}>Are you sure you want to delete this faculty?</p>
             <div style={confirmationStyles.confirmationButtons}>
               <button
                 style={confirmationStyles.yesButton}
                 onClick={() => confirmDelete(deleteConfirmation)}
-                onMouseOver={(e) =>
-                  (e.target.style.backgroundColor = confirmationStyles.yesButtonHover.backgroundColor)
-                }
-                onMouseOut={(e) =>
-                  (e.target.style.backgroundColor = confirmationStyles.yesButton.backgroundColor)
-                }
+                onMouseOver={(e) => (e.target.style.backgroundColor = confirmationStyles.yesButtonHover.backgroundColor)}
+                onMouseOut={(e) => (e.target.style.backgroundColor = confirmationStyles.yesButton.backgroundColor)}
               >
                 Yes
               </button>
               <button
                 style={confirmationStyles.cancelButton}
                 onClick={cancelDelete}
-                onMouseOver={(e) =>
-                  (e.target.style.backgroundColor =
-                    confirmationStyles.cancelButtonHover.backgroundColor)
-                }
-                onMouseOut={(e) =>
-                  (e.target.style.backgroundColor = confirmationStyles.cancelButton.backgroundColor)
-                }
+                onMouseOver={(e) => (e.target.style.backgroundColor = confirmationStyles.cancelButtonHover.backgroundColor)}
+                onMouseOut={(e) => (e.target.style.backgroundColor = confirmationStyles.cancelButton.backgroundColor)}
               >
                 Cancel
               </button>

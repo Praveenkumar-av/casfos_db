@@ -1,31 +1,34 @@
 import React, { useEffect, useState } from "react";
-import "../styles/style.css";
-import axios from "axios";
-import { useLocation, useNavigate } from "react-router-dom";
-import "../styles/viewFaculty.css";
+import "../styles/style.css"; // General styles
+import "../styles/viewFaculty.css"; // Faculty-specific styles
+import axios from "axios"; // HTTP client for API requests
+import { useLocation, useNavigate } from "react-router-dom"; // For routing and navigation
 
+// PrincipalFacultyUpdation component: Allows Principal to update, delete, and notify faculty records
 const PrincipalFacultyUpdation = () => {
-  const [facultyType, setFacultyType] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [yearOfAllotment, setYearOfAllotment] = useState("");
-  const [status, setStatus] = useState("");
-  const [modulesHandled, setModulesHandled] = useState("");
-  const [majorDomains, setMajorDomains] = useState([]);
-  const [minorDomains, setMinorDomains] = useState([]);
-  const [areasOfExpertise, setAreasOfExpertise] = useState("");
-  const [institution, setInstitution] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
-  const [tableData, setTableData] = useState([]);
-  const [totalFaculties, setTotalFaculties] = useState(0);
-  const [message, setMessage] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
-  const [deleteStatus, setDeleteStatus] = useState({});
-  const [notifyFacultyId, setNotifyFacultyId] = useState(null);
-  const [notifyRemarks, setNotifyRemarks] = useState("");
-  const [notifyStatus, setNotifyStatus] = useState({});
+  // State definitions for filters and faculty data
+  const [facultyType, setFacultyType] = useState(""); // Faculty type filter
+  const [name, setName] = useState(""); // Name filter
+  const [email, setEmail] = useState(""); // Email filter
+  const [yearOfAllotment, setYearOfAllotment] = useState(""); // Year of allotment filter
+  const [status, setStatus] = useState(""); // Status filter
+  const [modulesHandled, setModulesHandled] = useState(""); // Modules handled filter
+  const [majorDomains, setMajorDomains] = useState([]); // Major domains filter
+  const [minorDomains, setMinorDomains] = useState([]); // Minor domains filter
+  const [areasOfExpertise, setAreasOfExpertise] = useState(""); // Areas of expertise filter
+  const [institution, setInstitution] = useState(""); // Institution filter
+  const [mobileNumber, setMobileNumber] = useState(""); // Mobile number filter
+  const [tableData, setTableData] = useState([]); // Filtered faculty data for table
+  const [totalFaculties, setTotalFaculties] = useState(0); // Total number of faculties
+  const [message, setMessage] = useState(""); // Message for no records found
+  const [selectedFaculty, setSelectedFaculty] = useState(null); // Faculty selected for detailed view
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // Faculty ID for delete confirmation
+  const [deleteStatus, setDeleteStatus] = useState({}); // Delete operation status per faculty
+  const [notifyFacultyId, setNotifyFacultyId] = useState(null); // Faculty ID for notification
+  const [notifyRemarks, setNotifyRemarks] = useState(""); // Notification remarks
+  const [notifyStatus, setNotifyStatus] = useState({}); // Notify operation status per faculty
 
+  // Domain options for major and minor domains dropdowns
   const domainOptions = {
     "Forest & Wildlife": [
       "Silviculture",
@@ -61,13 +64,7 @@ const PrincipalFacultyUpdation = () => {
       "Ecosystem Health",
       "Others",
     ],
-    "Disaster Management": [
-      "Forest Fire Management & Damage assessment",
-      "Cyclone",
-      "Flood",
-      "Desertification",
-      "Others",
-    ],
+    "Disaster Management": ["Forest Fire Management & Damage assessment", "Cyclone", "Flood", "Desertification", "Others"],
     "Human Resource Development": [
       "Time Management",
       "Leadership Management",
@@ -80,14 +77,7 @@ const PrincipalFacultyUpdation = () => {
       "Building competencies for personal Excellence",
       "Others",
     ],
-    "Health and Fitness": [
-      "First Aid",
-      "Counselling",
-      "Physical, mental and Social Health",
-      "Stress Management",
-      "Yoga and Meditation",
-      "Others",
-    ],
+    "Health and Fitness": ["First Aid", "Counselling", "Physical, mental and Social Health", "Stress Management", "Yoga and Meditation", "Others"],
     "Ethics and Public Governance": [
       "Public administration, Public Grievance and Public Finance",
       "Decision Making",
@@ -110,12 +100,7 @@ const PrincipalFacultyUpdation = () => {
       "Cyber Security Laws",
       "Others",
     ],
-    "CCS Rules and Regulation": [
-      "Service Rules and matters",
-      "Conduct Rules",
-      "Disciplinary Proceedings",
-      "Others",
-    ],
+    "CCS Rules and Regulation": ["Service Rules and matters", "Conduct Rules", "Disciplinary Proceedings", "Others"],
     "Media Management": [
       "The Art of Interacting with Print and Electronic Media",
       "Role of Media",
@@ -126,11 +111,13 @@ const PrincipalFacultyUpdation = () => {
     ],
   };
 
+  // Navigation and location hooks
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
 
+  // Navigate to update page with faculty data
   const handleUpdateDetails = async (facultyId) => {
     try {
       const response = await axios.get(`http://localhost:3001/api/faculty/search/${facultyId}`);
@@ -143,10 +130,12 @@ const PrincipalFacultyUpdation = () => {
     }
   };
 
+  // Initiate faculty deletion process
   const handleDeleteFaculty = (facultyId) => {
     setDeleteConfirmation(facultyId);
   };
 
+  // Confirm and execute faculty deletion
   const confirmDelete = async (facultyId) => {
     setDeleteConfirmation(null);
     setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Deleting..." }));
@@ -157,9 +146,7 @@ const PrincipalFacultyUpdation = () => {
         setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Deleted" }));
         setTableData((prevData) => prevData.filter((faculty) => faculty._id !== facultyId));
         setTotalFaculties((prev) => prev - 1);
-        setTimeout(() => {
-          setDeleteStatus((prev) => ({ ...prev, [facultyId]: "" }));
-        }, 2000);
+        setTimeout(() => setDeleteStatus((prev) => ({ ...prev, [facultyId]: "" })), 2000);
       } else {
         setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Failed to Delete" }));
       }
@@ -169,29 +156,29 @@ const PrincipalFacultyUpdation = () => {
     }
   };
 
+  // Cancel faculty deletion
   const cancelDelete = () => {
     setDeleteConfirmation(null);
   };
 
+  // Initiate faculty notification process
   const handleNotifyFaculty = (facultyId) => {
     setNotifyFacultyId(facultyId);
     setNotifyRemarks("");
   };
 
+  // Submit notification for faculty
   const submitNotify = async (facultyId) => {
     setNotifyStatus((prev) => ({ ...prev, [facultyId]: "Notifying..." }));
     try {
       const response = await axios.post(`http://localhost:3001/api/faculty/notify/${facultyId}`, {
-        notifyremarks: notifyRemarks
+        notifyremarks: notifyRemarks,
       });
-      
       if (response.data.success) {
         setNotifyStatus((prev) => ({ ...prev, [facultyId]: "Notified" }));
         setTableData((prevData) => prevData.filter((faculty) => faculty._id !== facultyId));
         setTotalFaculties((prev) => prev - 1);
-        setTimeout(() => {
-          setNotifyStatus((prev) => ({ ...prev, [facultyId]: "" }));
-        }, 2000);
+        setTimeout(() => setNotifyStatus((prev) => ({ ...prev, [facultyId]: "" })), 2000);
       }
     } catch (error) {
       setNotifyStatus((prev) => ({ ...prev, [facultyId]: "Failed to Notify" }));
@@ -200,6 +187,7 @@ const PrincipalFacultyUpdation = () => {
     setNotifyFacultyId(null);
   };
 
+  // Apply filters and fetch faculty data
   const handleApplyFilter = async () => {
     try {
       const response = await axios.post("http://localhost:3001/api/faculty/filterFaculties", {
@@ -215,7 +203,6 @@ const PrincipalFacultyUpdation = () => {
         institution,
         mobileNumber,
       });
-
       setTableData(response.data);
       setTotalFaculties(response.data.length);
       setMessage(response.data.length > 0 ? "" : "No matching records found.");
@@ -227,37 +214,22 @@ const PrincipalFacultyUpdation = () => {
     }
   };
 
+  // Fetch initial data on mount
   useEffect(() => {
     handleApplyFilter();
   }, []);
 
+  // Refetch data when filters change
   useEffect(() => {
     handleApplyFilter();
-  }, [
-    facultyType,
-    name,
-    email,
-    yearOfAllotment,
-    status,
-    modulesHandled,
-    majorDomains,
-    minorDomains,
-    areasOfExpertise,
-    institution,
-    mobileNumber,
-  ]);
+  }, [facultyType, name, email, yearOfAllotment, status, modulesHandled, majorDomains, minorDomains, areasOfExpertise, institution, mobileNumber]);
 
+  // Render faculty details in popup
   const renderPopupContent = (data) => {
     const renderValue = (value, key) => {
       if (key === "photograph" && typeof value === "string") {
         const imageUrl = `http://localhost:3001/uploads/${value.split("\\").pop()}`;
-        return (
-          <img
-            src={imageUrl}
-            alt="Photograph"
-            style={{ width: "100px", height: "100px", objectFit: "cover" }}
-          />
-        );
+        return <img src={imageUrl} alt="Photograph" style={{ width: "100px", height: "100px", objectFit: "cover" }} />;
       }
       if (Array.isArray(value)) {
         return (
@@ -272,13 +244,11 @@ const PrincipalFacultyUpdation = () => {
         return (
           <ul>
             {Object.entries(value)
-              .filter(([key]) => key !== "_id")
-              .map(([key, val]) => (
-                <li key={key}>
-                  <strong>
-                    {key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:
-                  </strong>{" "}
-                  {renderValue(val, key)}
+              .filter(([subKey]) => subKey !== "_id")
+              .map(([subKey, val]) => (
+                <li key={subKey}>
+                  <strong>{subKey.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:</strong>{" "}
+                  {renderValue(val, subKey)}
                 </li>
               ))}
           </ul>
@@ -299,6 +269,7 @@ const PrincipalFacultyUpdation = () => {
       ));
   };
 
+  // Clear all filters and refetch data
   const handleClearFilter = () => {
     setFacultyType("");
     setName("");
@@ -314,14 +285,17 @@ const PrincipalFacultyUpdation = () => {
     handleApplyFilter();
   };
 
+  // Open faculty details popup
   const handleViewDetails = (faculty) => {
     setSelectedFaculty(faculty);
   };
 
+  // Close faculty details popup
   const closePopup = () => {
     setSelectedFaculty(null);
   };
 
+  // Inline styles
   const filterStyles = {
     filterContainer: {
       padding: "20px",
@@ -336,57 +310,18 @@ const PrincipalFacultyUpdation = () => {
       gap: "15px",
       marginBottom: "20px",
     },
-    filterItem: {
-      display: "flex",
-      flexDirection: "column",
-    },
-    label: {
-      marginBottom: "5px",
-      fontWeight: "500",
-      color: "#333",
-    },
-    input: {
-      padding: "8px 12px",
-      border: "1px solid #ddd",
-      borderRadius: "4px",
-      fontSize: "14px",
-      outline: "none",
-      transition: "border-color 0.2s",
-    },
-    inputFocus: {
-      borderColor: "#007BFF",
-    },
-    buttonContainer: {
-      display: "flex",
-      justifyContent: "flex-end",
-    },
-    clearButton: {
-      padding: "8px 16px",
-      backgroundColor: "#6c757d",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    clearButtonHover: {
-      backgroundColor: "#5a6268",
-    },
+    filterItem: { display: "flex", flexDirection: "column" },
+    label: { marginBottom: "5px", fontWeight: "500", color: "#333" },
+    input: { padding: "8px 12px", border: "1px solid #ddd", borderRadius: "4px", fontSize: "14px", outline: "none", transition: "border-color 0.2s" },
+    inputFocus: { borderColor: "#007BFF" },
+    buttonContainer: { display: "flex", justifyContent: "flex-end" },
+    clearButton: { padding: "8px 16px", backgroundColor: "#6c757d", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", transition: "background-color 0.2s" },
+    clearButtonHover: { backgroundColor: "#5a6268" },
   };
 
   const viewButtonStyles = {
-    viewButton: {
-      padding: "6px 12px",
-      backgroundColor: "#007BFF",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    viewButtonHover: {
-      backgroundColor: "#0056b3",
-    },
+    viewButton: { padding: "6px 12px", backgroundColor: "#007BFF", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", transition: "background-color 0.2s" },
+    viewButtonHover: { backgroundColor: "#0056b3" },
   };
 
   const deleteButtonStyles = {
@@ -403,13 +338,8 @@ const PrincipalFacultyUpdation = () => {
       justifyContent: "center",
       gap: "5px",
     },
-    deleteButtonHover: {
-      backgroundColor: "#cc0000",
-    },
-    deleteButtonDisabled: {
-      backgroundColor: "#6c757d",
-      cursor: "not-allowed",
-    },
+    deleteButtonHover: { backgroundColor: "#cc0000" },
+    deleteButtonDisabled: { backgroundColor: "#6c757d", cursor: "not-allowed" },
   };
 
   const notifyButtonStyles = {
@@ -426,28 +356,12 @@ const PrincipalFacultyUpdation = () => {
       justifyContent: "center",
       gap: "5px",
     },
-    notifyButtonHover: {
-      backgroundColor: "#e0a800",
-    },
-    notifyButtonDisabled: {
-      backgroundColor: "#6c757d",
-      cursor: "not-allowed",
-    },
+    notifyButtonHover: { backgroundColor: "#e0a800" },
+    notifyButtonDisabled: { backgroundColor: "#6c757d", cursor: "not-allowed" },
   };
 
   const popupStyles = {
-    popup: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "rgba(0, 0, 0, 0.5)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 1000,
-    },
+    popup: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0, 0, 0, 0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 },
     popupContent: {
       background: "white",
       padding: "20px",
@@ -459,146 +373,34 @@ const PrincipalFacultyUpdation = () => {
       position: "relative",
       animation: "slideIn 0.3s ease-out",
     },
-    popupHeader: {
-      marginBottom: "15px",
-      color: "#333",
-    },
-    closeButton: {
-      marginTop: "15px",
-      padding: "8px 16px",
-      backgroundColor: "#dc3545",
-      color: "white",
-      border: "none",
-      borderRadius: "5px",
-      cursor: "pointer",
-    },
+    popupHeader: { marginBottom: "15px", color: "#333" },
+    closeButton: { marginTop: "15px", padding: "8px 16px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "5px", cursor: "pointer" },
   };
 
   const confirmationStyles = {
-    confirmationPopup: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "rgba(0, 0, 0, 0.5)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 1001,
-    },
-    confirmationContent: {
-      background: "white",
-      padding: "20px",
-      borderRadius: "10px",
-      textAlign: "center",
-      width: "90%",
-      maxWidth: "400px",
-      animation: "fadeIn 0.3s ease-out",
-    },
-    confirmationText: {
-      marginBottom: "20px",
-      fontSize: "16px",
-      color: "#333",
-    },
-    confirmationButtons: {
-      display: "flex",
-      justifyContent: "space-around",
-    },
-    yesButton: {
-      padding: "8px 16px",
-      backgroundColor: "#28a745",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    yesButtonHover: {
-      backgroundColor: "#218838",
-    },
-    cancelButton: {
-      padding: "8px 16px",
-      backgroundColor: "#dc3545",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    cancelButtonHover: {
-      backgroundColor: "#c82333",
-    },
+    confirmationPopup: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0, 0, 0, 0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1001 },
+    confirmationContent: { background: "white", padding: "20px", borderRadius: "10px", textAlign: "center", width: "90%", maxWidth: "400px", animation: "fadeIn 0.3s ease-out" },
+    confirmationText: { marginBottom: "20px", fontSize: "16px", color: "#333" },
+    confirmationButtons: { display: "flex", justifyContent: "space-around" },
+    yesButton: { padding: "8px 16px", backgroundColor: "#28a745", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", transition: "background-color 0.2s" },
+    yesButtonHover: { backgroundColor: "#218838" },
+    cancelButton: { padding: "8px 16px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", transition: "background-color 0.2s" },
+    cancelButtonHover: { backgroundColor: "#c82333" },
   };
 
   const notifyPopupStyles = {
-    notifyPopup: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "rgba(0, 0, 0, 0.5)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 1001,
-    },
-    notifyContent: {
-      background: "white",
-      padding: "20px",
-      borderRadius: "10px",
-      width: "90%",
-      maxWidth: "400px",
-      animation: "fadeIn 0.3s ease-out",
-    },
-    notifyTextarea: {
-      width: "100%",
-      minHeight: "100px",
-      padding: "8px",
-      margin: "10px 0",
-      border: "1px solid #ddd",
-      borderRadius: "4px",
-      resize: "vertical",
-    },
-    notifyButtons: {
-      display: "flex",
-      justifyContent: "space-around",
-    },
-    submitButton: {
-      padding: "8px 16px",
-      backgroundColor: "#28a745",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-    },
-    cancelButton: {
-      padding: "8px 16px",
-      backgroundColor: "#dc3545",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-    },
+    notifyPopup: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0, 0, 0, 0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1001 },
+    notifyContent: { background: "white", padding: "20px", borderRadius: "10px", width: "90%", maxWidth: "400px", animation: "fadeIn 0.3s ease-out" },
+    notifyTextarea: { width: "100%", minHeight: "100px", padding: "8px", margin: "10px 0", border: "1px solid #ddd", borderRadius: "4px", resize: "vertical" },
+    notifyButtons: { display: "flex", justifyContent: "space-around" },
+    submitButton: { padding: "8px 16px", backgroundColor: "#28a745", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" },
+    cancelButton: { padding: "8px 16px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" },
   };
 
   const styles = {
-    usernameContainer: {
-      display: "flex",
-      alignItems: "center",
-      gap: "10px",
-      fontSize: "14px",
-      color: "#555",
-    },
-    userIcon: {
-      fontSize: "30px",
-      color: "#007BFF",
-    },
-    username: {
-      fontWeight: "bold",
-      fontSize: "18px",
-    },
+    usernameContainer: { display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#555" },
+    userIcon: { fontSize: "30px", color: "#007BFF" },
+    username: { fontWeight: "bold", fontSize: "18px" },
     totalFaculties: {
       position: "absolute",
       top: "10px",
@@ -617,39 +419,44 @@ const PrincipalFacultyUpdation = () => {
   };
 
   const addConductButtonStyles = {
-    addConductButton: {
-      padding: "6px 12px",
-      backgroundColor: "#28a745",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    addConductButtonHover: {
-      backgroundColor: "#218838",
-    },
+    addConductButton: { padding: "6px 12px", backgroundColor: "#28a745", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", transition: "background-color 0.2s" },
+    addConductButtonHover: { backgroundColor: "#218838" },
   };
 
+  // Render the component
   return (
     <div className="faculty-view">
+      {/* Meta tags and stylesheets */}
       <meta charSet="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
-      <link rel="stylesheet" href="style.css" />
       <title>CASFOS</title>
-      <style>
-        {`
-          @keyframes slideIn {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}
-      </style>
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateY(-50px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .faculty-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 1rem;
+        }
+        .faculty-table th, .faculty-table td {
+          padding: 10px;
+          border: 1px solid #ddd;
+          text-align: left;
+        }
+        .faculty-table th {
+          background-color: #f2f2f2;
+          font-weight: bold;
+        }
+      `}</style>
+
+      {/* Sidebar */}
       <section id="sidebar">
         <a href="#" className="brand">
           <span className="text">PRINCIPAL</span>
@@ -695,6 +502,8 @@ const PrincipalFacultyUpdation = () => {
           </li>
         </ul>
       </section>
+
+      {/* Main content */}
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
@@ -707,12 +516,15 @@ const PrincipalFacultyUpdation = () => {
             <span style={styles.username}>{username}</span>
           </div>
         </nav>
+
         <main style={{ position: "relative" }}>
           <div style={styles.totalFaculties}>Total No of Faculties: {totalFaculties}</div>
           <div className="dash-content">
             <div className="title">
               <span className="text">EXISTING FACULTY UPDATION</span>
             </div>
+
+            {/* Filter Section */}
             <div style={filterStyles.filterContainer}>
               <div style={filterStyles.filterGrid}>
                 <div style={filterStyles.filterItem}>
@@ -724,9 +536,7 @@ const PrincipalFacultyUpdation = () => {
                     value={facultyType}
                     onChange={(e) => setFacultyType(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select</option>
@@ -745,9 +555,7 @@ const PrincipalFacultyUpdation = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -761,9 +569,7 @@ const PrincipalFacultyUpdation = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -777,9 +583,7 @@ const PrincipalFacultyUpdation = () => {
                     value={yearOfAllotment}
                     onChange={(e) => setYearOfAllotment(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -792,9 +596,7 @@ const PrincipalFacultyUpdation = () => {
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select</option>
@@ -812,9 +614,7 @@ const PrincipalFacultyUpdation = () => {
                     value={modulesHandled}
                     onChange={(e) => setModulesHandled(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -827,9 +627,7 @@ const PrincipalFacultyUpdation = () => {
                     value={majorDomains[0] || ""}
                     onChange={(e) => setMajorDomains([e.target.value])}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select Major Domain</option>
@@ -849,14 +647,8 @@ const PrincipalFacultyUpdation = () => {
                     value={minorDomains[0] || ""}
                     onChange={(e) => setMinorDomains([e.target.value])}
                     disabled={!majorDomains[0]}
-                    style={{
-                      ...filterStyles.input,
-                      opacity: !majorDomains[0] ? 0.7 : 1,
-                      cursor: !majorDomains[0] ? "not-allowed" : "pointer",
-                    }}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    style={{ ...filterStyles.input, opacity: !majorDomains[0] ? 0.7 : 1, cursor: !majorDomains[0] ? "not-allowed" : "pointer" }}
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   >
                     <option value="">Select Minor Domain</option>
@@ -878,9 +670,7 @@ const PrincipalFacultyUpdation = () => {
                     value={areasOfExpertise}
                     onChange={(e) => setAreasOfExpertise(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -894,9 +684,7 @@ const PrincipalFacultyUpdation = () => {
                     value={institution}
                     onChange={(e) => setInstitution(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -910,9 +698,7 @@ const PrincipalFacultyUpdation = () => {
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
                     style={filterStyles.input}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = filterStyles.inputFocus.borderColor)
-                    }
+                    onFocus={(e) => (e.target.style.borderColor = filterStyles.inputFocus.borderColor)}
                     onBlur={(e) => (e.target.style.borderColor = "#ddd")}
                   />
                 </div>
@@ -921,21 +707,18 @@ const PrincipalFacultyUpdation = () => {
                 <button
                   style={filterStyles.clearButton}
                   onClick={handleClearFilter}
-                  onMouseOver={(e) =>
-                    (e.target.style.backgroundColor = filterStyles.clearButtonHover.backgroundColor)
-                  }
-                  onMouseOut={(e) =>
-                    (e.target.style.backgroundColor = filterStyles.clearButton.backgroundColor)
-                  }
+                  onMouseOver={(e) => (e.target.style.backgroundColor = filterStyles.clearButtonHover.backgroundColor)}
+                  onMouseOut={(e) => (e.target.style.backgroundColor = filterStyles.clearButton.backgroundColor)}
                 >
                   Clear Filter
                 </button>
               </div>
             </div>
 
+            {/* Message and Faculty Table */}
             {message && <p style={{ color: "red", marginTop: "1rem" }}>{message}</p>}
             {tableData.length > 0 && (
-              <table className="faculty-table" style={{ marginTop: "1rem" }}>
+              <table className="faculty-table">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -952,40 +735,30 @@ const PrincipalFacultyUpdation = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData.map((row, index) => (
-                    <tr key={index}>
-                      <td>{row.name}</td>
+                  {tableData.map((row) => (
+                    <tr key={row._id}>
+                      <td>{row.name || "-"}</td>
                       <td>
                         {row.photograph ? (
                           <img
                             src={`http://localhost:3001/uploads/${row.photograph.split("\\").pop()}`}
                             alt="Photograph"
-                            style={{
-                              width: "50px",
-                              height: "50px",
-                              borderRadius: "5px",
-                              objectFit: "cover",
-                            }}
+                            style={{ width: "50px", height: "50px", borderRadius: "5px", objectFit: "cover" }}
                           />
                         ) : (
                           "No Image"
                         )}
                       </td>
-                      <td>{row.facultyType}</td>
-                      <td>{row.mobileNumber}</td>
-                      <td>{row.email}</td>
-                      <td>{row.yearOfAllotment}</td>
+                      <td>{row.facultyType || "-"}</td>
+                      <td>{row.mobileNumber || "-"}</td>
+                      <td>{row.email || "-"}</td>
+                      <td>{row.yearOfAllotment || "-"}</td>
                       <td>
                         <button
                           style={viewButtonStyles.viewButton}
                           onClick={() => handleViewDetails(row)}
-                          onMouseOver={(e) =>
-                            (e.target.style.backgroundColor =
-                              viewButtonStyles.viewButtonHover.backgroundColor)
-                          }
-                          onMouseOut={(e) =>
-                            (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)
-                          }
+                          onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)}
                         >
                           View
                         </button>
@@ -994,13 +767,8 @@ const PrincipalFacultyUpdation = () => {
                         <button
                           style={viewButtonStyles.viewButton}
                           onClick={() => handleUpdateDetails(row._id)}
-                          onMouseOver={(e) =>
-                            (e.target.style.backgroundColor =
-                              viewButtonStyles.viewButtonHover.backgroundColor)
-                          }
-                          onMouseOut={(e) =>
-                            (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)
-                          }
+                          onMouseOver={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = viewButtonStyles.viewButton.backgroundColor)}
                         >
                           Update
                         </button>
@@ -1008,19 +776,9 @@ const PrincipalFacultyUpdation = () => {
                       <td>
                         <button
                           style={addConductButtonStyles.addConductButton}
-                          onClick={() =>
-                            navigate(
-                              `/addconduct/${row._id}?username=${encodeURIComponent(username)}`
-                            )
-                          }
-                          onMouseOver={(e) =>
-                            (e.target.style.backgroundColor =
-                              addConductButtonStyles.addConductButtonHover.backgroundColor)
-                          }
-                          onMouseOut={(e) =>
-                            (e.target.style.backgroundColor =
-                              addConductButtonStyles.addConductButton.backgroundColor)
-                          }
+                          onClick={() => navigate(`/addconduct/${row._id}?username=${encodeURIComponent(username)}`)}
+                          onMouseOver={(e) => (e.target.style.backgroundColor = addConductButtonStyles.addConductButtonHover.backgroundColor)}
+                          onMouseOut={(e) => (e.target.style.backgroundColor = addConductButtonStyles.addConductButton.backgroundColor)}
                         >
                           Add Conduct
                         </button>
@@ -1029,29 +787,22 @@ const PrincipalFacultyUpdation = () => {
                         <button
                           style={{
                             ...notifyButtonStyles.notifyButton,
-                            ...(notifyStatus[row._id] === "Notifying..."
-                              ? notifyButtonStyles.notifyButtonDisabled
-                              : {}),
+                            ...(notifyStatus[row._id] === "Notifying..." ? notifyButtonStyles.notifyButtonDisabled : {}),
                           }}
                           onClick={() => handleNotifyFaculty(row._id)}
                           onMouseOver={(e) =>
                             notifyStatus[row._id] !== "Notifying..." &&
-                            (e.target.style.backgroundColor =
-                              notifyButtonStyles.notifyButtonHover.backgroundColor)
+                            (e.target.style.backgroundColor = notifyButtonStyles.notifyButtonHover.backgroundColor)
                           }
                           onMouseOut={(e) =>
                             notifyStatus[row._id] !== "Notifying..." &&
-                            (e.target.style.backgroundColor =
-                              notifyButtonStyles.notifyButton.backgroundColor)
+                            (e.target.style.backgroundColor = notifyButtonStyles.notifyButton.backgroundColor)
                           }
                           disabled={notifyStatus[row._id] === "Notifying..."}
                         >
                           {notifyStatus[row._id] === "Notifying..." && (
                             <>
-                              <i
-                                className="bx bx-loader-circle bx-spin"
-                                style={styles.loadingIcon}
-                              ></i>
+                              <i className="bx bx-loader-circle bx-spin" style={styles.loadingIcon}></i>
                               Notifying...
                             </>
                           )}
@@ -1074,29 +825,22 @@ const PrincipalFacultyUpdation = () => {
                         <button
                           style={{
                             ...deleteButtonStyles.deleteButton,
-                            ...(deleteStatus[row._id] === "Deleting..."
-                              ? deleteButtonStyles.deleteButtonDisabled
-                              : {}),
+                            ...(deleteStatus[row._id] === "Deleting..." ? deleteButtonStyles.deleteButtonDisabled : {}),
                           }}
                           onClick={() => handleDeleteFaculty(row._id)}
                           onMouseOver={(e) =>
                             deleteStatus[row._id] !== "Deleting..." &&
-                            (e.target.style.backgroundColor =
-                              deleteButtonStyles.deleteButtonHover.backgroundColor)
+                            (e.target.style.backgroundColor = deleteButtonStyles.deleteButtonHover.backgroundColor)
                           }
                           onMouseOut={(e) =>
                             deleteStatus[row._id] !== "Deleting..." &&
-                            (e.target.style.backgroundColor =
-                              deleteButtonStyles.deleteButton.backgroundColor)
+                            (e.target.style.backgroundColor = deleteButtonStyles.deleteButton.backgroundColor)
                           }
                           disabled={deleteStatus[row._id] === "Deleting..."}
                         >
                           {deleteStatus[row._id] === "Deleting..." && (
                             <>
-                              <i
-                                className="bx bx-loader-circle bx-spin"
-                                style={styles.loadingIcon}
-                              ></i>
+                              <i className="bx bx-loader-circle bx-spin" style={styles.loadingIcon}></i>
                               Deleting...
                             </>
                           )}
@@ -1123,6 +867,8 @@ const PrincipalFacultyUpdation = () => {
           </div>
         </main>
       </section>
+
+      {/* Faculty Details Popup */}
       {selectedFaculty && (
         <div style={popupStyles.popup}>
           <div style={popupStyles.popupContent}>
@@ -1141,35 +887,26 @@ const PrincipalFacultyUpdation = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Popup */}
       {deleteConfirmation && (
         <div style={confirmationStyles.confirmationPopup}>
           <div style={confirmationStyles.confirmationContent}>
-            <p style={confirmationStyles.confirmationText}>
-              Are you sure you want to delete this faculty?
-            </p>
+            <p style={confirmationStyles.confirmationText}>Are you sure you want to delete this faculty?</p>
             <div style={confirmationStyles.confirmationButtons}>
               <button
                 style={confirmationStyles.yesButton}
                 onClick={() => confirmDelete(deleteConfirmation)}
-                onMouseOver={(e) =>
-                  (e.target.style.backgroundColor = confirmationStyles.yesButtonHover.backgroundColor)
-                }
-                onMouseOut={(e) =>
-                  (e.target.style.backgroundColor = confirmationStyles.yesButton.backgroundColor)
-                }
+                onMouseOver={(e) => (e.target.style.backgroundColor = confirmationStyles.yesButtonHover.backgroundColor)}
+                onMouseOut={(e) => (e.target.style.backgroundColor = confirmationStyles.yesButton.backgroundColor)}
               >
                 Yes
               </button>
               <button
                 style={confirmationStyles.cancelButton}
                 onClick={cancelDelete}
-                onMouseOver={(e) =>
-                  (e.target.style.backgroundColor =
-                    confirmationStyles.cancelButtonHover.backgroundColor)
-                }
-                onMouseOut={(e) =>
-                  (e.target.style.backgroundColor = confirmationStyles.cancelButton.backgroundColor)
-                }
+                onMouseOver={(e) => (e.target.style.backgroundColor = confirmationStyles.cancelButtonHover.backgroundColor)}
+                onMouseOut={(e) => (e.target.style.backgroundColor = confirmationStyles.cancelButton.backgroundColor)}
               >
                 Cancel
               </button>
@@ -1177,6 +914,8 @@ const PrincipalFacultyUpdation = () => {
           </div>
         </div>
       )}
+
+      {/* Notify Faculty Popup */}
       {notifyFacultyId && (
         <div style={notifyPopupStyles.notifyPopup}>
           <div style={notifyPopupStyles.notifyContent}>
@@ -1189,16 +928,10 @@ const PrincipalFacultyUpdation = () => {
               placeholder="Enter remarks here..."
             />
             <div style={notifyPopupStyles.notifyButtons}>
-              <button
-                style={notifyPopupStyles.submitButton}
-                onClick={() => submitNotify(notifyFacultyId)}
-              >
+              <button style={notifyPopupStyles.submitButton} onClick={() => submitNotify(notifyFacultyId)}>
                 Submit
               </button>
-              <button
-                style={notifyPopupStyles.cancelButton}
-                onClick={() => setNotifyFacultyId(null)}
-              >
+              <button style={notifyPopupStyles.cancelButton} onClick={() => setNotifyFacultyId(null)}>
                 Cancel
               </button>
             </div>

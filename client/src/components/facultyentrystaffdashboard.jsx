@@ -1,30 +1,32 @@
 import React, { useEffect, useState } from "react";
-import { Helmet } from "react-helmet";
-import "../styles/style.css";
-import axios from "axios";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Bar } from "react-chartjs-2";
-import Chart from "chart.js/auto";
+import { Helmet } from "react-helmet"; // For managing document head
+import "../styles/style.css"; // General styles
+import axios from "axios"; // HTTP client for API requests
+import { useLocation, useNavigate } from "react-router-dom"; // For navigation and URL parameters
+import { Bar } from "react-chartjs-2"; // Bar chart component
+import Chart from "chart.js/auto"; // Chart.js library for visualizations
 
+// FacultyEntryStaffDashboard component: Displays dashboard with notifications and analytics
 const FacultyEntryStaffDashboard = () => {
-  // Notification states
-  const [notifications, setNotifications] = useState([]);
-  const [expandedNotification, setExpandedNotification] = useState(null);
+  // State for notifications
+  const [notifications, setNotifications] = useState([]); // List of notifications
+  const [expandedNotification, setExpandedNotification] = useState(null); // ID of expanded notification
 
-  // Dashboard states
-  const [internalData, setInternalData] = useState([]);
-  const [externalData, setExternalData] = useState([]);
-  const [selectedFacultyYear, setSelectedFacultyYear] = useState("All");
-  const [sessionData, setSessionData] = useState([]);
-  const [selectedSessionYear, setSelectedSessionYear] = useState("All");
-  const [sessionLabels, setSessionLabels] = useState([]);
-  const [facultyLabels, setFacultyLabels] = useState([]);
-  const [userCounts, setUserCounts] = useState({ adminCount: 0, dataEntryCount: 0, viewerCount: 0 });
+  // State for dashboard analytics
+  const [internalData, setInternalData] = useState([]); // Internal faculty data
+  const [externalData, setExternalData] = useState([]); // External faculty data
+  const [selectedFacultyYear, setSelectedFacultyYear] = useState("All"); // Selected year for faculty chart
+  const [sessionData, setSessionData] = useState([]); // Session data
+  const [selectedSessionYear, setSelectedSessionYear] = useState("All"); // Selected year for session chart
+  const [sessionLabels, setSessionLabels] = useState([]); // Labels for session chart
+  const [facultyLabels, setFacultyLabels] = useState([]); // Labels for faculty chart
+  const [userCounts, setUserCounts] = useState({ adminCount: 0, dataEntryCount: 0, viewerCount: 0 }); // User role counts
 
+  // Navigation and location hooks
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const username = queryParams.get("username") || "Guest";
+  const username = queryParams.get("username") || "Guest"; // Default to "Guest" if no username
 
   // Format notification title based on type
   const formatNotificationTitle = (notification) => {
@@ -38,36 +40,34 @@ const FacultyEntryStaffDashboard = () => {
     return "Unknown Notification";
   };
 
-  // Fetch all types of notifications
+  // Fetch all notifications (rejections and fully acknowledged)
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
         const [approvalResponse, verificationResponse, notifyResponse] = await Promise.all([
           axios.get("http://localhost:3001/api/faculty/rejected-approvals"),
           axios.get("http://localhost:3001/api/faculty/rejected-verifications"),
-          axios.get("http://localhost:3001/api/faculty/notify-all-true")
+          axios.get("http://localhost:3001/api/faculty/notify-all-true"),
         ]);
-  
+
         const allNotifications = [
           ...approvalResponse.data.map((n) => ({ ...n, type: "approvalRejection" })),
           ...verificationResponse.data.map((n) => ({ ...n, type: "verificationRejection" })),
-          ...notifyResponse.data.map((n) => ({ ...n, type: "notifyFaculty" }))
+          ...notifyResponse.data.map((n) => ({ ...n, type: "notifyFaculty" })),
         ];
-  
+
+        // Sort notifications by timestamp and limit to 10
         const sortedNotifications = allNotifications
           .map((notification) => {
-            // Determine the appropriate timestamp based on type
-            let timestamp;
-            if (notification.type === "approvalRejection" || notification.type === "verificationRejection") {
-              timestamp = notification.updatedAt || notification.notificationDate || new Date(0); // Fallback to epoch if undefined
-            } else if (notification.type === "notifyFaculty") {
-              timestamp = notification.notificationDate || notification.updatedAt || new Date(0); // Prioritize notificationDate for notifyFaculty
-            }
+            let timestamp =
+              notification.type === "approvalRejection" || notification.type === "verificationRejection"
+                ? notification.updatedAt || notification.notificationDate || new Date(0)
+                : notification.notificationDate || notification.updatedAt || new Date(0);
             return { ...notification, timestamp: new Date(timestamp) };
           })
-          .sort((a, b) => b.timestamp - a.timestamp) // Sort by the normalized timestamp
+          .sort((a, b) => b.timestamp - a.timestamp) // Latest first
           .slice(0, 10);
-  
+
         setNotifications(sortedNotifications);
       } catch (error) {
         console.error("Error fetching notifications:", error);
@@ -76,19 +76,19 @@ const FacultyEntryStaffDashboard = () => {
     fetchNotifications();
   }, []);
 
-  // Toggle expand/collapse of notification
+  // Toggle notification expansion
   const toggleExpand = (id) => {
     setExpandedNotification(expandedNotification === id ? null : id);
   };
 
-  // Handle reenter button click
+  // Navigate to faculty entry page with notification data
   const handleReenter = (notification) => {
     navigate(`/facultyentry?username=${encodeURIComponent(username)}`, {
-      state: { facultyData: notification }
+      state: { facultyData: notification },
     });
   };
 
-  // Render notification details based on type
+  // Render detailed notification content
   const renderNotificationDetails = (notification) => {
     const isRejection = notification.type === "approvalRejection" || notification.type === "verificationRejection";
     const timeField = isRejection ? "updatedAt" : "notificationDate";
@@ -96,30 +96,47 @@ const FacultyEntryStaffDashboard = () => {
 
     return (
       <div style={styles.notificationDetails}>
-        <p><strong>{isRejection ? "Rejection" : "Notification"} Time:</strong> {new Date(notification[timeField]).toLocaleString()}</p>
-        <p><strong>Remarks:</strong> {notification[remarksField] || "No remarks provided"}</p>
-        <button
-          style={styles.reenterButton}
-          onClick={() => handleReenter(notification)}
-        >
+        <p>
+          <strong>{isRejection ? "Rejection" : "Notification"} Time:</strong>{" "}
+          {new Date(notification[timeField]).toLocaleString()}
+        </p>
+        <p>
+          <strong>Remarks:</strong> {notification[remarksField] || "No remarks provided"}
+        </p>
+        <button style={styles.reenterButton} onClick={() => handleReenter(notification)}>
           Reenter
         </button>
       </div>
     );
   };
 
-  // Fetch session data
+  // Fetch session data based on selected year
   useEffect(() => {
     const fetchSessionData = async () => {
       try {
-        let url = "http://localhost:3001/api/faculty/sessions";
-        if (selectedSessionYear !== "All") url += `?year=${selectedSessionYear}`;
-        else url += `?year=All`;
+        const url =
+          selectedSessionYear === "All"
+            ? "http://localhost:3001/api/faculty/sessions?year=All"
+            : `http://localhost:3001/api/faculty/sessions?year=${selectedSessionYear}`;
         const sessionRes = await axios.get(url);
         setSessionData(sessionRes.data.sessionCounts);
-        const labels = selectedSessionYear === "All"
-          ? [...Array(11)].map((_, i) => (2025 + i).toString())
-          : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const labels =
+          selectedSessionYear === "All"
+            ? [...Array(11)].map((_, i) => (2025 + i).toString()) // Years 2025-2035
+            : [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December",
+              ];
         setSessionLabels(labels);
       } catch (error) {
         console.error("Error fetching session data:", error);
@@ -128,7 +145,7 @@ const FacultyEntryStaffDashboard = () => {
     fetchSessionData();
   }, [selectedSessionYear]);
 
-  // Fetch user counts
+  // Fetch user counts for analytics
   useEffect(() => {
     const fetchAnalyticsData = async () => {
       try {
@@ -141,19 +158,34 @@ const FacultyEntryStaffDashboard = () => {
     fetchAnalyticsData();
   }, []);
 
-  // Fetch faculty data
+  // Fetch faculty data based on selected year
   useEffect(() => {
     const fetchFacultyData = async () => {
       try {
-        let url = "http://localhost:3001/api/faculty/monthly";
-        if (selectedFacultyYear !== "All") url += `?year=${selectedFacultyYear}`;
-        else url += `?year=All`;
+        const url =
+          selectedFacultyYear === "All"
+            ? "http://localhost:3001/api/faculty/monthly?year=All"
+            : `http://localhost:3001/api/faculty/monthly?year=${selectedFacultyYear}`;
         const facultyRes = await axios.get(url);
         setInternalData(facultyRes.data.internal);
         setExternalData(facultyRes.data.external);
-        const labels = selectedFacultyYear === "All"
-          ? [...Array(11)].map((_, i) => (2025 + i).toString())
-          : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const labels =
+          selectedFacultyYear === "All"
+            ? [...Array(11)].map((_, i) => (2025 + i).toString()) // Years 2025-2035
+            : [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December",
+              ];
         setFacultyLabels(labels);
       } catch (error) {
         console.error("Error fetching faculty data:", error);
@@ -162,57 +194,95 @@ const FacultyEntryStaffDashboard = () => {
     fetchFacultyData();
   }, [selectedFacultyYear]);
 
-  // Chart configurations
+  // Configuration for session chart
   const generateSessionChartConfig = () => ({
     labels: sessionLabels,
-    datasets: [{
-      label: "Total Sessions Handled",
-      data: sessionData,
-      backgroundColor: "rgba(9, 172, 248, 0.6)",
-      borderColor: "rgb(6, 213, 254)",
-      borderWidth: 1,
-    }],
-  });
-
-  const generateFacultyChartConfig = () => ({
-    labels: facultyLabels,
     datasets: [
-      { label: "Internal Faculty", data: internalData, backgroundColor: "rgba(75, 192, 192, 0.6)", borderColor: "rgba(75, 192, 192, 1)", borderWidth: 1 },
-      { label: "External Faculty", data: externalData, backgroundColor: "rgba(255, 99, 132, 0.6)", borderColor: "rgba(255, 99, 132, 1)", borderWidth: 1 },
+      {
+        label: "Total Sessions Handled",
+        data: sessionData,
+        backgroundColor: "rgba(9, 172, 248, 0.6)",
+        borderColor: "rgb(6, 213, 254)",
+        borderWidth: 1,
+      },
     ],
   });
 
+  // Configuration for faculty chart
+  const generateFacultyChartConfig = () => ({
+    labels: facultyLabels,
+    datasets: [
+      {
+        label: "Internal Faculty",
+        data: internalData,
+        backgroundColor: "rgba(75, 192, 192, 0.6)",
+        borderColor: "rgba(75, 192, 192, 1)",
+        borderWidth: 1,
+      },
+      {
+        label: "External Faculty",
+        data: externalData,
+        backgroundColor: "rgba(255, 99, 132, 0.6)",
+        borderColor: "rgba(255, 99, 132, 1)",
+        borderWidth: 1,
+      },
+    ],
+  });
+
+  // User count data for display (currently not rendered in JSX)
   const salesData = [
     { id: 1, value: userCounts.adminCount || "0", title: "Admin", bgColor: "#bfecff", iconColor: "#5ccbff", iconClass: "fas fa-user-shield" },
     { id: 2, value: userCounts.dataEntryCount || "0", title: "Data Entry Staff", bgColor: "#FFF3D2", iconColor: "#FFA85C", iconClass: "fas fa-keyboard" },
     { id: 3, value: userCounts.viewerCount || "0", title: "Data Viewer", bgColor: "#D2FFD2", iconColor: "#5CFF5C", iconClass: "fas fa-eye" },
   ];
 
+  // Handle faculty year selection change
   const handleFacultyYearChange = (event) => setSelectedFacultyYear(event.target.value);
 
+  // Render the dashboard
   return (
     <>
-      <div>
-        <Helmet>
-          <meta charSet="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
-          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-          <link rel="stylesheet" href="style.css" />
-          <title>CASFOS</title>
-        </Helmet>
+      <Helmet>
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+        <link rel="stylesheet" href="style.css" />
+        <title>CASFOS</title>
+      </Helmet>
 
+      <div>
         <section id="sidebar">
           <a href="#" className="brand">
             <span className="text">FACULTY ENTRY STAFF</span>
           </a>
           <ul className="side-menu top">
-            <li className="active"><a href={`/facultyentrydashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
-            <li><a href={`/facultyentry?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty Entry</span></a></li>
-            <li><a href={`/viewfaculty?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty View</span></a></li>
+            <li className="active">
+              <a href={`/facultyentrydashboard?username=${encodeURIComponent(username)}`}>
+                <i className="bx bxs-dashboard" />
+                <span className="text">Home</span>
+              </a>
+            </li>
+            <li>
+              <a href={`/facultyentry?username=${encodeURIComponent(username)}`}>
+                <i className="bx bxs-doughnut-chart" />
+                <span className="text">Faculty Entry</span>
+              </a>
+            </li>
+            <li>
+              <a href={`/viewfaculty?username=${encodeURIComponent(username)}`}>
+                <i className="bx bxs-doughnut-chart" />
+                <span className="text">Faculty View</span>
+              </a>
+            </li>
           </ul>
           <ul className="side-menu">
-            <li><a href="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
+            <li>
+              <a href="/" className="logout">
+                <i className="bx bxs-log-out-circle" />
+                <span className="text">Logout</span>
+              </a>
+            </li>
           </ul>
         </section>
 
@@ -220,7 +290,9 @@ const FacultyEntryStaffDashboard = () => {
           <nav>
             <i className="bx bx-menu" />
             <span className="head-title">Dashboard</span>
-            <form action="#"><div className="form-input"></div></form>
+            <form action="#">
+              <div className="form-input"></div>
+            </form>
             <div style={styles.usernameContainer}>
               <i className="bx bxs-user-circle" style={styles.userIcon}></i>
               <span style={styles.username}>{username}</span>
@@ -228,10 +300,6 @@ const FacultyEntryStaffDashboard = () => {
           </nav>
 
           <main>
-            <Helmet>
-              <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet" />
-            </Helmet>
-
             {/* Notification Panel */}
             <div style={styles.notificationPanel}>
               <div style={styles.notificationHeader}>
@@ -248,8 +316,8 @@ const FacultyEntryStaffDashboard = () => {
                         ...styles.notificationBanner,
                         backgroundColor:
                           notification.type === "approvalRejection" || notification.type === "verificationRejection"
-                            ? "#f8d7da" // Reddish for rejections
-                            : "#d4edda", // Greenish for fully acknowledged
+                            ? "#f8d7da" // Red for rejections
+                            : "#d4edda", // Green for notifications
                       }}
                     >
                       <div style={styles.notificationSummary}>
@@ -260,10 +328,7 @@ const FacultyEntryStaffDashboard = () => {
                           </span>
                         </span>
                         <div>
-                          <button
-                            style={styles.expandButton}
-                            onClick={() => toggleExpand(notification._id)}
-                          >
+                          <button style={styles.expandButton} onClick={() => toggleExpand(notification._id)}>
                             {expandedNotification === notification._id ? "▲" : "▼"}
                           </button>
                         </div>
@@ -275,7 +340,12 @@ const FacultyEntryStaffDashboard = () => {
               )}
             </div>
 
-            <div className="analytics-container" style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: "20px", marginTop: "20px" }}>
+            {/* Analytics Charts */}
+            <div
+              className="analytics-container"
+              style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: "20px", marginTop: "20px" }}
+            >
+              {/* Faculty Chart */}
               <div style={moduleStyle}>
                 <h3 style={titleStyle}>Count of Faculties Entered</h3>
                 <div className="filters">
@@ -291,6 +361,7 @@ const FacultyEntryStaffDashboard = () => {
                 <Bar data={generateFacultyChartConfig()} />
               </div>
 
+              {/* Session Chart */}
               <div style={moduleStyle}>
                 <h3 style={titleStyle}>Total Sessions Handled</h3>
                 <div className="filters">
@@ -313,6 +384,7 @@ const FacultyEntryStaffDashboard = () => {
   );
 };
 
+// Inline styles for notification panel and UI elements
 const styles = {
   notificationPanel: {
     maxWidth: "800px",
@@ -394,12 +466,36 @@ const styles = {
     color: "#666",
     padding: "20px",
   },
-  usernameContainer: { display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#555" },
-  userIcon: { fontSize: "30px", color: "#007BFF" },
-  username: { fontWeight: "bold", fontSize: "18px" },
+  usernameContainer: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    fontSize: "14px",
+    color: "#555",
+  },
+  userIcon: {
+    fontSize: "30px",
+    color: "#007BFF",
+  },
+  username: {
+    fontWeight: "bold",
+    fontSize: "18px",
+  },
 };
 
-const moduleStyle = { width: "45%", padding: "20px", backgroundColor: "white", borderRadius: "15px", boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)", textAlign: "center" };
-const titleStyle = { marginBottom: "15px", fontSize: "1.2em", color: "#28a745" };
+// Styles for chart modules
+const moduleStyle = {
+  width: "45%",
+  padding: "20px",
+  backgroundColor: "white",
+  borderRadius: "15px",
+  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+  textAlign: "center",
+};
+const titleStyle = {
+  marginBottom: "15px",
+  fontSize: "1.2em",
+  color: "#28a745",
+};
 
 export default FacultyEntryStaffDashboard;

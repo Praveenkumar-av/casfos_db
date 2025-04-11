@@ -64,7 +64,7 @@ const Register = () => {
             <img src="images/CASFOS-Coimbatore.jpg" alt="IMG" /><br /><br />
             <div>
               <form>
-                {['Head of Office', 'Principal', 'Asset Manager/Entry Staff', 'Faculty Entry Staff/Superintendent', 'Viewer'].map((label, index) => (
+              {['Head of Office', 'Principal', 'Asset Manager/StoreKeeper', 'Faculty Entry Staff/Verifier', 'Viewer'].map((label, index) => (
                   <label key={index} className="particles-checkbox-container">
                     <input
                       type="radio"

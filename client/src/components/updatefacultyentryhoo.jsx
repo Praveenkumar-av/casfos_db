@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { useLocation } from "react-router-dom";
-import "../styles/facultymanagement.css";
-import "../styles/style.css";
-import axios from "axios";
-import Swal from "sweetalert2";
+import { useLocation } from "react-router-dom"; // For accessing URL query parameters
+import "../styles/facultymanagement.css"; // Custom CSS for faculty management
+import "../styles/style.css"; // General styles
+import axios from "axios"; // HTTP client for API requests
+import Swal from "sweetalert2"; // For displaying alerts
+import { Helmet } from "react-helmet"; // For managing document head
 
 // Utility function to convert ISO date to yyyy-MM-dd format
 const formatDate = (isoDate) => {
@@ -15,7 +16,7 @@ const formatDate = (isoDate) => {
   return `${year}-${month}-${day}`;
 };
 
-// Domain options
+// Domain options for major and minor domains dropdowns
 const domainOptions = {
   "Forest & Wildlife": [
     "Silviculture",
@@ -51,13 +52,7 @@ const domainOptions = {
     "Ecosystem Health",
     "Others",
   ],
-  "Disaster Management": [
-    "Forest Fire Management & Damage assessment",
-    "Cyclone",
-    "Flood",
-    "Desertification",
-    "Others",
-  ],
+  "Disaster Management": ["Forest Fire Management & Damage assessment", "Cyclone", "Flood", "Desertification", "Others"],
   "Human Resource Development": [
     "Time Management",
     "Leadership Management",
@@ -70,14 +65,7 @@ const domainOptions = {
     "Building competencies for personal Excellence",
     "Others",
   ],
-  "Health and Fitness": [
-    "First Aid",
-    "Counselling",
-    "Physical, mental and Social Health",
-    "Stress Management",
-    "Yoga and Meditation",
-    "Others",
-  ],
+  "Health and Fitness": ["First Aid", "Counselling", "Physical, mental and Social Health", "Stress Management", "Yoga and Meditation", "Others"],
   "Ethics and Public Governance": [
     "Public administration, Public Grievance and Public Finance",
     "Decision Making",
@@ -100,12 +88,7 @@ const domainOptions = {
     "Cyber Security Laws",
     "Others",
   ],
-  "CCS Rules and Regulation": [
-    "Service Rules and matters",
-    "Conduct Rules",
-    "Disciplinary Proceedings",
-    "Others",
-  ],
+  "CCS Rules and Regulation": ["Service Rules and matters", "Conduct Rules", "Disciplinary Proceedings", "Others"],
   "Media Management": [
     "The Art of Interacting with Print and Electronic Media",
     "Role of Media",
@@ -116,94 +99,91 @@ const domainOptions = {
   ],
 };
 
+// UpdateFacultyEntryHoo component: Allows Head of Office to update faculty records
 function UpdateFacultyEntryHoo() {
+  // Extract username and faculty data from location
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
   const { facultyData, isUpdate } = location.state || {};
 
-  // Format dates from backend
-  const formattedFacultyData = {
-    ...facultyData,
-    rrSfsDate: formatDate(facultyData?.rrSfsDate),
-    dateOfJoining: formatDate(facultyData?.dateOfJoining),
-    dateOfRelieve: formatDate(facultyData?.dateOfRelieve),
-    dateOfBirth: formatDate(facultyData?.dateOfBirth),
-    joined: formatDate(facultyData?.joined),
-    publications: facultyData?.publications?.map((pub) => ({
-      ...pub,
-      dateOfPublication: formatDate(pub.dateOfPublication),
-    })) || [],
-    coursesHandled: facultyData?.coursesHandled?.map((course) => ({
-      ...course,
-    })) || [],
-    toursAttended: facultyData?.toursAttended?.map((tour) => ({
-      ...tour,
-      startDate: formatDate(tour.startDate),
-      endDate: formatDate(tour.endDate),
-    })) || [],
-    examiner: facultyData?.examiner?.map((exam) => ({
-      ...exam,
-      date: formatDate(exam.date),
-    })) || [],
-    specialSessions: facultyData?.specialSessions?.map((session) => ({
-      ...session,
-      date: formatDate(session.date),
-    })) || [],
-  };
+  // Format dates from backend data
+  const formattedFacultyData = facultyData
+    ? {
+        ...facultyData,
+        rrSfsDate: formatDate(facultyData.rrSfsDate),
+        dateOfJoining: formatDate(facultyData.dateOfJoining),
+        dateOfRelieve: formatDate(facultyData.dateOfRelieve),
+        dateOfBirth: formatDate(facultyData.dateOfBirth),
+        joined: formatDate(facultyData.joined),
+        publications: facultyData.publications?.map((pub) => ({
+          ...pub,
+          dateOfPublication: formatDate(pub.dateOfPublication),
+        })) || [],
+        coursesHandled: facultyData.coursesHandled?.map((course) => ({ ...course })) || [],
+        toursAttended: facultyData.toursAttended?.map((tour) => ({
+          ...tour,
+          startDate: formatDate(tour.startDate),
+          endDate: formatDate(tour.endDate),
+        })) || [],
+        examiner: facultyData.examiner?.map((exam) => ({ ...exam, date: formatDate(exam.date) })) || [],
+        specialSessions: facultyData.specialSessions?.map((session) => ({
+          ...session,
+          date: formatDate(session.date),
+        })) || [],
+      }
+    : {};
 
   const _id = formattedFacultyData._id;
 
-  // Initialize state with formatted faculty data
-  const [facultyType, setFacultyType] = useState(formattedFacultyData?.facultyType || "");
+  // State definitions
+  const [facultyType, setFacultyType] = useState(formattedFacultyData.facultyType || "");
   const [facultyDetails, setFacultyDetails] = useState({
-    name: formattedFacultyData?.name || "",
-    cadre: formattedFacultyData?.cadre || "",
-    yearOfAllotment: formattedFacultyData?.yearOfAllotment || "",
-    rrSfsDate: formattedFacultyData?.rrSfsDate || "",
-    dateOfJoining: formattedFacultyData?.dateOfJoining || "",
-    dateOfRelieve: formattedFacultyData?.dateOfRelieve || "",
-    dateOfBirth: formattedFacultyData?.dateOfBirth || "",
-    mobileNumber: formattedFacultyData?.mobileNumber || "",
-    communicationAddress: formattedFacultyData?.communicationAddress || "",
-    permanentAddress: formattedFacultyData?.permanentAddress || "",
-    email: formattedFacultyData?.email || "",
-    photograph: formattedFacultyData?.photograph || "",
-    presentPlaceOfWorking: formattedFacultyData?.presentPlaceOfWorking || "",
-    status: formattedFacultyData?.status || "serving",
-    modulesHandled: formattedFacultyData?.modulesHandled || [],
-    majorDomains: formattedFacultyData?.majorDomains || [],
-    minorDomains: formattedFacultyData?.minorDomains || [],
-    areasOfExpertise: formattedFacultyData?.areasOfExpertise || "",
-    awardsReceived: formattedFacultyData?.awardsReceived || "",
-    inServiceTrainingHandled: formattedFacultyData?.inServiceTrainingHandled || "",
-    publications: formattedFacultyData?.publications || [],
-    educationDetails: formattedFacultyData?.educationDetails || [],
-    coursesHandled: formattedFacultyData?.coursesHandled || [],
-    toursAttended: formattedFacultyData?.toursAttended || [],
-    examiner: formattedFacultyData?.examiner || [],
-    specialSessions: formattedFacultyData?.specialSessions || [],
-    institution: formattedFacultyData?.institution || "",
-    otherResponsibilities: formattedFacultyData?.otherResponsibilities || [],
-    joined: formattedFacultyData?.joined || "",
-    staffid: formattedFacultyData?.staffid || "",
+    name: formattedFacultyData.name || "",
+    cadre: formattedFacultyData.cadre || "",
+    yearOfAllotment: formattedFacultyData.yearOfAllotment || "",
+    rrSfsDate: formattedFacultyData.rrSfsDate || "",
+    dateOfJoining: formattedFacultyData.dateOfJoining || "",
+    dateOfRelieve: formattedFacultyData.dateOfRelieve || "",
+    dateOfBirth: formattedFacultyData.dateOfBirth || "",
+    mobileNumber: formattedFacultyData.mobileNumber || "",
+    communicationAddress: formattedFacultyData.communicationAddress || "",
+    permanentAddress: formattedFacultyData.permanentAddress || "",
+    email: formattedFacultyData.email || "",
+    photograph: formattedFacultyData.photograph || "",
+    presentPlaceOfWorking: formattedFacultyData.presentPlaceOfWorking || "",
+    status: formattedFacultyData.status || "serving",
+    modulesHandled: formattedFacultyData.modulesHandled || [],
+    majorDomains: formattedFacultyData.majorDomains || [],
+    minorDomains: formattedFacultyData.minorDomains || [],
+    areasOfExpertise: formattedFacultyData.areasOfExpertise || "",
+    awardsReceived: formattedFacultyData.awardsReceived || "",
+    inServiceTrainingHandled: formattedFacultyData.inServiceTrainingHandled || "",
+    publications: formattedFacultyData.publications || [],
+    educationDetails: formattedFacultyData.educationDetails || [],
+    coursesHandled: formattedFacultyData.coursesHandled || [],
+    toursAttended: formattedFacultyData.toursAttended || [],
+    examiner: formattedFacultyData.examiner || [],
+    specialSessions: formattedFacultyData.specialSessions || [],
+    institution: formattedFacultyData.institution || "",
+    otherResponsibilities: formattedFacultyData.otherResponsibilities || [],
+    joined: formattedFacultyData.joined || "",
+    staffid: formattedFacultyData.staffid || "",
   });
-  const [savingStatus, setSavingStatus] = useState("");
+  const [savingStatus, setSavingStatus] = useState(""); // Tracks save operation status
 
-  // State for domain expertise
+  // State for domain expertise (major and minor domains)
   const [domainExpertise, setDomainExpertise] = useState(() => {
-    if (formattedFacultyData?.majorDomains?.length > 0) {
+    if (formattedFacultyData.majorDomains?.length > 0) {
       return formattedFacultyData.majorDomains.map((major) => ({
         major,
-        minors: formattedFacultyData.minorDomains?.filter((minor) =>
-          domainOptions[major]?.includes(minor)
-        ) || [],
+        minors: formattedFacultyData.minorDomains?.filter((minor) => domainOptions[major]?.includes(minor)) || [],
       }));
     }
     return [{ major: "", minors: [] }];
   });
 
-  // Handlers for domain expertise
+  // Domain expertise handlers
   const handleMajorDomainChange = (index, value) => {
     const updatedExpertise = [...domainExpertise];
     updatedExpertise[index] = { major: value, minors: [] };
@@ -216,9 +196,7 @@ function UpdateFacultyEntryHoo() {
     if (checked) {
       updatedExpertise[index].minors = [...updatedExpertise[index].minors, subDomain];
     } else {
-      updatedExpertise[index].minors = updatedExpertise[index].minors.filter(
-        (d) => d !== subDomain
-      );
+      updatedExpertise[index].minors = updatedExpertise[index].minors.filter((d) => d !== subDomain);
     }
     setDomainExpertise(updatedExpertise);
     updateFacultyDomains(updatedExpertise);
@@ -227,11 +205,7 @@ function UpdateFacultyEntryHoo() {
   const updateFacultyDomains = (expertise) => {
     const majorDomains = expertise.map((e) => e.major).filter(Boolean);
     const minorDomains = expertise.flatMap((e) => e.minors);
-    setFacultyDetails((prev) => ({
-      ...prev,
-      majorDomains,
-      minorDomains,
-    }));
+    setFacultyDetails((prev) => ({ ...prev, majorDomains, minorDomains }));
   };
 
   const handleAddDomainExpertise = () => {
@@ -246,177 +220,147 @@ function UpdateFacultyEntryHoo() {
 
   // Handlers for adding nested items
   const handleAddPublication = () => {
-    setFacultyDetails({
-      ...facultyDetails,
-      publications: [
-        ...facultyDetails.publications,
-        { typeOfPublication: "", title: "", dateOfPublication: "", additionalDetails: "" },
-      ],
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      publications: [...prev.publications, { typeOfPublication: "", title: "", dateOfPublication: "", additionalDetails: "" }],
+    }));
   };
 
   const handleAddEducationDetail = () => {
-    setFacultyDetails({
-      ...facultyDetails,
-      educationDetails: [
-        ...facultyDetails.educationDetails,
-        { degree: "", specialization: "", institutionName: "" },
-      ],
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      educationDetails: [...prev.educationDetails, { degree: "", specialization: "", institutionName: "" }],
+    }));
   };
 
   const handleAddCourse = () => {
-    setFacultyDetails({
-      ...facultyDetails,
+    setFacultyDetails((prev) => ({
+      ...prev,
       coursesHandled: [
-        ...facultyDetails.coursesHandled,
-        {
-          courseType: "",
-          batchno: "",
-          title: "",
-          feedbackRating: "",
-          feedbackRatings: "",
-          otherCourseType: "",
-        },
+        ...prev.coursesHandled,
+        { courseType: "", batchno: "", title: "", feedbackRating: "", feedbackRatings: "", otherCourseType: "" },
       ],
-    });
+    }));
   };
 
   const handleAddTour = () => {
-    setFacultyDetails({
-      ...facultyDetails,
+    setFacultyDetails((prev) => ({
+      ...prev,
       toursAttended: [
-        ...facultyDetails.toursAttended,
-        {
-          activityType: "",
-          days: "",
-          startDate: "",
-          endDate: "",
-          fieldExerciseName: "",
-          batchNumber: "",
-          location: "",
-          remarks: "",
-          region: "",
-        },
+        ...prev.toursAttended,
+        { activityType: "", days: "", startDate: "", endDate: "", fieldExerciseName: "", batchNumber: "", location: "", remarks: "", region: "" },
       ],
-    });
+    }));
   };
 
   const handleAddExaminer = () => {
-    setFacultyDetails({
-      ...facultyDetails,
-      examiner: [
-        ...facultyDetails.examiner,
-        { batchNo: "", year: "", batchType: "", date: "", paperCorrected: "" },
-      ],
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      examiner: [...prev.examiner, { batchNo: "", year: "", batchType: "", date: "", paperCorrected: "" }],
+    }));
   };
 
   const handleAddSpecialSession = () => {
-    setFacultyDetails({
-      ...facultyDetails,
+    setFacultyDetails((prev) => ({
+      ...prev,
       specialSessions: [
-        ...facultyDetails.specialSessions,
+        ...prev.specialSessions,
         { institutionname: "", topic: "", date: "", feedbackRating: "", feedbackRating1: "" },
       ],
-    });
+    }));
   };
 
   const handleAddResponsibility = () => {
-    setFacultyDetails({
-      ...facultyDetails,
-      otherResponsibilities: [...facultyDetails.otherResponsibilities, { responsibility: "" }],
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      otherResponsibilities: [...prev.otherResponsibilities, { responsibility: "" }],
+    }));
   };
 
   // Handlers for removing nested items
   const handleRemovePublication = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      publications: facultyDetails.publications.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      publications: prev.publications.filter((_, i) => i !== index),
+    }));
   };
 
   const handleRemoveEducationDetail = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      educationDetails: facultyDetails.educationDetails.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      educationDetails: prev.educationDetails.filter((_, i) => i !== index),
+    }));
   };
 
   const handleRemoveCourse = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      coursesHandled: facultyDetails.coursesHandled.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      coursesHandled: prev.coursesHandled.filter((_, i) => i !== index),
+    }));
   };
 
   const handleRemoveTour = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      toursAttended: facultyDetails.toursAttended.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      toursAttended: prev.toursAttended.filter((_, i) => i !== index),
+    }));
   };
 
   const handleRemoveExaminer = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      examiner: facultyDetails.examiner.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      examiner: prev.examiner.filter((_, i) => i !== index),
+    }));
   };
 
   const handleRemoveSpecialSession = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      specialSessions: facultyDetails.specialSessions.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      specialSessions: prev.specialSessions.filter((_, i) => i !== index),
+    }));
   };
 
   const handleRemoveResponsibility = (index) => {
-    setFacultyDetails({
-      ...facultyDetails,
-      otherResponsibilities: facultyDetails.otherResponsibilities.filter((_, i) => i !== index),
-    });
+    setFacultyDetails((prev) => ({
+      ...prev,
+      otherResponsibilities: prev.otherResponsibilities.filter((_, i) => i !== index),
+    }));
   };
 
-  // Handlers for input changes
+  // Input change handlers
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFacultyDetails({ ...facultyDetails, photograph: file });
+      setFacultyDetails((prev) => ({ ...prev, photograph: file }));
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFacultyDetails({ ...facultyDetails, [name]: value });
+    setFacultyDetails((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleNestedInputChange = (e, field, index) => {
     const { name, value } = e.target;
-    const updatedField = facultyDetails[field].map((item, i) =>
-      i === index ? { ...item, [name]: value } : item
-    );
-    setFacultyDetails({ ...facultyDetails, [field]: updatedField });
+    const updatedField = facultyDetails[field].map((item, i) => (i === index ? { ...item, [name]: value } : item));
+    setFacultyDetails((prev) => ({ ...prev, [field]: updatedField }));
   };
 
+  // Form submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!facultyType) {
-      Swal.fire({
-        icon: "warning",
-        title: "Validation Error",
-        text: "Please select a faculty type.",
-      });
+      Swal.fire({ icon: "warning", title: "Validation Error", text: "Please select a faculty type." });
       return;
     }
+
     setSavingStatus("Saving...");
     const updatedFacultyDetails = { ...facultyDetails, facultyType, _id };
 
     try {
       const formData = new FormData();
 
-      // Handle scalar fields and file
+      // Append scalar fields and file
       Object.entries(updatedFacultyDetails).forEach(([key, value]) => {
         if (key === "photograph" && value instanceof File) {
           formData.append(key, value);
@@ -425,7 +369,7 @@ function UpdateFacultyEntryHoo() {
         }
       });
 
-      // Handle array fields
+      // Append array fields
       const arrayFields = [
         "modulesHandled",
         "majorDomains",
@@ -457,40 +401,79 @@ function UpdateFacultyEntryHoo() {
       const response = await axios.post("http://localhost:3001/api/faculty/save", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
       if (response.data.success) {
         setSavingStatus("Saved");
-        Swal.fire({
-          icon: "success",
-          title: "Success!",
-          text: "Faculty data updated successfully!",
-        });
+        Swal.fire({ icon: "success", title: "Success!", text: "Faculty data updated successfully!" });
         setTimeout(() => setSavingStatus(""), 2000);
       } else {
         setSavingStatus("Failed to Save");
-        Swal.fire({
-          icon: "error",
-          title: "Oops...",
-          text: "Failed to update faculty data.",
-        });
+        Swal.fire({ icon: "error", title: "Oops...", text: "Failed to update faculty data." });
       }
     } catch (error) {
       console.error("Error updating faculty data:", error);
       setSavingStatus("Failed to Save");
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "An error occurred while updating the data.",
-      });
+      Swal.fire({ icon: "error", title: "Error", text: "An error occurred while updating the data." });
     }
   };
 
+  // Inline styles
+  const styles = {
+    usernameContainer: { display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#555" },
+    userIcon: { fontSize: "30px", color: "#007BFF" },
+    username: { fontWeight: "bold", fontSize: "18px" },
+    header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
+    subtitle: { color: "#666", fontSize: "14px", marginBottom: "20px" },
+    cardContainer: { display: "flex", gap: "15px" },
+    card: { flex: "1", padding: "15px", borderRadius: "10px", textAlign: "center", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" },
+    icon: { width: "50px", height: "50px", borderRadius: "50%", margin: "0 auto 10px", display: "flex", justifyContent: "center", alignItems: "center" },
+    iconStyle: { fontSize: "24px", color: "#fff" },
+    change: { color: "#666", fontSize: "12px" },
+    loadingIcon: { fontSize: "16px", color: "#007BFF" },
+    successIcon: { fontSize: "16px", color: "#28a745" },
+    errorIcon: { fontSize: "16px", color: "#dc3545" },
+  };
+
+  // Render the component
   return (
     <div className="faculty-view">
-      <meta charSet="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
-      <link rel="stylesheet" href="style.css" />
-      <title>CASFOS</title>
+      <Helmet>
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
+        <title>CASFOS</title>
+        <style>{`
+          .faculty-management input, .faculty-management select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+          }
+          .faculty-management button {
+            padding: 8px 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 0;
+          }
+          .faculty-management button:hover {
+            background-color: #0056b3;
+          }
+          .faculty-management h3, .faculty-management h4 {
+            color: #333;
+            margin-top: 20px;
+          }
+          .faculty-management .domain-section {
+            margin-left: 20px;
+          }
+        `}</style>
+      </Helmet>
+
+      {/* Sidebar */}
       <section id="sidebar">
         <a href="#" className="brand">
           <span className="text">HEAD OF OFFICE</span>
@@ -536,6 +519,8 @@ function UpdateFacultyEntryHoo() {
           </li>
         </ul>
       </section>
+
+      {/* Main content */}
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
@@ -548,6 +533,7 @@ function UpdateFacultyEntryHoo() {
             <span style={styles.username}>{username}</span>
           </div>
         </nav>
+
         <main>
           <div className="faculty-management">
             <div className="dash-content">
@@ -562,113 +548,43 @@ function UpdateFacultyEntryHoo() {
                     <h2>{facultyType.charAt(0).toUpperCase() + facultyType.slice(1)} Faculty</h2>
                   </div>
 
+                  {/* Internal Faculty Form */}
                   {facultyType === "internal" && (
                     <div>
                       <h3>Internal Faculty Details</h3>
                       <label>Name:</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={facultyDetails.name}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="text" name="name" value={facultyDetails.name} onChange={handleInputChange} required />
                       <label>Cadre:</label>
-                      <input
-                        type="text"
-                        name="cadre"
-                        value={facultyDetails.cadre}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="cadre" value={facultyDetails.cadre} onChange={handleInputChange} />
                       <label>Year of Allotment:</label>
-                      <input
-                        type="text"
-                        name="yearOfAllotment"
-                        value={facultyDetails.yearOfAllotment}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="yearOfAllotment" value={facultyDetails.yearOfAllotment} onChange={handleInputChange} />
                       <label>RR/SFS Date:</label>
-                      <input
-                        type="date"
-                        name="rrSfsDate"
-                        value={facultyDetails.rrSfsDate}
-                        onChange={handleInputChange}
-                      />
+                      <input type="date" name="rrSfsDate" value={facultyDetails.rrSfsDate} onChange={handleInputChange} />
                       <label>Date of Joining:</label>
-                      <input
-                        type="date"
-                        name="dateOfJoining"
-                        value={facultyDetails.dateOfJoining}
-                        onChange={handleInputChange}
-                      />
+                      <input type="date" name="dateOfJoining" value={facultyDetails.dateOfJoining} onChange={handleInputChange} />
                       <label>Date of Relieve:</label>
-                      <input
-                        type="date"
-                        name="dateOfRelieve"
-                        value={facultyDetails.dateOfRelieve}
-                        onChange={handleInputChange}
-                      />
+                      <input type="date" name="dateOfRelieve" value={facultyDetails.dateOfRelieve} onChange={handleInputChange} />
                       <label>Date of Birth:</label>
-                      <input
-                        type="date"
-                        name="dateOfBirth"
-                        value={facultyDetails.dateOfBirth}
-                        onChange={handleInputChange}
-                      />
+                      <input type="date" name="dateOfBirth" value={facultyDetails.dateOfBirth} onChange={handleInputChange} />
                       <label>Mobile Number:</label>
-                      <input
-                        type="text"
-                        name="mobileNumber"
-                        value={facultyDetails.mobileNumber}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="mobileNumber" value={facultyDetails.mobileNumber} onChange={handleInputChange} />
                       <label>Communication Address:</label>
-                      <input
-                        type="text"
-                        name="communicationAddress"
-                        value={facultyDetails.communicationAddress}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="communicationAddress" value={facultyDetails.communicationAddress} onChange={handleInputChange} />
                       <label>Permanent Address:</label>
-                      <input
-                        type="text"
-                        name="permanentAddress"
-                        value={facultyDetails.permanentAddress}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="permanentAddress" value={facultyDetails.permanentAddress} onChange={handleInputChange} />
                       <label>Email:</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={facultyDetails.email}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="email" name="email" value={facultyDetails.email} onChange={handleInputChange} required />
                       <label>Photograph:</label>
-                      <input
-                        type="file"
-                        name="photograph"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                      />
+                      <input type="file" name="photograph" accept="image/*" onChange={handleFileChange} />
                       <label>Status:</label>
-                      <select
-                        name="status"
-                        value={facultyDetails.status}
-                        onChange={handleInputChange}
-                      >
+                      <select name="status" value={facultyDetails.status} onChange={handleInputChange}>
                         <option value="serving">Serving</option>
                         <option value="retired">Repatriated</option>
                       </select>
                       {facultyDetails.status === "serving" && (
                         <div>
                           <label>Present Place of Working:</label>
-                          <input
-                            type="text"
-                            name="presentPlaceOfWorking"
-                            value={facultyDetails.presentPlaceOfWorking}
-                            onChange={handleInputChange}
-                          />
+                          <input type="text" name="presentPlaceOfWorking" value={facultyDetails.presentPlaceOfWorking} onChange={handleInputChange} />
                         </div>
                       )}
 
@@ -677,10 +593,7 @@ function UpdateFacultyEntryHoo() {
                         <div key={index} className="domain-expertise-entry" style={{ marginBottom: "20px" }}>
                           <div className="domain-section">
                             <h4>Major Domain {index + 1}</h4>
-                            <select
-                              value={expertise.major}
-                              onChange={(e) => handleMajorDomainChange(index, e.target.value)}
-                            >
+                            <select value={expertise.major} onChange={(e) => handleMajorDomainChange(index, e.target.value)}>
                               <option value="">Select Major Domain</option>
                               {Object.keys(domainOptions).map((domain) => (
                                 <option key={domain} value={domain}>
@@ -699,9 +612,7 @@ function UpdateFacultyEntryHoo() {
                                     id={`minor-${index}-${subDomain}`}
                                     value={subDomain}
                                     checked={expertise.minors.includes(subDomain)}
-                                    onChange={(e) =>
-                                      handleMinorDomainChange(index, subDomain, e.target.checked)
-                                    }
+                                    onChange={(e) => handleMinorDomainChange(index, subDomain, e.target.checked)}
                                   />
                                   <label htmlFor={`minor-${index}-${subDomain}`}>{subDomain}</label>
                                 </div>
@@ -709,50 +620,25 @@ function UpdateFacultyEntryHoo() {
                             </div>
                           )}
                           {domainExpertise.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDomainExpertise(index)}
-                              style={{ marginTop: "10px", color: "white" }}
-                            >
+                            <button type="button" onClick={() => handleRemoveDomainExpertise(index)} style={{ marginTop: "10px", backgroundColor: "#dc3545" }}>
                               Remove
                             </button>
                           )}
                         </div>
                       ))}
-                      <button
-                        type="button"
-                        onClick={handleAddDomainExpertise}
-                        style={{ marginTop: "10px" }}
-                      >
+                      <button type="button" onClick={handleAddDomainExpertise} style={{ marginTop: "10px" }}>
                         <i className="bx bx-plus" /> Add Domain Expertise
                       </button>
 
                       <label>Areas of Expertise:</label>
-                      <input
-                        type="text"
-                        name="areasOfExpertise"
-                        value={facultyDetails.areasOfExpertise}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="areasOfExpertise" value={facultyDetails.areasOfExpertise} onChange={handleInputChange} />
                       <label>Awards Received:</label>
-                      <input
-                        type="text"
-                        name="awardsReceived"
-                        value={facultyDetails.awardsReceived}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="awardsReceived" value={facultyDetails.awardsReceived} onChange={handleInputChange} />
                       <label>In-service Training Handled:</label>
-                      <input
-                        type="text"
-                        name="inServiceTrainingHandled"
-                        value={facultyDetails.inServiceTrainingHandled}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="inServiceTrainingHandled" value={facultyDetails.inServiceTrainingHandled} onChange={handleInputChange} />
 
                       <h3>Education Details</h3>
-                      <button type="button" onClick={handleAddEducationDetail}>
-                        Add Education
-                      </button>
+                      <button type="button" onClick={handleAddEducationDetail}>Add Education</button>
                       {facultyDetails.educationDetails.map((edu, index) => (
                         <div key={index}>
                           <h4>Education {index + 1}</h4>
@@ -777,27 +663,18 @@ function UpdateFacultyEntryHoo() {
                             value={edu.institutionName}
                             onChange={(e) => handleNestedInputChange(e, "educationDetails", index)}
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEducationDetail(index)}
-                          >
+                          <button type="button" onClick={() => handleRemoveEducationDetail(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
                       ))}
 
                       <h3>Publications</h3>
-                      <button type="button" onClick={handleAddPublication}>
-                        Add Publication
-                      </button>
+                      <button type="button" onClick={handleAddPublication}>Add Publication</button>
                       {facultyDetails.publications.map((pub, index) => (
                         <div key={index}>
                           <h4>Publication {index + 1}</h4>
-                          <select
-                            name="typeOfPublication"
-                            value={pub.typeOfPublication}
-                            onChange={(e) => handleNestedInputChange(e, "publications", index)}
-                          >
+                          <select name="typeOfPublication" value={pub.typeOfPublication} onChange={(e) => handleNestedInputChange(e, "publications", index)}>
                             <option value="">Select Type</option>
                             <option value="Books Published">Books Published</option>
                             <option value="Articles Published">Articles Published</option>
@@ -824,27 +701,18 @@ function UpdateFacultyEntryHoo() {
                             value={pub.additionalDetails}
                             onChange={(e) => handleNestedInputChange(e, "publications", index)}
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePublication(index)}
-                          >
+                          <button type="button" onClick={() => handleRemovePublication(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
                       ))}
 
                       <h3>Courses Handled</h3>
-                      <button type="button" onClick={handleAddCourse}>
-                        Add Course
-                      </button>
+                      <button type="button" onClick={handleAddCourse}>Add Course</button>
                       {facultyDetails.coursesHandled.map((course, index) => (
                         <div key={index}>
                           <h4>Course {index + 1}</h4>
-                          <select
-                            name="courseType"
-                            value={course.courseType}
-                            onChange={(e) => handleNestedInputChange(e, "coursesHandled", index)}
-                          >
+                          <select name="courseType" value={course.courseType} onChange={(e) => handleNestedInputChange(e, "coursesHandled", index)}>
                             <option value="">Select Type</option>
                             <option value="InductionTraining">Induction Training</option>
                             <option value="InserviceTraining">In-service Training</option>
@@ -877,11 +745,7 @@ function UpdateFacultyEntryHoo() {
                             max="10"
                             onChange={(e) => handleNestedInputChange(e, "coursesHandled", index)}
                           />
-                          <select
-                            name="feedbackRatings"
-                            value={course.feedbackRatings}
-                            onChange={(e) => handleNestedInputChange(e, "coursesHandled", index)}
-                          >
+                          <select name="feedbackRatings" value={course.feedbackRatings} onChange={(e) => handleNestedInputChange(e, "coursesHandled", index)}>
                             <option value="">Select Rating</option>
                             <option value="poor">Poor</option>
                             <option value="good">Good</option>
@@ -895,24 +759,18 @@ function UpdateFacultyEntryHoo() {
                             value={course.otherCourseType}
                             onChange={(e) => handleNestedInputChange(e, "coursesHandled", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveCourse(index)}>
+                          <button type="button" onClick={() => handleRemoveCourse(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
                       ))}
 
                       <h3>Tours Attended</h3>
-                      <button type="button" onClick={handleAddTour}>
-                        Add Tour
-                      </button>
+                      <button type="button" onClick={handleAddTour}>Add Tour</button>
                       {facultyDetails.toursAttended.map((tour, index) => (
                         <div key={index}>
                           <h4>Tour {index + 1}</h4>
-                          <select
-                            name="activityType"
-                            value={tour.activityType}
-                            onChange={(e) => handleNestedInputChange(e, "toursAttended", index)}
-                          >
+                          <select name="activityType" value={tour.activityType} onChange={(e) => handleNestedInputChange(e, "toursAttended", index)}>
                             <option value="">Select Type</option>
                             <option value="FieldExercise">Field Exercise</option>
                             <option value="StudyTour">Study Tour</option>
@@ -971,16 +829,14 @@ function UpdateFacultyEntryHoo() {
                             value={tour.region}
                             onChange={(e) => handleNestedInputChange(e, "toursAttended", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveTour(index)}>
+                          <button type="button" onClick={() => handleRemoveTour(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
                       ))}
 
                       <h3>Examiner</h3>
-                      <button type="button" onClick={handleAddExaminer}>
-                        Add Examiner
-                      </button>
+                      <button type="button" onClick={handleAddExaminer}>Add Examiner</button>
                       {facultyDetails.examiner.map((exam, index) => (
                         <div key={index}>
                           <h4>Examiner {index + 1}</h4>
@@ -1018,16 +874,14 @@ function UpdateFacultyEntryHoo() {
                             value={exam.paperCorrected}
                             onChange={(e) => handleNestedInputChange(e, "examiner", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveExaminer(index)}>
+                          <button type="button" onClick={() => handleRemoveExaminer(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
                       ))}
 
                       <h3>Special Sessions</h3>
-                      <button type="button" onClick={handleAddSpecialSession}>
-                        Add Special Session
-                      </button>
+                      <button type="button" onClick={handleAddSpecialSession}>Add Special Session</button>
                       {facultyDetails.specialSessions.map((session, index) => (
                         <div key={index}>
                           <h4>Special Session {index + 1}</h4>
@@ -1065,16 +919,14 @@ function UpdateFacultyEntryHoo() {
                             value={session.feedbackRating1}
                             onChange={(e) => handleNestedInputChange(e, "specialSessions", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveSpecialSession(index)}>
+                          <button type="button" onClick={() => handleRemoveSpecialSession(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
                       ))}
 
                       <h3>Other Responsibilities</h3>
-                      <button type="button" onClick={handleAddResponsibility}>
-                        Add Responsibility
-                      </button>
+                      <button type="button" onClick={handleAddResponsibility}>Add Responsibility</button>
                       {facultyDetails.otherResponsibilities.map((resp, index) => (
                         <div key={index}>
                           <h4>Responsibility {index + 1}</h4>
@@ -1085,7 +937,7 @@ function UpdateFacultyEntryHoo() {
                             value={resp.responsibility}
                             onChange={(e) => handleNestedInputChange(e, "otherResponsibilities", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveResponsibility(index)}>
+                          <button type="button" onClick={() => handleRemoveResponsibility(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
@@ -1093,105 +945,46 @@ function UpdateFacultyEntryHoo() {
                     </div>
                   )}
 
+                  {/* External Faculty Form */}
                   {facultyType === "external" && (
                     <div>
                       <h3>External Faculty Details</h3>
                       <label>Name:</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={facultyDetails.name}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="text" name="name" value={facultyDetails.name} onChange={handleInputChange} required />
                       <label>Cadre:</label>
-                      <input
-                        type="text"
-                        name="cadre"
-                        value={facultyDetails.cadre}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="cadre" value={facultyDetails.cadre} onChange={handleInputChange} />
                       <label>Year of Allotment:</label>
-                      <input
-                        type="text"
-                        name="yearOfAllotment"
-                        value={facultyDetails.yearOfAllotment}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="yearOfAllotment" value={facultyDetails.yearOfAllotment} onChange={handleInputChange} />
                       <label>Mobile Number:</label>
-                      <input
-                        type="text"
-                        name="mobileNumber"
-                        value={facultyDetails.mobileNumber}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="mobileNumber" value={facultyDetails.mobileNumber} onChange={handleInputChange} />
                       <label>Communication Address:</label>
-                      <input
-                        type="text"
-                        name="communicationAddress"
-                        value={facultyDetails.communicationAddress}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="communicationAddress" value={facultyDetails.communicationAddress} onChange={handleInputChange} />
                       <label>Permanent Address:</label>
-                      <input
-                        type="text"
-                        name="permanentAddress"
-                        value={facultyDetails.permanentAddress}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="permanentAddress" value={facultyDetails.permanentAddress} onChange={handleInputChange} />
                       <label>Email:</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={facultyDetails.email}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="email" name="email" value={facultyDetails.email} onChange={handleInputChange} required />
                       <label>Photograph:</label>
-                      <input
-                        type="file"
-                        name="photograph"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                      />
+                      <input type="file" name="photograph" accept="image/*" onChange={handleFileChange} />
                       <label>Status:</label>
-                      <select
-                        name="status"
-                        value={facultyDetails.status}
-                        onChange={handleInputChange}
-                      >
+                      <select name="status" value={facultyDetails.status} onChange={handleInputChange}>
                         <option value="serving">Serving</option>
                         <option value="retired">Repatriated</option>
                       </select>
                       {facultyDetails.status === "serving" && (
                         <div>
                           <label>Present Place of Working:</label>
-                          <input
-                            type="text"
-                            name="presentPlaceOfWorking"
-                            value={facultyDetails.presentPlaceOfWorking}
-                            onChange={handleInputChange}
-                          />
+                          <input type="text" name="presentPlaceOfWorking" value={facultyDetails.presentPlaceOfWorking} onChange={handleInputChange} />
                         </div>
                       )}
                       <label>Institution:</label>
-                      <input
-                        type="text"
-                        name="institution"
-                        value={facultyDetails.institution}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="text" name="institution" value={facultyDetails.institution} onChange={handleInputChange} required />
 
                       <h3>Domain Expertise</h3>
                       {domainExpertise.map((expertise, index) => (
                         <div key={index} className="domain-expertise-entry" style={{ marginBottom: "20px" }}>
                           <div className="domain-section">
                             <h4>Major Domain {index + 1}</h4>
-                            <select
-                              value={expertise.major}
-                              onChange={(e) => handleMajorDomainChange(index, e.target.value)}
-                            >
+                            <select value={expertise.major} onChange={(e) => handleMajorDomainChange(index, e.target.value)}>
                               <option value="">Select Major Domain</option>
                               {Object.keys(domainOptions).map((domain) => (
                                 <option key={domain} value={domain}>
@@ -1210,9 +1003,7 @@ function UpdateFacultyEntryHoo() {
                                     id={`minor-${index}-${subDomain}`}
                                     value={subDomain}
                                     checked={expertise.minors.includes(subDomain)}
-                                    onChange={(e) =>
-                                      handleMinorDomainChange(index, subDomain, e.target.checked)
-                                    }
+                                    onChange={(e) => handleMinorDomainChange(index, subDomain, e.target.checked)}
                                   />
                                   <label htmlFor={`minor-${index}-${subDomain}`}>{subDomain}</label>
                                 </div>
@@ -1220,43 +1011,23 @@ function UpdateFacultyEntryHoo() {
                             </div>
                           )}
                           {domainExpertise.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDomainExpertise(index)}
-                              style={{ marginTop: "10px", color: "white" }}
-                            >
+                            <button type="button" onClick={() => handleRemoveDomainExpertise(index)} style={{ marginTop: "10px", backgroundColor: "#dc3545" }}>
                               Remove
                             </button>
                           )}
                         </div>
                       ))}
-                      <button
-                        type="button"
-                        onClick={handleAddDomainExpertise}
-                        style={{ marginTop: "10px" }}
-                      >
+                      <button type="button" onClick={handleAddDomainExpertise} style={{ marginTop: "10px" }}>
                         <i className="bx bx-plus" /> Add Domain Expertise
                       </button>
 
                       <label>Areas of Expertise:</label>
-                      <input
-                        type="text"
-                        name="areasOfExpertise"
-                        value={facultyDetails.areasOfExpertise}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="areasOfExpertise" value={facultyDetails.areasOfExpertise} onChange={handleInputChange} />
                       <label>Awards Received:</label>
-                      <input
-                        type="text"
-                        name="awardsReceived"
-                        value={facultyDetails.awardsReceived}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="awardsReceived" value={facultyDetails.awardsReceived} onChange={handleInputChange} />
 
                       <h3>Education Details</h3>
-                      <button type="button" onClick={handleAddEducationDetail}>
-                        Add Education
-                      </button>
+                      <button type="button" onClick={handleAddEducationDetail}>Add Education</button>
                       {facultyDetails.educationDetails.map((edu, index) => (
                         <div key={index}>
                           <h4>Education {index + 1}</h4>
@@ -1281,10 +1052,7 @@ function UpdateFacultyEntryHoo() {
                             value={edu.institutionName}
                             onChange={(e) => handleNestedInputChange(e, "educationDetails", index)}
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEducationDetail(index)}
-                          >
+                          <button type="button" onClick={() => handleRemoveEducationDetail(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
@@ -1300,28 +1068,30 @@ function UpdateFacultyEntryHoo() {
                             onChange={(e) => {
                               const updatedModules = [...facultyDetails.modulesHandled];
                               updatedModules[index] = e.target.value;
-                              setFacultyDetails({ ...facultyDetails, modulesHandled: updatedModules });
+                              setFacultyDetails((prev) => ({ ...prev, modulesHandled: updatedModules }));
                             }}
                           />
-                          <button type="button" onClick={() => {
-                            const updatedModules = facultyDetails.modulesHandled.filter((_, i) => i !== index);
-                            setFacultyDetails({ ...facultyDetails, modulesHandled: updatedModules });
-                          }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedModules = facultyDetails.modulesHandled.filter((_, i) => i !== index);
+                              setFacultyDetails((prev) => ({ ...prev, modulesHandled: updatedModules }));
+                            }}
+                            style={{ backgroundColor: "#dc3545" }}
+                          >
                             Remove
                           </button>
                         </div>
                       ))}
-                      <button type="button" onClick={() => setFacultyDetails({
-                        ...facultyDetails,
-                        modulesHandled: [...facultyDetails.modulesHandled, ""]
-                      })}>
+                      <button
+                        type="button"
+                        onClick={() => setFacultyDetails((prev) => ({ ...prev, modulesHandled: [...prev.modulesHandled, ""] }))}
+                      >
                         Add Module
                       </button>
 
                       <h3>Other Responsibilities</h3>
-                      <button type="button" onClick={handleAddResponsibility}>
-                        Add Responsibility
-                      </button>
+                      <button type="button" onClick={handleAddResponsibility}>Add Responsibility</button>
                       {facultyDetails.otherResponsibilities.map((resp, index) => (
                         <div key={index}>
                           <h4>Responsibility {index + 1}</h4>
@@ -1332,7 +1102,7 @@ function UpdateFacultyEntryHoo() {
                             value={resp.responsibility}
                             onChange={(e) => handleNestedInputChange(e, "otherResponsibilities", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveResponsibility(index)}>
+                          <button type="button" onClick={() => handleRemoveResponsibility(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
@@ -1340,105 +1110,46 @@ function UpdateFacultyEntryHoo() {
                     </div>
                   )}
 
+                  {/* Contract Faculty Form */}
                   {facultyType === "contract" && (
                     <div>
                       <h3>Contract Faculty Details</h3>
                       <label>Name:</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={facultyDetails.name}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="text" name="name" value={facultyDetails.name} onChange={handleInputChange} required />
                       <label>Cadre:</label>
-                      <input
-                        type="text"
-                        name="cadre"
-                        value={facultyDetails.cadre}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="cadre" value={facultyDetails.cadre} onChange={handleInputChange} />
                       <label>Year of Allotment:</label>
-                      <input
-                        type="text"
-                        name="yearOfAllotment"
-                        value={facultyDetails.yearOfAllotment}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="yearOfAllotment" value={facultyDetails.yearOfAllotment} onChange={handleInputChange} />
                       <label>Mobile Number:</label>
-                      <input
-                        type="text"
-                        name="mobileNumber"
-                        value={facultyDetails.mobileNumber}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="mobileNumber" value={facultyDetails.mobileNumber} onChange={handleInputChange} />
                       <label>Communication Address:</label>
-                      <input
-                        type="text"
-                        name="communicationAddress"
-                        value={facultyDetails.communicationAddress}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="communicationAddress" value={facultyDetails.communicationAddress} onChange={handleInputChange} />
                       <label>Permanent Address:</label>
-                      <input
-                        type="text"
-                        name="permanentAddress"
-                        value={facultyDetails.permanentAddress}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="permanentAddress" value={facultyDetails.permanentAddress} onChange={handleInputChange} />
                       <label>Email:</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={facultyDetails.email}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="email" name="email" value={facultyDetails.email} onChange={handleInputChange} required />
                       <label>Photograph:</label>
-                      <input
-                        type="file"
-                        name="photograph"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                      />
+                      <input type="file" name="photograph" accept="image/*" onChange={handleFileChange} />
                       <label>Status:</label>
-                      <select
-                        name="status"
-                        value={facultyDetails.status}
-                        onChange={handleInputChange}
-                      >
+                      <select name="status" value={facultyDetails.status} onChange={handleInputChange}>
                         <option value="serving">Serving</option>
                         <option value="retired">Repatriated</option>
                       </select>
                       {facultyDetails.status === "serving" && (
                         <div>
                           <label>Present Place of Working:</label>
-                          <input
-                            type="text"
-                            name="presentPlaceOfWorking"
-                            value={facultyDetails.presentPlaceOfWorking}
-                            onChange={handleInputChange}
-                          />
+                          <input type="text" name="presentPlaceOfWorking" value={facultyDetails.presentPlaceOfWorking} onChange={handleInputChange} />
                         </div>
                       )}
                       <label>Institution:</label>
-                      <input
-                        type="text"
-                        name="institution"
-                        value={facultyDetails.institution}
-                        onChange={handleInputChange}
-                        required
-                      />
+                      <input type="text" name="institution" value={facultyDetails.institution} onChange={handleInputChange} required />
 
                       <h3>Domain Expertise</h3>
                       {domainExpertise.map((expertise, index) => (
                         <div key={index} className="domain-expertise-entry" style={{ marginBottom: "20px" }}>
                           <div className="domain-section">
                             <h4>Major Domain {index + 1}</h4>
-                            <select
-                              value={expertise.major}
-                              onChange={(e) => handleMajorDomainChange(index, e.target.value)}
-                            >
+                            <select value={expertise.major} onChange={(e) => handleMajorDomainChange(index, e.target.value)}>
                               <option value="">Select Major Domain</option>
                               {Object.keys(domainOptions).map((domain) => (
                                 <option key={domain} value={domain}>
@@ -1457,9 +1168,7 @@ function UpdateFacultyEntryHoo() {
                                     id={`minor-${index}-${subDomain}`}
                                     value={subDomain}
                                     checked={expertise.minors.includes(subDomain)}
-                                    onChange={(e) =>
-                                      handleMinorDomainChange(index, subDomain, e.target.checked)
-                                    }
+                                    onChange={(e) => handleMinorDomainChange(index, subDomain, e.target.checked)}
                                   />
                                   <label htmlFor={`minor-${index}-${subDomain}`}>{subDomain}</label>
                                 </div>
@@ -1467,43 +1176,23 @@ function UpdateFacultyEntryHoo() {
                             </div>
                           )}
                           {domainExpertise.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveDomainExpertise(index)}
-                              style={{ marginTop: "10px", color: "white" }}
-                            >
+                            <button type="button" onClick={() => handleRemoveDomainExpertise(index)} style={{ marginTop: "10px", backgroundColor: "#dc3545" }}>
                               Remove
                             </button>
                           )}
                         </div>
                       ))}
-                      <button
-                        type="button"
-                        onClick={handleAddDomainExpertise}
-                        style={{ marginTop: "10px" }}
-                      >
+                      <button type="button" onClick={handleAddDomainExpertise} style={{ marginTop: "10px" }}>
                         <i className="bx bx-plus" /> Add Domain Expertise
                       </button>
 
                       <label>Areas of Expertise:</label>
-                      <input
-                        type="text"
-                        name="areasOfExpertise"
-                        value={facultyDetails.areasOfExpertise}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="areasOfExpertise" value={facultyDetails.areasOfExpertise} onChange={handleInputChange} />
                       <label>Awards Received:</label>
-                      <input
-                        type="text"
-                        name="awardsReceived"
-                        value={facultyDetails.awardsReceived}
-                        onChange={handleInputChange}
-                      />
+                      <input type="text" name="awardsReceived" value={facultyDetails.awardsReceived} onChange={handleInputChange} />
 
                       <h3>Education Details</h3>
-                      <button type="button" onClick={handleAddEducationDetail}>
-                        Add Education
-                      </button>
+                      <button type="button" onClick={handleAddEducationDetail}>Add Education</button>
                       {facultyDetails.educationDetails.map((edu, index) => (
                         <div key={index}>
                           <h4>Education {index + 1}</h4>
@@ -1528,10 +1217,7 @@ function UpdateFacultyEntryHoo() {
                             value={edu.institutionName}
                             onChange={(e) => handleNestedInputChange(e, "educationDetails", index)}
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEducationDetail(index)}
-                          >
+                          <button type="button" onClick={() => handleRemoveEducationDetail(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
@@ -1547,28 +1233,30 @@ function UpdateFacultyEntryHoo() {
                             onChange={(e) => {
                               const updatedModules = [...facultyDetails.modulesHandled];
                               updatedModules[index] = e.target.value;
-                              setFacultyDetails({ ...facultyDetails, modulesHandled: updatedModules });
+                              setFacultyDetails((prev) => ({ ...prev, modulesHandled: updatedModules }));
                             }}
                           />
-                          <button type="button" onClick={() => {
-                            const updatedModules = facultyDetails.modulesHandled.filter((_, i) => i !== index);
-                            setFacultyDetails({ ...facultyDetails, modulesHandled: updatedModules });
-                          }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedModules = facultyDetails.modulesHandled.filter((_, i) => i !== index);
+                              setFacultyDetails((prev) => ({ ...prev, modulesHandled: updatedModules }));
+                            }}
+                            style={{ backgroundColor: "#dc3545" }}
+                          >
                             Remove
                           </button>
                         </div>
                       ))}
-                      <button type="button" onClick={() => setFacultyDetails({
-                        ...facultyDetails,
-                        modulesHandled: [...facultyDetails.modulesHandled, ""]
-                      })}>
+                      <button
+                        type="button"
+                        onClick={() => setFacultyDetails((prev) => ({ ...prev, modulesHandled: [...prev.modulesHandled, ""] }))}
+                      >
                         Add Module
                       </button>
 
                       <h3>Other Responsibilities</h3>
-                      <button type="button" onClick={handleAddResponsibility}>
-                        Add Responsibility
-                      </button>
+                      <button type="button" onClick={handleAddResponsibility}>Add Responsibility</button>
                       {facultyDetails.otherResponsibilities.map((resp, index) => (
                         <div key={index}>
                           <h4>Responsibility {index + 1}</h4>
@@ -1579,7 +1267,7 @@ function UpdateFacultyEntryHoo() {
                             value={resp.responsibility}
                             onChange={(e) => handleNestedInputChange(e, "otherResponsibilities", index)}
                           />
-                          <button type="button" onClick={() => handleRemoveResponsibility(index)}>
+                          <button type="button" onClick={() => handleRemoveResponsibility(index)} style={{ backgroundColor: "#dc3545" }}>
                             Remove
                           </button>
                         </div>
@@ -1587,6 +1275,7 @@ function UpdateFacultyEntryHoo() {
                     </div>
                   )}
 
+                  {/* Submit Button */}
                   {isUpdate && (
                     <button
                       type="submit"
@@ -1634,65 +1323,5 @@ function UpdateFacultyEntryHoo() {
     </div>
   );
 }
-
-const styles = {
-  usernameContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    fontSize: "14px",
-    color: "#555",
-  },
-  userIcon: {
-    fontSize: "30px",
-    color: "#007BFF",
-  },
-  username: {
-    fontWeight: "bold",
-    fontSize: "18px",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "10px",
-  },
-  subtitle: {
-    color: "#666",
-    fontSize: "14px",
-    marginBottom: "20px",
-  },
-  cardContainer: {
-    display: "flex",
-    gap: "15px",
-  },
-  card: {
-    flex: "1",
-    padding: "15px",
-    borderRadius: "10px",
-    textAlign: "center",
-    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-  },
-  icon: {
-    width: "50px",
-    height: "50px",
-    borderRadius: "50%",
-    margin: "0 auto 10px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  iconStyle: {
-    fontSize: "24px",
-    color: "#fff",
-  },
-  change: {
-    color: "#666",
-    fontSize: "12px",
-  },
-  loadingIcon: { fontSize: "16px", color: "#007BFF" },
-  successIcon: { fontSize: "16px", color: "#28a745" },
-  errorIcon: { fontSize: "16px", color: "#dc3545" },
-};
 
 export default UpdateFacultyEntryHoo;

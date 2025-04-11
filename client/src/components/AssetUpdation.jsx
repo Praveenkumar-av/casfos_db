@@ -8,7 +8,7 @@ function AssetUpdation() {
   const [permanentAssets, setPermanentAssets] = useState([]);
   const [consumableAssets, setConsumableAssets] = useState([]);
   const [returnedAssets, setReturnedAssets] = useState([]); // New state for returned assets
-  const [activeTab, setActiveTab] = useState("permanent");
+  const [activeTab, setActiveTab] = useState("conditionChange");
   const [popupData, setPopupData] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editedAsset, setEditedAsset] = useState({});
@@ -706,12 +706,7 @@ function AssetUpdation() {
 
         <h2 style={componentStyles.title}>Asset Updation</h2>
         <div style={componentStyles.tabContainer}>
-          <button style={activeTab === "permanent" ? componentStyles.activeTab : componentStyles.tab} onClick={() => setActiveTab("permanent")}>
-            Permanent Assets
-          </button>
-          <button style={activeTab === "consumable" ? componentStyles.activeTab : componentStyles.tab} onClick={() => setActiveTab("consumable")}>
-            Consumable Assets
-          </button>
+         
           <button style={activeTab === "conditionChange" ? componentStyles.activeTab : componentStyles.tab} onClick={() => setActiveTab("conditionChange")}>
             Condition Change
           </button>

@@ -56,7 +56,7 @@ router.post("/return", AssetController.return); // Return an asset
 router.post("/storeReturnedReceipt", AssetController.storeReturnedReceipt); // Store returned receipt
 router.post("/saveReturnedStatus", AssetController.saveReturnedStatus); // Save returned status
 router.post("/saveReturnedPermanentStatus", AssetController.saveReturnedPermanentStatus); // Save permanent asset return status
-router.get("/getReturnedAssets", AssetController.getReturnedAssets); // Fetch returned assets
+router.post("/getReturnedAssets", AssetController.getReturnedAssets); // Fetch returned assets
 router.get("/getReturnedForApproval", AssetController.getReturnedForApproval); // Fetch returns pending approval
 router.get("/getReturnedForConditionChange", AssetController.getReturnedForConditionChange); // Fetch returns for condition change
 router.post("/updateReturnCondition/:id", AssetController.updateReturnCondition); // Update return condition

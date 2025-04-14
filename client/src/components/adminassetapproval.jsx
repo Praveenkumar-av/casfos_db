@@ -619,23 +619,61 @@ function AssetApproval() {
   const renderReturnAssetDetails = (asset) => {
     if (!asset) return null;
     return (
-      <div style={componentStyles.assetDetails}>
-        <p><strong>Asset Type:</strong> {asset.assetType || "N/A"}</p>
-        <p><strong>Asset Category:</strong> {asset.assetCategory || "N/A"}</p>
-        <p><strong>Item Name:</strong> {asset.itemName || "N/A"}</p>
-        <p><strong>Sub Category:</strong> {asset.subCategory || "N/A"}</p>
-        <p><strong>Item Description:</strong> {asset.itemDescription || "N/A"}</p>
-        <p><strong>Returned From:</strong> {asset.location || "N/A"}</p>
-        {asset.assetType === "Permanent" ? (
-          <p><strong>Item ID:</strong> {asset.itemId || "N/A"}</p>
-        ) : (
-          <p><strong>Returned Quantity:</strong> {asset.returnQuantity || "N/A"}</p>
-        )}
-        <p><strong>Condition:</strong> {asset.status || "N/A"}</p>
-        <p><strong>Remark:</strong> {asset.remark || "N/A"}</p>
-        <p><strong>Receipt PDF:</strong> <a href={asset.pdfUrl} target="_blank" rel="noopener noreferrer">View Receipt</a></p>
-        <p><strong>Signed Receipt:</strong> <a href={asset.signedPdfUrl} target="_blank" rel="noopener noreferrer">View Signed</a></p>
-      </div>
+      <table style={componentStyles.detailsTable}>
+        <tbody>
+          <tr style={componentStyles.evenRow}>
+            <td>Asset Type</td>
+            <td>{asset.assetType || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.oddRow}>
+            <td>Asset Category</td>
+            <td>{asset.assetCategory || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.evenRow}>
+            <td>Item Name</td>
+            <td>{asset.itemName || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.oddRow}>
+            <td>Sub Category</td>
+            <td>{asset.subCategory || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.evenRow}>
+            <td>Item Description</td>
+            <td>{asset.itemDescription || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.oddRow}>
+            <td>Returned From</td>
+            <td>{asset.location || "N/A"}</td>
+          </tr>
+          {asset.assetType === "Permanent" ? (
+            <tr style={componentStyles.evenRow}>
+              <td>Item ID</td>
+              <td>{asset.itemId || "N/A"}</td>
+            </tr>
+          ) : (
+            <tr style={componentStyles.evenRow}>
+              <td>Returned Quantity</td>
+              <td>{asset.returnQuantity || "N/A"}</td>
+            </tr>
+          )}
+          <tr style={componentStyles.oddRow}>
+            <td>Condition</td>
+            <td>{asset.status || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.evenRow}>
+            <td>Remark</td>
+            <td>{asset.remark || "N/A"}</td>
+          </tr>
+          <tr style={componentStyles.oddRow}>
+            <td>Receipt PDF</td>
+            <td>{renderLink(asset.pdfUrl, "View Receipt")}</td>
+          </tr>
+          <tr style={componentStyles.evenRow}>
+            <td>Signed Receipt</td>
+            <td>{renderLink(asset.signedPdfUrl, "View Signed Receipt")}</td>
+          </tr>
+        </tbody>
+      </table>
     );
   };
 

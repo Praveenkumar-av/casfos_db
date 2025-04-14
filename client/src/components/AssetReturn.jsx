@@ -15,7 +15,7 @@ const AssetReturn = () => {
   const [assetCategory, setAssetCategory] = useState("");
   const [selectedItem, setSelectedItem] = useState("");
   const [storeItems, setStoreItems] = useState([]);
-  const [returnItem, setReturnItem] = useState({ location: "", returnQuantity: 0, condition: "", issuedQuantity: 0, returnIds: [] });
+  const [returnItem, setReturnItem] = useState({ location: "", returnQuantity: 0, issuedQuantity: 0, returnIds: [] });
   const [issuedIds, setIssuedIds] = useState([]);
   const [isEditingRejected, setIsEditingRejected] = useState(false); // Add editing state
 
@@ -129,7 +129,6 @@ const AssetReturn = () => {
           const rejectedAsset = response.data.data;
 
           const returnIds = rejectedAsset.returnIds || rejectedAsset.issuedIds || (rejectedAsset.itemId ? [rejectedAsset.itemId] : []);
-          const condition = rejectedAsset.status === "Good" ? "Good" : "To Be Serviced";
 
           setAssetType(rejectedAsset.assetType || "Permanent");
           setAssetCategory(rejectedAsset.assetCategory || "");
@@ -137,7 +136,6 @@ const AssetReturn = () => {
           setReturnItem({
             location: rejectedAsset.location || "",
             returnQuantity: returnIds.length,
-            condition: condition,
             issuedQuantity: rejectedAsset.quantity || 0,
             returnIds: returnIds,
           });
@@ -160,7 +158,7 @@ const AssetReturn = () => {
     }
   }, [rejectedId]);
   const handleSubmitReturn = async () => {
-    if (!selectedItem || !returnItem.location || returnItem.returnQuantity <= 0 || !returnItem.condition) {
+    if (!selectedItem || !returnItem.location || returnItem.returnQuantity <= 0 ) {
       Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields and ensure return quantity is greater than 0!" });
       return;
     }
@@ -183,7 +181,6 @@ const AssetReturn = () => {
       itemDescription, 
       location: returnItem.location, 
       returnQuantity: returnItem.returnQuantity, 
-      condition: returnItem.condition, 
       returnIds: assetType === "Permanent" ? returnItem.returnIds : undefined // Only include IDs for Permanent
     };
 
@@ -203,7 +200,7 @@ const AssetReturn = () => {
   const resetReturnForm = () => {
     setAssetCategory("");
     setSelectedItem("");
-    setReturnItem({ location: "", returnQuantity: 0, condition: "", issuedQuantity: 0, returnIds: [] });
+    setReturnItem({ location: "", returnQuantity: 0, issuedQuantity: 0, returnIds: [] });
     setIssuedIds([]);
     setIssuedLocations([]); // Add this line
     setIsEditingRejected(false); // Reset editing state
@@ -307,15 +304,7 @@ const AssetReturn = () => {
                 </div>
               </div>
               <div style={styles.formRow}>
-                <div style={styles.inputGroup}>
-                  <label>Condition:</label>
-                  <select value={returnItem.condition} onChange={(e) => handleReturnItemChange("condition", e.target.value)} style={styles.input}>
-                    <option value="">Select Condition</option>
-                    {conditionOptions.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
+              
                 {assetType === "Permanent" && (
   <div style={styles.inputGroup}>
     <label>Select Return IDs:</label>

@@ -19,7 +19,7 @@ const StorekeeperDashboard = () => {
         const response = await axios.get("http://localhost:3001/api/assets/get-asset-notification");
         const sortedNotifications = response.data
           .sort((a, b) => new Date(b.actionTime) - new Date(a.actionTime))
-          .slice(0, 10);
+          .slice(0, 50);
         setNotifications(sortedNotifications);
       } catch (error) {
         console.error("Error fetching notifications:", error);
@@ -136,7 +136,7 @@ const StorekeeperDashboard = () => {
       type,
       buildingNo,
     } = notification;
-
+  
     return (
       <div className="notification-details">
         <p><strong>Action Time:</strong> {new Date(actionTime).toLocaleString()}</p>
@@ -146,9 +146,8 @@ const StorekeeperDashboard = () => {
             <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
             <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
             <p><strong>Sub Category:</strong> {subCategory || "N/A"}</p>
-            <p><strong>Location:</strong> {location || "N/A"}</p>
-            <p><strong>Type:</strong> {type || "N/A"}</p>
-            <p><strong>Building No:</strong> {buildingNo || "N/A"}</p>
+            {type && <p><strong>Type:</strong> {type || "N/A"}</p>}
+            {buildingNo && <p><strong>Building No:</strong> {buildingNo || "N/A"}</p>}
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
         ) : (action.includes("asset approved") || action.includes("asset rejected")) &&
@@ -209,8 +208,8 @@ const StorekeeperDashboard = () => {
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
         )}
-
-        {action.includes("rejected") || action.includes("cancelled") ? (
+  
+        {(action.includes("rejected") || action.includes("cancelled")) && !action.includes("return") ? (
           <button
             className="update-button"
             onClick={() => {
@@ -218,7 +217,6 @@ const StorekeeperDashboard = () => {
               if (action.includes("building maintenance")) tab = "service";
               else if (action.includes("building upgrade")) tab = "building-upgrade";
               else if (action.includes("building disposal")) tab = "disposable";
-              else if (action.includes("return")) tab = "assetreturn";
               else if (action.includes("issue")) tab = "assetissue";
               else if (action.includes("service")) tab = "assetstore";
               else if (action.includes("updation")) {
@@ -227,7 +225,7 @@ const StorekeeperDashboard = () => {
                 )}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
                 return;
               }
-
+  
               window.location.href = `/assetstore?username=${encodeURIComponent(
                 username
               )}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
@@ -239,7 +237,6 @@ const StorekeeperDashboard = () => {
       </div>
     );
   };
-
   return (
     <div className="dashboard-container">
       <Helmet>
@@ -444,15 +441,7 @@ const StorekeeperDashboard = () => {
                   </p>
                 </div>
                 <div className="map-container">
-                  <iframe
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.123456789012!2d76.987654321!3d11.0123456789!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTHCsDAwJzQ0LjQiTiA3NsKwNTknMTMuNiJF!5e0!3m2!1sen!2sin!4v1234567890123!5m2!1sen!2sin"
-                    width="100%"
-                    height="400"
-                    style={{ border: 0 }}
-                    allowFullScreen=""
-                    loading="lazy"
-                    title="CASFOS Location"
-                  ></iframe>
+                  <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.2649732361087!2d76.93796778831465!3d11.018735325854964!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba858dde76380d3%3A0xbe08bb837838e990!2sCentral%20Academy%20for%20State%20Forest%20Service!5e0!3m2!1sen!2sin!4v1744637852810!5m2!1sen!2sin" width="600" height="450" style={{border:0}} allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
                 </div>
               </div>
             </div>

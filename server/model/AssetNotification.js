@@ -19,7 +19,7 @@ const assetNotificationSchema = new mongoose.Schema({
       'exchange approved', 'exchange rejected', 'asset disposal approved',
       'asset disposal cancelled', 'condition changed', 'asset updation approved',
       'asset updation rejected', 'building upgrade approved',
-      'building upgrade rejected', 'building disposal cancelled',"building maintenance approved", // Added
+      'building upgrade rejected', 'building disposal cancelled',"building maintenance approved", 
       "building maintenance rejected",
     ],
   },

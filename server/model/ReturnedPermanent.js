@@ -8,7 +8,7 @@ const ReturnedPermanentSchema = new mongoose.Schema({
   itemDescription: { type: String },
   location: { type: String },
   itemId: { type: String },
-  status: { type: String, enum: ["Good","service", "dispose","returned"], default: null },
+  status: { type: String, enum: ["Good","service", "dispose","returned"], default: "returned" },
   remark: { type: String },
   pdfUrl: { type: String },
   signedPdfUrl: { type: String },

@@ -39,10 +39,10 @@ const AssetStore = () => {
   const [items, setItems] = useState([]);
   const [warrantyPhotoUrls, setWarrantyPhotoUrls] = useState({});
   const [buildingData, setBuildingData] = useState({
-    subCategory: "", customSubCategory: "", location: "", type: "", customType: "", buildingNo: "", approvedEstimate: "", plinthArea: "", status: "", dateOfConstruction: "", costOfConstruction: 0, remarks: "", approvedBuildingPlanUrl: "", kmzOrkmlFileUrl: ""
+    subCategory: "", customSubCategory: "", location: "", type: "", customType: "", buildingNo: "", approvedEstimate: "", plinthArea: "", status: "", customStatus: "",dateOfConstruction: "", costOfConstruction: 0, remarks: "", approvedBuildingPlanUrl: "", kmzOrkmlFileUrl: ""
   });
   const [landData, setLandData] = useState({
-    subCategory: "", customSubCategory: "", location: "", status: "", dateOfPossession: "", controllerOrCustody: "", details: ""
+    subCategory: "", customSubCategory: "", location: "", status: "",customStatus: "",  dateOfPossession: "", controllerOrCustody: "", details: ""
   });
   const [returnedAssets, setReturnedAssets] = useState([]);
   const [maintenanceData, setMaintenanceData] = useState({
@@ -70,6 +70,7 @@ const AssetStore = () => {
     demolitionPeriod: "",
     demolitionEstimate: "",
     methodOfDisposal: "", // Add this line
+    customMethodOfDisposal: "", // Added new field
   });
   const [storeItems, setStoreItems] = useState([]);
   const [disposableItems, setDisposableItems] = useState([]);
@@ -148,10 +149,10 @@ const AssetStore = () => {
         try {
           const response = await axios.get(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
           const rejectedAsset = response.data.data;
-
+  
           setAssetType(rejectedAsset.assetType || "Permanent");
           setAssetCategory(rejectedAsset.assetCategory || "");
-
+  
           if (rejectedAsset.serviceNo || rejectedAsset.serviceDate || rejectedAsset.serviceAmount) {
             setRejectedAction("service");
             setActiveTab("serviced");
@@ -187,22 +188,21 @@ const AssetStore = () => {
               quantity: 0,
               purchaseValue: 0,
               bookValue: 0,
-              methodOfDisposal: rejectedAsset.methodOfDisposal || "", // Add this line
+              methodOfDisposal: rejectedAsset.methodOfDisposal || "",
               inspectionDate: "",
               condemnationDate: "",
               remark: "",
               disposalValue: 0,
             });
-          }
-          else if (
+          } else if (
             rejectedAsset.assetCategory === "Building" &&
             rejectedAsset.rejected === "yes" &&
             rejectedAsset.custody
           ) {
             setRejectedAction("maintenance");
-            setActiveTab("serviced"); // Ensure this aligns with tab=service from URL
+            setActiveTab("serviced");
             setMaintenanceData({
-              subCategory: rejectedAsset.subCategory || "", // Populate subcategory
+              subCategory: rejectedAsset.subCategory || "",
               buildingNo: rejectedAsset.buildingNo || "",
               yearOfMaintenance: rejectedAsset.yearOfMaintenance
                 ? rejectedAsset.yearOfMaintenance.split("T")[0]
@@ -219,7 +219,6 @@ const AssetStore = () => {
               text: "You are now editing a rejected maintenance entry. Update the details and resubmit.",
             });
           } else if (rejectedAsset.purchaseValue || rejectedAsset.bookValue || rejectedAsset.inspectionDate) {
-            // Handle non-building disposal rejection
             setRejectedAction("disposal");
             setActiveTab("disposable");
             setDisposableData({
@@ -234,8 +233,8 @@ const AssetStore = () => {
               condemnationDate: rejectedAsset.condemnationDate ? rejectedAsset.condemnationDate.split("T")[0] : "",
               remark: rejectedAsset.remark || "",
               disposalValue: rejectedAsset.disposalValue || 0,
-              methodOfDisposal: rejectedAsset.methodOfDisposal || "", // Add this line
-              condemnationYear: "", // Reset building-specific fields
+              methodOfDisposal: rejectedAsset.methodOfDisposal || "",
+              condemnationYear: "",
               certificateObtained: "",
               authority: "",
               dateOfReferenceUrl: "",
@@ -257,8 +256,8 @@ const AssetStore = () => {
                 dateOfCompletion: upgrade.dateOfCompletion ? upgrade.dateOfCompletion.split("T")[0] : "",
                 defectliabiltyPeriod: upgrade.defectliabiltyPeriod || "",
                 executionAgency: upgrade.executionAgency || "",
-                dateOfHandover: upgrade.dateOfHandover ? upgrade.dateOfHandover.split("T")[0] : "", // Add this
-      documentUrl: upgrade.documentUrl || "", // Add this
+                dateOfHandover: upgrade.dateOfHandover ? upgrade.dateOfHandover.split("T")[0] : "",
+                documentUrl: upgrade.documentUrl || "",
               }))
             );
           } else {
@@ -268,44 +267,69 @@ const AssetStore = () => {
             setPurchaseDate(rejectedAsset.purchaseDate ? rejectedAsset.purchaseDate.split("T")[0] : "");
             setSupplierName(rejectedAsset.supplierName || "");
             setSupplierAddress(rejectedAsset.supplierAddress || "");
-            setSource(rejectedAsset.source || "");
-            setCustomSource(rejectedAsset.source === "Other" ? rejectedAsset.source : "");
-            setModeOfPurchase(rejectedAsset.modeOfPurchase || "");
-            setCustomModeOfPurchase(rejectedAsset.modeOfPurchase === "Others" ? rejectedAsset.modeOfPurchase : "");
+  
+            // Handle source
+            setSource(sourceOptions.includes(rejectedAsset.source) ? rejectedAsset.source : "Other");
+            setCustomSource(sourceOptions.includes(rejectedAsset.source) ? (rejectedAsset.source === "Other" ? "" : "") : rejectedAsset.source || "");
+  
+            // Handle modeOfPurchase
+            setModeOfPurchase(modeOfPurchaseOptions.includes(rejectedAsset.modeOfPurchase) ? rejectedAsset.modeOfPurchase : "Others");
+            setCustomModeOfPurchase(modeOfPurchaseOptions.includes(rejectedAsset.modeOfPurchase) ? (rejectedAsset.modeOfPurchase === "Others" ? "" : "") : rejectedAsset.modeOfPurchase || "");
+  
             setBillNo(rejectedAsset.billNo || "");
             setReceivedBy(rejectedAsset.receivedBy || "");
             setBillPhotoUrl(rejectedAsset.billPhotoUrl || "");
-
+  
             if (rejectedAsset.assetCategory === "Building") {
+              const buildingSubCategoryOptions = subCategoryOptions.Building;
+              const buildingTypeOptions = ["Type-A5", "Type-A2", "Type-5", "Type-4", "Type-3", "Type-2", "Type-D", "Others"];
+              const statusOptions = ["Permanent", "Lease", "Others"];
+  
               setBuildingData({
-                subCategory: rejectedAsset.subCategory || "",
-                customSubCategory: rejectedAsset.subCategory === "Others" ? rejectedAsset.subCategory : "",
+                subCategory: buildingSubCategoryOptions.includes(rejectedAsset.subCategory) ? rejectedAsset.subCategory : "Others",
+                customSubCategory: buildingSubCategoryOptions.includes(rejectedAsset.subCategory) ? (rejectedAsset.subCategory === "Others" ? "" : "") : rejectedAsset.subCategory || "",
                 location: rejectedAsset.location || "",
-                type: rejectedAsset.type || "",
-                customType: rejectedAsset.type === "Others" ? rejectedAsset.type : "",
+                type: rejectedAsset.subCategory === "Residential Quarters" 
+                  ? (buildingTypeOptions.includes(rejectedAsset.type) ? rejectedAsset.type : "Others")
+                  : (rejectedAsset.type || ""),
+                customType: rejectedAsset.subCategory === "Residential Quarters" 
+                  ? (buildingTypeOptions.includes(rejectedAsset.type) ? (rejectedAsset.type === "Others" ? "" : "") : rejectedAsset.type || "")
+                  : "",
                 buildingNo: rejectedAsset.buildingNo || "",
                 plinthArea: rejectedAsset.plinthArea || "",
-                status: rejectedAsset.status || "",
+                status: statusOptions.includes(rejectedAsset.status) ? rejectedAsset.status : "Others",
+                customStatus: statusOptions.includes(rejectedAsset.status) ? (rejectedAsset.status === "Others" ? "" : "") : rejectedAsset.status || "",
                 dateOfConstruction: rejectedAsset.dateOfConstruction ? rejectedAsset.dateOfConstruction.split("T")[0] : "",
                 costOfConstruction: rejectedAsset.costOfConstruction || 0,
                 remarks: rejectedAsset.remarks || "",
+                approvedEstimate: rejectedAsset.approvedEstimate || "",
+                approvedBuildingPlanUrl: rejectedAsset.approvedBuildingPlanUrl || "",
+                kmzOrkmlFileUrl: rejectedAsset.kmzOrkmlFileUrl || "",
               });
             } else if (rejectedAsset.assetCategory === "Land") {
+              const landSubCategoryOptions = subCategoryOptions.Land;
+              const statusOptions = ["Permanent", "Lease", "Others"];
+  
               setLandData({
-                subCategory: rejectedAsset.subCategory || "",
-                customSubCategory: rejectedAsset.subCategory === "Others" ? rejectedAsset.subCategory : "",
+                subCategory: landSubCategoryOptions.includes(rejectedAsset.subCategory) ? rejectedAsset.subCategory : "Others",
+                customSubCategory: landSubCategoryOptions.includes(rejectedAsset.subCategory) ? (rejectedAsset.subCategory === "Others" ? "" : "") : rejectedAsset.subCategory || "",
                 location: rejectedAsset.location || "",
-                status: rejectedAsset.status || "",
+                status: statusOptions.includes(rejectedAsset.status) ? rejectedAsset.status : "Others",
+                customStatus: statusOptions.includes(rejectedAsset.status) ? (rejectedAsset.status === "Others" ? "" : "") : rejectedAsset.status || "",
                 dateOfPossession: rejectedAsset.dateOfPossession ? rejectedAsset.dateOfPossession.split("T")[0] : "",
                 controllerOrCustody: rejectedAsset.controllerOrCustody || "",
                 details: rejectedAsset.details || "",
               });
             } else {
+              const currentSubCategoryOptions = subCategoryOptions[rejectedAsset.assetCategory] || ["Generic", "Others"];
+              const currentItemNameOptions = itemNameOptions[rejectedAsset.subCategory] || ["Generic", "Others"];
+  
               setItems(
                 rejectedAsset.items.map((item) => ({
-                  itemName: item.itemName || "",
-                  subCategory: item.subCategory || "",
-                  customSubCategory: item.subCategory === "Others" ? item.subCategory : "",
+                  itemName: currentItemNameOptions.includes(item.itemName) ? item.itemName : "Others",
+                  customItemName: currentItemNameOptions.includes(item.itemName) ? (item.itemName === "Others" ? "" : "") : item.itemName || "",
+                  subCategory: currentSubCategoryOptions.includes(item.subCategory) ? item.subCategory : "Others",
+                  customSubCategory: currentSubCategoryOptions.includes(item.subCategory) ? (item.subCategory === "Others" ? "" : "") : item.subCategory || "",
                   itemDescription: item.itemDescription || "",
                   quantityReceived: item.quantityReceived || 0,
                   unitPrice: item.unitPrice || 0,
@@ -313,7 +337,6 @@ const AssetStore = () => {
                   itemPhoto: null,
                   itemIds: item.itemIds || [],
                   showIdInputs: item.itemIds.length > 0,
-                  customItemName: item.itemName === "Others" ? item.itemName : "",
                   amcFromDate: item.amcFromDate ? item.amcFromDate.split("T")[0] : "",
                   amcToDate: item.amcToDate ? item.amcToDate.split("T")[0] : "",
                   amcCost: item.amcCost || 0,
@@ -323,6 +346,7 @@ const AssetStore = () => {
                   warrantyPhoto: null,
                 }))
               );
+  
               const newItemPhotoUrls = {};
               const newWarrantyPhotoUrls = {};
               const newAmcPhotoUrls = {};
@@ -336,7 +360,7 @@ const AssetStore = () => {
               setAmcPhotoUrls(newAmcPhotoUrls);
             }
           }
-
+  
           setIsEditingRejected(true);
           Swal.fire({
             icon: "info",
@@ -355,7 +379,6 @@ const AssetStore = () => {
       fetchRejectedAsset();
     }
   }, [rejectedId]);
-
   const isFutureDate = (dateStr) => {
     if (!dateStr) return false; // No date provided, so no error (handled separately if required)
     const inputDate = new Date(dateStr);
@@ -461,15 +484,18 @@ const AssetStore = () => {
   }, [assetType, assetCategory, activeTab]);
 
   useEffect(() => {
-    if (activeTab === "returned" && assetType && assetCategory) {
+    if (activeTab === "returned" && assetType) {
       const fetchReturnedAssets = async () => {
         try {
-          console.log("hii")
-          const response = await axios.post("http://localhost:3001/api/assets/getReturnedAssets", {
+          console.log("Fetching returned assets");
+          const payload = {
             assetType,
-            assetCategory,
             status: "returned",
-          });
+          };
+          if (assetCategory) {
+            payload.assetCategory = assetCategory;
+          }
+          const response = await axios.post("http://localhost:3001/api/assets/getReturnedAssets", payload);
           const formattedAssets = response.data.map((asset) => ({
             _id: asset._id,
             assetType: asset.assetType,
@@ -707,15 +733,7 @@ const AssetStore = () => {
   };
 
   // Handle disposable ID selection and reset purchaseValues
-  const handleDisposableIdSelection = (itemId) => {
-    setDisposableData((prev) => {
-      const newItemIds = prev.itemIds.includes(itemId)
-        ? prev.itemIds.filter((id) => id !== itemId)
-        : [...prev.itemIds, itemId];
-      setPurchaseValues({}); // Reset purchaseValues for new selection
-      return { ...prev, itemIds: newItemIds, purchaseValue: 0 }; // Reset purchaseValue until new fetch
-    });
-  };
+
 
   // Store/Receipt Entry Functions
   const addItem = () => {
@@ -780,7 +798,8 @@ const AssetStore = () => {
       ...prev,
       [field]: value,
       ...(field === "subCategory" && value !== "Others" ? { customSubCategory: "" } : {}),
-      ...(field === "type" && value !== "Others" ? { customType: "" } : {})
+      ...(field === "type" && value !== "Others" ? { customType: "" } : {}),
+      ...(field === "status" && value !== "Others" ? { customStatus: "" } : {}), // Reset customStatus
     }));
   };
 
@@ -788,7 +807,8 @@ const AssetStore = () => {
     setLandData(prev => ({
       ...prev,
       [field]: value,
-      ...(field === "subCategory" && value !== "Others" ? { customSubCategory: "" } : {})
+      ...(field === "subCategory" && value !== "Others" ? { customSubCategory: "" } : {}),
+      ...(field === "status" && value !== "Others" ? { customStatus: "" } : {}), // Reset customStatus
     }));
   };
 // Utility function to format item names
@@ -823,7 +843,7 @@ const handleSubmitStore = async () => {
       buildingNo: buildingData.buildingNo,
       approvedEstimate: buildingData.approvedEstimate,
       plinthArea: buildingData.plinthArea || undefined,
-      status: buildingData.status,
+      status: buildingData.status === "Others" ? buildingData.customStatus : buildingData.status, // Use customStatus if Others
       dateOfConstruction: buildingData.dateOfConstruction || undefined,
       costOfConstruction: buildingData.costOfConstruction || undefined,
       remarks: buildingData.remarks || undefined,
@@ -837,7 +857,7 @@ const handleSubmitStore = async () => {
       entryDate,
       subCategory: landData.subCategory === "Others" ? landData.customSubCategory : landData.subCategory,
       location: landData.location,
-      status: landData.status,
+      status: landData.status === "Others" ? landData.customStatus : landData.status, // Use customStatus if Others
       dateOfPossession: landData.dateOfPossession || undefined,
       controllerOrCustody: landData.controllerOrCustody || undefined,
       details: landData.details || undefined,
@@ -922,7 +942,6 @@ const handleSubmitStore = async () => {
     console.error(error);
   }
 };
-
 const resetStoreForm = () => {
   setAssetCategory("");
   setEntryDate("");
@@ -948,6 +967,7 @@ const resetStoreForm = () => {
     approvedEstimate: "",
     plinthArea: "",
     status: "",
+    customStatus: "", // Reset customStatus
     dateOfConstruction: "",
     costOfConstruction: 0,
     remarks: "",
@@ -959,6 +979,7 @@ const resetStoreForm = () => {
     customSubCategory: "",
     location: "",
     status: "",
+    customStatus: "", // Reset customStatus
     dateOfPossession: "",
     controllerOrCustody: "",
     details: "",
@@ -1289,13 +1310,76 @@ const resetStoreForm = () => {
   };
 
   // Disposable Assets Functions
-  const handleDisposableChange = (field, value) => {
-    setDisposableData(prev => ({
+// Disposable Assets Functions
+const handleDisposableIdSelection = (itemId) => {
+  setDisposableData((prev) => {
+    let newItemIds;
+    if (prev.itemIds.includes(itemId)) {
+      newItemIds = prev.itemIds.filter((id) => id !== itemId); // Deselect ID
+    } else if (prev.itemIds.length < availableQuantity) {
+      newItemIds = [...prev.itemIds, itemId]; // Select ID if within limit
+    } else {
+      return prev; // Prevent adding more IDs than availableQuantity
+    }
+    
+    const newQuantity = assetType === "Permanent" && assetCategory !== "Building" 
+      ? newItemIds.length 
+      : prev.quantity; // Update quantity for permanent assets
+    
+    setPurchaseValues({}); // Reset purchaseValues for new selection
+    return { 
+      ...prev, 
+      itemIds: newItemIds, 
+      quantity: newQuantity, 
+      purchaseValue: 0 // Reset purchaseValue until new fetch
+    };
+  });
+};
+
+const handleDisposableChange = (field, value) => {
+  setDisposableData((prev) => {
+    // For quantity changes
+    if (field === "quantity") {
+      const newQuantity = Math.min(parseInt(value) || 0, availableQuantity);
+      
+      // For permanent assets (non-building), quantity is controlled by itemIds.length
+      if (assetType === "Permanent" && assetCategory !== "Building") {
+        return prev; // Ignore manual quantity changes
+      }
+      
+      // For consumable assets or building category
+      return {
+        ...prev,
+        [field]: newQuantity,
+      };
+    }
+    
+    // For method of disposal changes
+    if (field === "methodOfDisposal") {
+      return {
+        ...prev,
+        [field]: value,
+        ...(value !== "Other" ? { customMethodOfDisposal: "" } : {}), // Reset custom field when not "Other"
+      };
+    }
+    
+    // For all other fields
+    return {
       ...prev,
       [field]: value,
-      ...(field === "quantity" && value > availableQuantity ? { quantity: availableQuantity } : {})
-    }));
-  };
+    };
+  });
+};
+const validateDisposableSubmit = () => {
+  if (assetType === "Permanent" && assetCategory !== "Building") {
+    if (disposableData.itemIds.length !== disposableData.quantity) {
+      alert(`Please select exactly ${disposableData.quantity} items for disposal`);
+      return false;
+    }
+  }
+  return true;
+};
+
 
   const handleServicedChange = (field, value) => {
     setServicedData(prev => ({ ...prev, [field]: value }));
@@ -1358,7 +1442,6 @@ const resetStoreForm = () => {
       return updated;
     });
   };
-
   const handleSubmitDisposable = async () => {
     if (assetCategory === "Building") {
       if (
@@ -1369,12 +1452,13 @@ const resetStoreForm = () => {
         !disposableData.date ||
         !disposableData.demolitionPeriod ||
         !disposableData.demolitionEstimate ||
-        !disposableData.methodOfDisposal
+        !disposableData.methodOfDisposal ||
+        (disposableData.methodOfDisposal === "Other" && !disposableData.customMethodOfDisposal)
       ) {
         Swal.fire({
           icon: "warning",
           title: "Warning",
-          text: "Please fill all required fields for building condemnation!",
+          text: "Please fill all fields, including custom method of disposal if 'Other' is selected!",
         });
         return;
       }
@@ -1382,9 +1466,8 @@ const resetStoreForm = () => {
         Swal.fire({ icon: "warning", title: "Warning", text: "Date cannot be in the future!" });
         return;
       }
-
+  
       try {
-        console.log(disposableData.subCategory)
         await axios.post("http://localhost:3001/api/assets/requestForDisposal", {
           assetType,
           assetCategory,
@@ -1398,11 +1481,11 @@ const resetStoreForm = () => {
           date: disposableData.date,
           demolitionPeriod: disposableData.demolitionPeriod,
           demolitionEstimate: disposableData.demolitionEstimate,
-          methodOfDisposal: disposableData.methodOfDisposal,
+          methodOfDisposal:
+            disposableData.methodOfDisposal === "Other"
+              ? disposableData.customMethodOfDisposal
+              : disposableData.methodOfDisposal,
         });
-        if (isEditingRejected && rejectedId && rejectedAction === "disposal") {
-          await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
-        }
         Swal.fire({ icon: "success", title: "Success!", text: "Building condemnation request submitted!" });
         setDisposableData({
           itemName: "",
@@ -1426,11 +1509,8 @@ const resetStoreForm = () => {
           demolitionPeriod: "",
           demolitionEstimate: "",
           methodOfDisposal: "",
+          customMethodOfDisposal: "",
         });
-        setIsEditingRejected(false);
-        setRejectedAction("");
-        window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=disposable`);
-        setActiveTab("disposable");
       } catch (error) {
         Swal.fire({ icon: "error", title: "Oops...", text: "Failed to submit building condemnation request!" });
         console.error(error);
@@ -1438,20 +1518,25 @@ const resetStoreForm = () => {
     } else {
       if (
         !disposableData.itemName ||
+        !disposableData.subCategory ||
         !disposableData.itemDescription ||
-        (assetType === "Permanent" && disposableData.itemIds.length === 0) ||
-        (assetType === "Consumable" && (!disposableData.quantity || disposableData.quantity <= 0)) ||
+        disposableData.quantity <= 0 ||
         disposableData.bookValue < 0 ||
         !disposableData.inspectionDate ||
         !disposableData.condemnationDate ||
         !disposableData.remark ||
         disposableData.disposalValue < 0 ||
-        !disposableData.methodOfDisposal
+        !disposableData.methodOfDisposal ||
+        (disposableData.methodOfDisposal === "Other" && !disposableData.customMethodOfDisposal) ||
+        (assetType === "Permanent" && disposableData.itemIds.length !== disposableData.quantity)
       ) {
         Swal.fire({
           icon: "warning",
           title: "Warning",
-          text: "Please fill all fields and provide valid quantity/IDs!",
+          text:
+            assetType === "Permanent" && disposableData.itemIds.length !== disposableData.quantity
+              ? "The number of selected Item IDs must match the disposal quantity!"
+              : "Please fill all fields and provide valid quantity/IDs!",
         });
         return;
       }
@@ -1463,7 +1548,7 @@ const resetStoreForm = () => {
         Swal.fire({ icon: "warning", title: "Warning", text: "Condemnation Date cannot be in the future!" });
         return;
       }
-
+  
       try {
         await axios.post("http://localhost:3001/api/assets/requestForDisposal", {
           assetType,
@@ -1479,11 +1564,11 @@ const resetStoreForm = () => {
           condemnationDate: disposableData.condemnationDate,
           remark: disposableData.remark,
           disposalValue: disposableData.disposalValue,
-          methodOfDisposal: disposableData.methodOfDisposal,
+          methodOfDisposal:
+            disposableData.methodOfDisposal === "Other"
+              ? disposableData.customMethodOfDisposal
+              : disposableData.methodOfDisposal,
         });
-        if (isEditingRejected && rejectedId && rejectedAction === "disposal") {
-          await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
-        }
         Swal.fire({ icon: "success", title: "Success!", text: "Disposable asset saved!" });
         setDisposableData({
           itemName: "",
@@ -1507,14 +1592,11 @@ const resetStoreForm = () => {
           demolitionPeriod: "",
           demolitionEstimate: "",
           methodOfDisposal: "",
+          customMethodOfDisposal: "",
         });
         setDisposableItems([]);
         setPurchaseValues({});
         setAvailableQuantity(0);
-        setIsEditingRejected(false);
-        setRejectedAction("");
-        window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=disposable`);
-        setActiveTab("disposable");
       } catch (error) {
         Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save disposable asset!" });
         console.error(error);
@@ -1817,18 +1899,30 @@ const resetStoreForm = () => {
                         />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label>Status:</label>
-                        <select
-                          value={buildingData.status}
-                          onChange={(e) => handleBuildingChange("status", e.target.value)}
-                          style={styles.input}
-                        >
-                          <option value="">Select Status</option>
-                          <option value="Permanent">Permanent</option>
-                          <option value="Lease">Lease</option>
-                          <option value="Others">Others</option>
-                        </select>
-                      </div>
+        <label>Status:</label>
+        <select
+          value={buildingData.status}
+          onChange={(e) => handleBuildingChange("status", e.target.value)}
+          style={styles.input}
+        >
+          <option value="">Select Status</option>
+          <option value="Permanent">Permanent</option>
+          <option value="Lease">Lease</option>
+          <option value="Others">Others</option>
+        </select>
+      </div>
+      {buildingData.status === "Others" && (
+        <div style={styles.inputGroup}>
+          <label>Custom Status:</label>
+          <input
+            type="text"
+            value={buildingData.customStatus}
+            onChange={(e) => handleBuildingChange("customStatus", e.target.value)}
+            style={styles.input}
+            placeholder="Enter custom status"
+          />
+        </div>
+      )}
                       <div style={styles.inputGroup}>
                         <label>Date of Construction:</label>
                         <input
@@ -1914,8 +2008,31 @@ const resetStoreForm = () => {
                       <div style={styles.inputGroup}><label>Location:</label><input type="text" value={landData.location} onChange={(e) => handleLandChange("location", e.target.value)} style={styles.input} /></div>
                     </div>
                     <div style={styles.formRow}>
-                      <div style={styles.inputGroup}><label>Status:</label><input type="text" value={landData.status} onChange={(e) => handleLandChange("status", e.target.value)} style={styles.input} /></div>
-                      <div style={styles.inputGroup}><label>Date of Possession:</label><input type="date" value={landData.dateOfPossession} onChange={(e) => handleLandChange("dateOfPossession", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
+                    <div style={styles.inputGroup}>
+        <label>Status:</label>
+        <select
+          value={landData.status}
+          onChange={(e) => handleLandChange("status", e.target.value)}
+          style={styles.input}
+        >
+          <option value="">Select Status</option>
+          <option value="Permanent">Permanent</option>
+          <option value="Lease">Lease</option>
+          <option value="Others">Others</option>
+        </select>
+      </div>
+      {landData.status === "Others" && (
+        <div style={styles.inputGroup}>
+          <label>Custom Status:</label>
+          <input
+            type="text"
+            value={landData.customStatus}
+            onChange={(e) => handleLandChange("customStatus", e.target.value)}
+            style={styles.input}
+            placeholder="Enter custom status"
+          />
+        </div>
+      )}               <div style={styles.inputGroup}><label>Date of Possession:</label><input type="date" value={landData.dateOfPossession} onChange={(e) => handleLandChange("dateOfPossession", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} /></div>
                       <div style={styles.inputGroup}><label>Controller/Custody:</label><input type="text" value={landData.controllerOrCustody} onChange={(e) => handleLandChange("controllerOrCustody", e.target.value)} style={styles.input} /></div>
                     </div>
                     <div style={styles.formRow}>
@@ -2302,356 +2419,376 @@ const resetStoreForm = () => {
               </div>
             )}
 
-            {
-              activeTab === "disposable" && (
-                <div style={styles.formContainer}>
-                  <div style={styles.formRow}>
-                    <div style={styles.inputGroup}>
-                      <label>Asset Type:</label>
-                      <select
-                        value={assetType}
-                        onChange={(e) => setAssetType(e.target.value)}
-                        style={styles.input}
-                      >
-                        <option value="Permanent">Permanent</option>
-                        <option value="Consumable">Consumable</option>
-                      </select>
-                    </div>
-                    <div style={styles.inputGroup}>
-                      <label>Asset Category:</label>
-                      <select
-                        value={assetCategory}
-                        onChange={(e) => setAssetCategory(e.target.value)}
-                        style={styles.input}
-                      >
-                        <option value="">Select Category</option>
-                        {(assetType === "Permanent"
-                          ? permanentAssetOptions
-                          : consumableAssetOptions
-                        ).map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+{
+  activeTab === "disposable" && (
+    <div style={styles.formContainer}>
+      <div style={styles.formRow}>
+        <div style={styles.inputGroup}>
+          <label>Asset Type:</label>
+          <select
+            value={assetType}
+            onChange={(e) => setAssetType(e.target.value)}
+            style={styles.input}
+          >
+            <option value="Permanent">Permanent</option>
+            <option value="Consumable">Consumable</option>
+          </select>
+        </div>
+        <div style={styles.inputGroup}>
+          <label>Asset Category:</label>
+          <select
+            value={assetCategory}
+            onChange={(e) => setAssetCategory(e.target.value)}
+            style={styles.input}
+          >
+            <option value="">Select Category</option>
+            {(assetType === "Permanent"
+              ? permanentAssetOptions
+              : consumableAssetOptions
+            ).map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-                  {assetCategory === "Building" ? (
-                    <>
-                      {/* Building-specific fields */}
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Sub Category:</label>
-                          <select
-                            value={disposableData.subCategory}
-                            onChange={(e) => handleDisposableChange("subCategory", e.target.value)}
-                            style={styles.input}
-                          >
-                            <option value="">Select Sub Category</option>
-                            {subCategoryOptions["Building"].map((sub) => (
-                              <option key={sub} value={sub}>{sub}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Condemnation Year:</label>
-                          <input
-                            type="number"
-                            value={disposableData.condemnationYear || ""}
-                            onChange={(e) => handleDisposableChange("condemnationYear", parseInt(e.target.value) || "")}
-                            style={styles.input}
-                            onFocus={(e) => e.target.select()}
-                            min="1900"
-                            max={new Date().getFullYear()}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Certificate Obtained:</label>
-                          <select
-                            value={disposableData.certificateObtained || ""}
-                            onChange={(e) => handleDisposableChange("certificateObtained", e.target.value)}
-                            style={styles.input}
-                          >
-                            <option value="">Select</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Authority:</label>
-                          <input
-                            type="text"
-                            value={disposableData.authority || ""}
-                            onChange={(e) => handleDisposableChange("authority", e.target.value)}
-                            style={styles.input}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Date of Reference (File Upload):</label>
-                          <input
-                            type="file"
-                            onChange={(e) => handleFileUpload(e.target.files[0], "dateOfReference")}
-                            style={styles.input}
-                          />
-                          {disposableData.dateOfReferenceUrl && (
-                            <a href={disposableData.dateOfReferenceUrl} target="_blank" rel="noopener noreferrer">
-                              View File
-                            </a>
-                          )}
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Agency:</label>
-                          <input
-                            type="text"
-                            value={disposableData.agency || ""}
-                            onChange={(e) => handleDisposableChange("agency", e.target.value)}
-                            style={styles.input}
-                          />
-                        </div>
+      {assetCategory === "Building" ? (
+        <>
+          {/* Building-specific fields */}
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Sub Category:</label>
+              <select
+                value={disposableData.subCategory}
+                onChange={(e) => handleDisposableChange("subCategory", e.target.value)}
+                style={styles.input}
+              >
+                <option value="">Select Sub Category</option>
+                {subCategoryOptions["Building"].map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Condemnation Year:</label>
+              <input
+                type="number"
+                value={disposableData.condemnationYear || ""}
+                onChange={(e) => handleDisposableChange("condemnationYear", parseInt(e.target.value) || "")}
+                style={styles.input}
+                onFocus={(e) => e.target.select()}
+                min="1900"
+                max={new Date().getFullYear()}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Certificate Obtained:</label>
+              <select
+                value={disposableData.certificateObtained || ""}
+                onChange={(e) => handleDisposableChange("certificateObtained", e.target.value)}
+                style={styles.input}
+              >
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Authority:</label>
+              <input
+                type="text"
+                value={disposableData.authority || ""}
+                onChange={(e) => handleDisposableChange("authority", e.target.value)}
+                style={styles.input}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Date of Reference (File Upload):</label>
+              <input
+                type="file"
+                onChange={(e) => handleFileUpload(e.target.files[0], "dateOfReference")}
+                style={styles.input}
+              />
+              {disposableData.dateOfReferenceUrl && (
+                <a href={disposableData.dateOfReferenceUrl} target="_blank" rel="noopener noreferrer">
+                  View File
+                </a>
+              )}
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Agency:</label>
+              <input
+                type="text"
+                value={disposableData.agency || ""}
+                onChange={(e) => handleDisposableChange("agency", e.target.value)}
+                style={styles.input}
+              />
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Agency Reference Number (File Upload):</label>
+              <input
+                type="file"
+                onChange={(e) => handleFileUpload(e.target.files[0], "agencyReferenceNumber")}
+                style={styles.input}
+              />
+              {disposableData.agencyReferenceNumberUrl && (
+                <a href={disposableData.agencyReferenceNumberUrl} target="_blank" rel="noopener noreferrer">
+                  View File
+                </a>
+              )}
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Date:</label>
+              <input
+                type="date"
+                value={disposableData.date || ""}
+                onChange={(e) => handleDisposableChange("date", e.target.value)}
+                style={styles.input}
+                max={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Demolition Period:</label>
+              <input
+                type="text"
+                value={disposableData.demolitionPeriod || ""}
+                onChange={(e) => handleDisposableChange("demolitionPeriod", e.target.value)}
+                style={styles.input}
+                placeholder="e.g., 3 months"
+              />
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Demolition Estimate:</label>
+              <input
+                type="number"
+                value={disposableData.demolitionEstimate || ""}
+                onChange={(e) => handleDisposableChange("demolitionEstimate", parseFloat(e.target.value) || "")}
+                style={styles.input}
+                onFocus={(e) => e.target.select()}
+                min="0"
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Method of Disposal:</label>
+              <select
+                value={
+                  ["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal)
+                    ? disposableData.methodOfDisposal
+                    : ""
+                }
+                onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
+                style={styles.input}
+              >
+                <option value="" disabled>Select Method</option>
+                <option value="Sold">Sold</option>
+                <option value="Auctioned">Auctioned</option>
+                <option value="Destroyed">Destroyed</option>
+                <option value="Other">Other</option>
+              </select>
+              {disposableData.methodOfDisposal === "Other" && (
+                <input
+                  type="text"
+                  value={disposableData.customMethodOfDisposal || ""}
+                  onChange={(e) => handleDisposableChange("customMethodOfDisposal", e.target.value)}
+                  placeholder="Enter custom method"
+                  style={{ ...styles.input, marginTop: "5px" }}
+                />
+              )}
+            </div>
+          </div>
 
-                      </div>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Agency Reference Number (File Upload):</label>
-                          <input
-                            type="file"
-                            onChange={(e) => handleFileUpload(e.target.files[0], "agencyReferenceNumber")}
-                            style={styles.input}
-                          />
-                          {disposableData.agencyReferenceNumberUrl && (
-                            <a href={disposableData.agencyReferenceNumberUrl} target="_blank" rel="noopener noreferrer">
-                              View File
-                            </a>
-                          )}
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Date:</label>
-                          <input
-                            type="date"
-                            value={disposableData.date || ""}
-                            onChange={(e) => handleDisposableChange("date", e.target.value)}
-                            style={styles.input}
-                            max={new Date().toISOString().split("T")[0]}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Demolition Period:</label>
-                          <input
-                            type="text"
-                            value={disposableData.demolitionPeriod || ""}
-                            onChange={(e) => handleDisposableChange("demolitionPeriod", e.target.value)}
-                            style={styles.input}
-                            placeholder="e.g., 3 months"
-                          />
-                        </div>
-                      </div>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Demolition Estimate:</label>
-                          <input
-                            type="number"
-                            value={disposableData.demolitionEstimate || ""}
-                            onChange={(e) => handleDisposableChange("demolitionEstimate", parseFloat(e.target.value) || "")}
-                            style={styles.input}
-                            onFocus={(e) => e.target.select()}
-                            min="0"
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Method of Disposal:</label>
-                          <select
-                            value={["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal) ? disposableData.methodOfDisposal : "Select Method"}
-                            onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-                            style={styles.input}
-                          >
-                            <option value="Select Method" disabled>Select Method</option>
-                            <option value="Sold">Sold</option>
-                            <option value="Auctioned">Auctioned</option>
-                            <option value="Destroyed">Destroyed</option>
-                            <option value="Other">Other</option>
-                          </select>
-                          {disposableData.methodOfDisposal === "Other" && (
-                            <input
-                              type="text"
-                              value={disposableData.methodOfDisposal === "Other" ? "" : disposableData.methodOfDisposal}
-                              onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-                              placeholder="Enter custom method"
-                              style={{ ...styles.input, marginTop: "5px" }}
-                            />
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={styles.buttonContainer}>
-                        <button onClick={handleSubmitDisposable} style={styles.button}>
-                          Submit
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    /* Original fields for non-Building categories */
-                    <>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Item:</label>
-                          <select
-                            value={`${disposableData.itemName} - ${disposableData.subCategory} - ${disposableData.itemDescription}`}
-                            onChange={(e) => {
-                              const [itemName, subCategory, itemDescription] = e.target.value.split(" - ");
-                              setDisposableData((prev) => ({
-                                ...prev,
-                                itemName,
-                                subCategory,
-                                itemDescription,
-                              }));
-                            }}
-                            style={styles.input}
-                          >
-                            <option value="">Select Item</option>
-                            {storeItems.map((item) => (
-                              <option
-                                key={`${item.itemName}-${item.subCategory}-${item.itemDescription}`}
-                                value={`${item.itemName} - ${item.subCategory} - ${item.itemDescription}`}
-                              >
-                                {`${item.itemName} - ${item.subCategory} - ${item.itemDescription}`}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Method of Disposal:</label>
-                          <select
-                            value={["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal) ? disposableData.methodOfDisposal : "Select Method"}
-                            onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-                            style={styles.input}
-                          >
-                            <option value="Select Method" disabled>Select Method</option>
-                            <option value="Sold">Sold</option>
-                            <option value="Auctioned">Auctioned</option>
-                            <option value="Destroyed">Destroyed</option>
-                            <option value="Other">Other</option>
-                          </select>
-                          {disposableData.methodOfDisposal === "Other" && (
-                            <input
-                              type="text"
-                              value={disposableData.methodOfDisposal === "Other" ? "" : disposableData.methodOfDisposal}
-                              onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
-                              placeholder="Enter custom method"
-                              style={{ ...styles.input, marginTop: "5px" }}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Available Quantity:</label>
-                          <input
-                            type="number"
-                            value={availableQuantity}
-                            disabled
-                            style={styles.input}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Disposal Quantity:</label>
-                          <input
-                            type="number"
-                            value={disposableData.quantity}
-                            onChange={(e) => handleDisposableChange("quantity", parseInt(e.target.value) || 0)}
-                            onFocus={(e) => e.target.select()}
-                            max={availableQuantity}
-                            min="0"
-                            style={styles.input}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Purchase Value:</label>
-                          <input
-                            type="number"
-                            value={disposableData.purchaseValue}
-                            disabled
-                            style={styles.input}
-                          />
-                        </div>
-                      </div>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Book Value:</label>
-                          <input
-                            type="number"
-                            value={disposableData.bookValue}
-                            onChange={(e) => handleDisposableChange("bookValue", parseFloat(e.target.value) || 0)}
-                            onFocus={(e) => e.target.select()}
-                            style={styles.input}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Inspection Date:</label>
-                          <input
-                            type="date"
-                            value={disposableData.inspectionDate}
-                            onChange={(e) => handleDisposableChange("inspectionDate", e.target.value)}
-                            style={styles.input}
-                            max={new Date().toISOString().split("T")[0]}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Condemnation Date:</label>
-                          <input type="date" value={disposableData.condemnationDate} onChange={(e) => handleDisposableChange("condemnationDate", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} />
-                        </div>
-                      </div>
-                      <div style={styles.formRow}>
-                        <div style={styles.inputGroup}>
-                          <label>Disposal Value:</label>
-                          <input
-                            type="number"
-                            value={disposableData.disposalValue}
-                            onChange={(e) => handleDisposableChange("disposalValue", parseFloat(e.target.value) || 0)}
-                            onFocus={(e) => e.target.select()}
-                            style={styles.input}
-                          />
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label>Remark:</label>
-                          <input
-                            type="text"
-                            value={disposableData.remark}
-                            onChange={(e) => handleDisposableChange("remark", e.target.value)}
-                            style={styles.input}
-                          />
-                        </div>
-                      </div>
-                      {assetType === "Permanent" && assetCategory !== "Building" && (
-                        <div style={styles.inputGroup}>
-                          <label>Select Disposable Item IDs (Available: {availableQuantity}):</label>
-                          <div style={styles.checkboxContainer}>
-                            {disposableItems.map((id) => (
-                              <label key={id} style={styles.checkboxLabel}>
-                                <input
-                                  type="checkbox"
-                                  checked={disposableData.itemIds.includes(id)}
-                                  onChange={(e) => handleDisposableIdSelection(id)}
-                                  disabled={disposableData.itemIds.length >= availableQuantity && !disposableData.itemIds.includes(id)}
-                                />
-                                {id} {purchaseValues[id] !== undefined ? `- ₹${purchaseValues[id]}` : "- Fetching..."}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div style={styles.buttonContainer}>
-                        <button onClick={handleSubmitDisposable} style={styles.button}>
-                          Submit
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )
-            }
+          <div style={styles.buttonContainer}>
+            <button onClick={handleSubmitDisposable} style={styles.button}>
+              Submit
+            </button>
+          </div>
+        </>
+      ) : (
+        /* Fields for non-Building categories */
+        <>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Item:</label>
+              <select
+                value={`${disposableData.itemName} - ${disposableData.subCategory} - ${disposableData.itemDescription}`}
+                onChange={(e) => {
+                  const [itemName, subCategory, itemDescription] = e.target.value.split(" - ");
+                  setDisposableData((prev) => ({
+                    ...prev,
+                    itemName,
+                    subCategory,
+                    itemDescription,
+                    itemIds: [], // Reset itemIds on item change
+                    quantity: 0, // Reset quantity
+                  }));
+                  setPurchaseValues({}); // Reset purchase values
+                }}
+                style={styles.input}
+              >
+                <option value="">Select Item</option>
+                {storeItems.map((item) => (
+                  <option
+                    key={`${item.itemName}-${item.subCategory}-${item.itemDescription}`}
+                    value={`${item.itemName} - ${item.subCategory} - ${item.itemDescription}`}
+                  >
+                    {`${item.itemName} - ${item.subCategory} - ${item.itemDescription}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Method of Disposal:</label>
+              <select
+                value={
+                  ["Sold", "Auctioned", "Destroyed", "Other"].includes(disposableData.methodOfDisposal)
+                    ? disposableData.methodOfDisposal
+                    : ""
+                }
+                onChange={(e) => handleDisposableChange("methodOfDisposal", e.target.value)}
+                style={styles.input}
+              >
+                <option value="" disabled>Select Method</option>
+                <option value="Sold">Sold</option>
+                <option value="Auctioned">Auctioned</option>
+                <option value="Destroyed">Destroyed</option>
+                <option value="Other">Other</option>
+              </select>
+              {disposableData.methodOfDisposal === "Other" && (
+                <input
+                  type="text"
+                  value={disposableData.customMethodOfDisposal || ""}
+                  onChange={(e) => handleDisposableChange("customMethodOfDisposal", e.target.value)}
+                  placeholder="Enter custom method"
+                  style={{ ...styles.input, marginTop: "5px" }}
+                />
+              )}
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Available Quantity:</label>
+              <input
+                type="number"
+                value={availableQuantity}
+                disabled
+                style={styles.input}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Disposal Quantity:</label>
+              <input
+                type="number"
+                value={disposableData.quantity}
+                onChange={(e) => handleDisposableChange("quantity", parseInt(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                max={availableQuantity}
+                min="0"
+                style={styles.input}
+                disabled={assetType === "Permanent"} // Disable for Permanent assets
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Purchase Value:</label>
+              <input
+                type="number"
+                value={disposableData.purchaseValue}
+                disabled
+                style={styles.input}
+              />
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Book Value:</label>
+              <input
+                type="number"
+                value={disposableData.bookValue}
+                onChange={(e) => handleDisposableChange("bookValue", parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                style={styles.input}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Inspection Date:</label>
+              <input
+                type="date"
+                value={disposableData.inspectionDate}
+                onChange={(e) => handleDisposableChange("inspectionDate", e.target.value)}
+                style={styles.input}
+                max={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Condemnation Date:</label>
+              <input
+                type="date"
+                value={disposableData.condemnationDate}
+                onChange={(e) => handleDisposableChange("condemnationDate", e.target.value)}
+                style={styles.input}
+                max={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+          </div>
+          <div style={styles.formRow}>
+            <div style={styles.inputGroup}>
+              <label>Disposal Value:</label>
+              <input
+                type="number"
+                value={disposableData.disposalValue}
+                onChange={(e) => handleDisposableChange("disposalValue", parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                style={styles.input}
+              />
+            </div>
+            <div style={styles.inputGroup}>
+              <label>Remark:</label>
+              <input
+                type="text"
+                value={disposableData.remark}
+                onChange={(e) => handleDisposableChange("remark", e.target.value)}
+                style={styles.input}
+              />
+            </div>
+          </div>
+          {assetType === "Permanent" && assetCategory !== "Building" && (
+            <div style={styles.inputGroup}>
+              <label>Select Disposable Item IDs (Available: {availableQuantity}, Selected: {disposableData.itemIds.length}):</label>
+              <div style={styles.checkboxContainer}>
+                {disposableItems.map((id) => (
+                  <label key={id} style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={disposableData.itemIds.includes(id)}
+                      onChange={() => handleDisposableIdSelection(id)}
+                      disabled={
+                        !disposableData.itemIds.includes(id) &&
+                        disposableData.itemIds.length >= availableQuantity
+                      }
+                    />
+                    {id} {purchaseValues[id] !== undefined ? `- ₹${purchaseValues[id]}` : "- Fetching..."}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={styles.buttonContainer}>
+            <button onClick={handleSubmitDisposable} style={styles.button}>
+              Submit
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
             {activeTab === "buildingupgrade" && (
               <div style={styles.formContainer}>
                 <div style={styles.formRow}>

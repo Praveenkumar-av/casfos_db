@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef } from "react"; // Ensure useRef is imported
+// AssetIssue.jsx
+// This component handles the issuance and acknowledgment of assets in the CASFOS Asset Management System.
+// It allows users to issue permanent or consumable assets, select items, specify quantities, and assign them to locations or individuals.
+// It also supports acknowledging issued assets by uploading signed receipts.
+// The component supports editing rejected issues and generates PDF receipts for issued assets.
+
+import React, { useEffect, useState, useRef } from "react";
 import { Helmet } from "react-helmet";
 import "../styles/style.css";
 import { FaPlus } from "react-icons/fa";
@@ -7,14 +13,18 @@ import { useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
 import { jsPDF } from "jspdf";
 
+// Component definition
 const AssetIssue = () => {
+  // Constants and Hooks
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
   const serverBaseUrl = "http://localhost:3001";
-  const [uploadedFiles, setUploadedFiles] = useState({});
-  const rejectedId = queryParams.get("rejectedId"); // Get rejectedId from URL
-  const [isEditingRejected, setIsEditingRejected] = useState(false); // New state for editing rejected issue
+  const rejectedId = queryParams.get("rejectedId");
+  const fileInputRefs = useRef({});
+
+  // State Variables
+  const [isEditingRejected, setIsEditingRejected] = useState(false);
   const [activeTab, setActiveTab] = useState("issue");
   const [assetType, setAssetType] = useState("Permanent");
   const [assetCategory, setAssetCategory] = useState("");
@@ -24,10 +34,51 @@ const AssetIssue = () => {
   const [inStock, setInStock] = useState(0);
   const [issueItems, setIssueItems] = useState([]);
   const [tempIssues, setTempIssues] = useState([]);
-  const fileInputRefs = useRef({});
-  const permanentAssetOptions = ["Furniture", "Vehicle", "Instruments", "Sports and Goods", "Fabrics", "Electrical", "Electronics", "Photograph Items", "ICT Goods"];
-  const consumableAssetOptions = ["Stationery", "IT", "Electrical", "Plumbing", "Glassware/Laboratory Items", "Sanitory Items", "Sports Goods", "Fabrics", "Instruments"];
-  const issuedToOptions = ["faculty_chamber", "officer_quarters", "staff_quarters", "corbett_hall", "champion_hall", "gis_lab", "van_vatika", "hostel", "officers_mess", "van_sakthi", "library", "classroom", "office_room", "officers_lounge", "gymnasium", "name"];
+  const [uploadedFiles, setUploadedFiles] = useState({});
+
+  // Asset Options
+  const permanentAssetOptions = [
+    "Furniture",
+    "Vehicle",
+    "Instruments",
+    "Sports and Goods",
+    "Fabrics",
+    "Electrical",
+    "Electronics",
+    "Photograph Items",
+    "ICT Goods",
+  ];
+  const consumableAssetOptions = [
+    "Stationery",
+    "IT",
+    "Electrical",
+    "Plumbing",
+    "Glassware/Laboratory Items",
+    "Sanitory Items",
+    "Sports Goods",
+    "Fabrics",
+    "Instruments",
+  ];
+  const issuedToOptions = [
+    "faculty_chamber",
+    "officer_quarters",
+    "staff_quarters",
+    "corbett_hall",
+    "champion_hall",
+    "gis_lab",
+    "van_vatika",
+    "hostel",
+    "officers_mess",
+    "van_sakthi",
+    "library",
+    "classroom",
+    "office_room",
+    "officers_lounge",
+    "gymnasium",
+    "name",
+  ];
+
+  // Effect to handle rejected asset editing
   useEffect(() => {
     if (rejectedId) {
       const fetchRejectedAsset = async () => {
@@ -39,19 +90,26 @@ const AssetIssue = () => {
           setAssetCategory(rejectedAsset.assetCategory || "");
           setSelectedItem(`${rejectedAsset.itemName} - ${rejectedAsset.subCategory} - ${rejectedAsset.itemDescription}`);
 
-          const issuedToParts = rejectedAsset.issuedTo.match(/^(.*) \((.*)\)$/) || [null, rejectedAsset.issuedTo];
-          const issuedTo = issuedToParts[1] === "name" || issuedToOptions.includes(issuedToParts[1]) ? issuedToParts[1] : "name";
+          const issuedToParts = rejectedAsset.issuedTo.match(/^(.*) \((.*)\)$/) || [
+            null,
+            rejectedAsset.issuedTo,
+          ];
+          const issuedTo = issuedToParts[1] === "name" || issuedToOptions.includes(issuedToParts[1])
+            ? issuedToParts[1]
+            : "name";
           const name = issuedTo === "name" ? issuedToParts[1] : "";
           const designation = issuedTo === "name" ? issuedToParts[2] : "";
 
-          setIssueItems([{
-            issuedTo,
-            name,
-            designation,
-            location: rejectedAsset.location || "",
-            quantity: rejectedAsset.quantity || 0,
-            selectedIds: rejectedAsset.issuedIds || [],
-          }]);
+          setIssueItems([
+            {
+              issuedTo,
+              name,
+              designation,
+              location: rejectedAsset.location || "",
+              quantity: rejectedAsset.quantity || 0,
+              selectedIds: rejectedAsset.issuedIds || [],
+            },
+          ]);
 
           setIsEditingRejected(true);
           await Swal.fire({
@@ -71,11 +129,16 @@ const AssetIssue = () => {
       fetchRejectedAsset();
     }
   }, [rejectedId]);
+
+  // Effect to fetch store items based on asset type and category
   useEffect(() => {
     if (assetType && assetCategory) {
       const fetchStoreItems = async () => {
         try {
-          const response = await axios.post(`${serverBaseUrl}/api/assets/getStoreItems`, { assetType, assetCategory });
+          const response = await axios.post(`${serverBaseUrl}/api/assets/getStoreItems`, {
+            assetType,
+            assetCategory,
+          });
           setStoreItems(response.data.items || []);
         } catch (error) {
           console.error("Failed to fetch store items:", error);
@@ -86,16 +149,28 @@ const AssetIssue = () => {
     }
   }, [assetType, assetCategory]);
 
+  // Effect to fetch stock and available IDs for selected item
   useEffect(() => {
     if (assetType && assetCategory && selectedItem) {
       const [itemName, subCategory, itemDescription] = selectedItem.split(" - ");
       const fetchStock = async () => {
         try {
-          const stockResponse = await axios.post(`${serverBaseUrl}/api/assets/checkInStock`, { assetType, assetCategory, itemName, itemDescription });
+          const stockResponse = await axios.post(`${serverBaseUrl}/api/assets/checkInStock`, {
+            assetType,
+            assetCategory,
+            itemName,
+            itemDescription,
+          });
           setInStock(stockResponse.data.inStock || 0);
 
           if (assetType === "Permanent") {
-            const idResponse = await axios.post(`${serverBaseUrl}/api/assets/getAvailableIds`, { assetType, assetCategory, itemName, subCategory, itemDescription });
+            const idResponse = await axios.post(`${serverBaseUrl}/api/assets/getAvailableIds`, {
+              assetType,
+              assetCategory,
+              itemName,
+              subCategory,
+              itemDescription,
+            });
             setAvailableIds(idResponse.data.itemIds || []);
           } else {
             setAvailableIds([]);
@@ -110,6 +185,7 @@ const AssetIssue = () => {
     }
   }, [assetType, assetCategory, selectedItem]);
 
+  // Effect to fetch temporary issues for acknowledgment tab
   useEffect(() => {
     if (activeTab === "acknowledge") {
       const fetchTempIssues = async () => {
@@ -125,10 +201,16 @@ const AssetIssue = () => {
     }
   }, [activeTab]);
 
+  // Handler Functions
+  // Add a new issue item to the list
   const addIssueItem = () => {
-    setIssueItems([...issueItems, { issuedTo: "", name: "", designation: "", location: "", quantity: 0, selectedIds: [] }]);
+    setIssueItems([
+      ...issueItems,
+      { issuedTo: "", name: "", designation: "", location: "", quantity: 0, selectedIds: [] },
+    ]);
   };
 
+  // Update issue item fields
   const handleIssueItemChange = (index, field, value) => {
     const updatedIssueItems = issueItems.map((item, i) => {
       if (i === index) {
@@ -137,12 +219,12 @@ const AssetIssue = () => {
           const limitedIds = item.selectedIds.slice(0, newQuantity);
           return { ...item, quantity: newQuantity, selectedIds: limitedIds };
         } else if (field === "issuedTo") {
-          return { 
-            ...item, 
+          return {
+            ...item,
             [field]: value,
             name: value === "name" ? item.name : "",
             designation: value === "name" ? item.designation : "",
-            location: value === "name" ? item.location : ""
+            location: value === "name" ? item.location : "",
           };
         }
         return { ...item, [field]: value };
@@ -152,6 +234,7 @@ const AssetIssue = () => {
     setIssueItems(updatedIssueItems);
   };
 
+  // Handle individual ID selection for permanent assets
   const handleIdSelection = (index, id, checked) => {
     setIssueItems((prevItems) =>
       prevItems.map((item, i) =>
@@ -169,6 +252,7 @@ const AssetIssue = () => {
     );
   };
 
+  // Handle select all IDs for an issue item
   const handleSelectAll = (index, checked) => {
     const usedIds = issueItems.filter((_, i) => i !== index).flatMap((item) => item.selectedIds);
     const filteredAvailableIds = availableIds.filter((id) => !usedIds.includes(id));
@@ -178,13 +262,16 @@ const AssetIssue = () => {
         i === index
           ? {
               ...item,
-              selectedIds: checked ? filteredAvailableIds.slice(0, Math.min(maxSelectable, filteredAvailableIds.length)) : [],
+              selectedIds: checked
+                ? filteredAvailableIds.slice(0, Math.min(maxSelectable, filteredAvailableIds.length))
+                : [],
             }
           : item
       )
     );
   };
 
+  // Generate PDF receipt for an issued asset
   const generateReceiptPDF = (issueData, issue) => {
     const doc = new jsPDF({
       orientation: "portrait",
@@ -196,6 +283,7 @@ const AssetIssue = () => {
     const secondaryColor = "#00C4B4";
     const textColor = "#333333";
 
+    // Header
     doc.setFillColor(primaryColor);
     doc.rect(0, 0, 210, 30, "F");
     doc.setFont("helvetica", "bold");
@@ -205,6 +293,7 @@ const AssetIssue = () => {
     doc.setFontSize(10);
     doc.text("Generated on: " + new Date().toLocaleDateString(), 105, 25, { align: "center" });
 
+    // Body
     doc.setTextColor(textColor);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
@@ -231,7 +320,6 @@ const AssetIssue = () => {
       ...(issue.issuedTo === "name" ? [["Location", issue.location || "N/A"]] : []),
       ["Quantity", issue.quantity || "N/A"],
     ];
-    
 
     if (issueData.assetType === "Permanent" && issue.selectedIds.length > 0) {
       details.push(["Item IDs", issue.selectedIds.join(", ")]);
@@ -248,6 +336,7 @@ const AssetIssue = () => {
       yPos += splitValue.length * 5 + 2;
     });
 
+    // Footer
     doc.setDrawColor(secondaryColor);
     doc.line(10, yPos + 5, 200, yPos + 5);
 
@@ -268,6 +357,7 @@ const AssetIssue = () => {
     return doc.output("blob");
   };
 
+  // Submit issued assets and generate receipts
   const handleSubmitIssue = async () => {
     if (!selectedItem || issueItems.length === 0) {
       await Swal.fire({ icon: "warning", title: "Warning", text: "Please select an item and add at least one issue!" });
@@ -279,8 +369,7 @@ const AssetIssue = () => {
       if (
         !issue.issuedTo ||
         issue.quantity <= 0 ||
-        (issue.issuedTo === "name" && (!issue.name ||     !issue.location ||
-          !issue.designation)) ||
+        (issue.issuedTo === "name" && (!issue.name || !issue.location || !issue.designation)) ||
         (assetType === "Permanent" && issue.selectedIds.length !== issue.quantity)
       ) {
         await Swal.fire({ icon: "warning", title: "Warning", text: "Please fill all fields correctly!" });
@@ -343,6 +432,7 @@ const AssetIssue = () => {
 
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
+
       if (isEditingRejected && rejectedId) {
         await axios.delete(`${serverBaseUrl}/api/assets/rejected-asset/${rejectedId}`);
       }
@@ -358,16 +448,6 @@ const AssetIssue = () => {
 
       resetIssueForm();
       setIsEditingRejected(false);
-
-      await Swal.fire({
-        icon: "success",
-        title: "Success!",
-        text: "All receipts generated and downloaded successfully!",
-      }).then(() => {
-        window.location.reload();
-      });
-
-      resetIssueForm();
     } catch (error) {
       await Swal.fire({
         icon: "error",
@@ -378,18 +458,19 @@ const AssetIssue = () => {
     }
   };
 
+  // Acknowledge a temporary issue by uploading a signed receipt
   const handleAcknowledgeDone = async (tempIssueId) => {
     const file = uploadedFiles[tempIssueId];
-  
+
     if (!file) {
       await Swal.fire({ icon: "error", title: "Oops...", text: "Please upload a signed receipt first!" });
       return;
     }
-  
+
     const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
     const allowedExtensions = [".pdf", ".jpeg", ".jpg", ".png"];
     const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-  
+
     if (!allowedMimeTypes.includes(file.type) || !allowedExtensions.includes(fileExtension)) {
       await Swal.fire({
         icon: "error",
@@ -398,17 +479,16 @@ const AssetIssue = () => {
       });
       return;
     }
-  
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("tempIssueId", tempIssueId);
-  
+
     try {
       const response = await axios.post(`${serverBaseUrl}/api/assets/acknowledgeTempIssue`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-  
-      // Update state only after the user acknowledges the success alert
+
       const updatedTempIssues = tempIssues.map((issue) =>
         issue._id === tempIssueId
           ? {
@@ -420,18 +500,16 @@ const AssetIssue = () => {
             }
           : issue
       );
-  
+
       const newUploadedFiles = { ...uploadedFiles };
       delete newUploadedFiles[tempIssueId];
-  
-      // Show success alert and wait for user interaction
+
       await Swal.fire({
         icon: "success",
         title: "Success!",
         text: "Receipt acknowledged!",
       });
-  
-      // Update state after the alert is closed
+
       setTempIssues(updatedTempIssues);
       setUploadedFiles(newUploadedFiles);
     } catch (error) {
@@ -444,17 +522,18 @@ const AssetIssue = () => {
     }
   };
 
-  const handleFileChange = async (tempIssueId, file) => { // Add async
+  // Handle file upload for signed receipt
+  const handleFileChange = async (tempIssueId, file) => {
     if (!file) return;
-  
+
     const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
     const allowedExtensions = [".pdf", ".jpeg", ".jpg", ".png"];
     const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     const isValidMimeType = allowedMimeTypes.includes(file.type);
     const isValidExtension = allowedExtensions.includes(fileExtension);
-  
+
     if (!isValidMimeType || !isValidExtension) {
-      await Swal.fire({ // Add await
+      await Swal.fire({
         icon: "error",
         title: "Invalid File Type",
         text: "Only PDF, JPEG, and PNG files are allowed!",
@@ -464,12 +543,14 @@ const AssetIssue = () => {
       }
       return;
     }
-  
+
     setUploadedFiles({
       ...uploadedFiles,
       [tempIssueId]: file,
     });
   };
+
+  // Reset the issue form after submission
   const resetIssueForm = () => {
     setAssetCategory("");
     setSelectedItem("");
@@ -478,8 +559,10 @@ const AssetIssue = () => {
     setInStock(0);
   };
 
+  // JSX Rendering
   return (
     <>
+      {/* Helmet for SEO and metadata */}
       <Helmet>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -487,23 +570,62 @@ const AssetIssue = () => {
         <title>CASFOS - Asset Issue</title>
       </Helmet>
 
+      {/* Sidebar Navigation */}
       <section id="sidebar">
-          <a href="#" className="brand">
-            <span className="text">STOREKEEPER</span>
-          </a>
-          <ul className="side-menu top">
-            <li ><a href={`/storekeeperdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
-            <li ><a href={`/assetstore?username=${encodeURIComponent(username)}`}><i className="bx bxs-shopping-bag-alt" /><span className="text">Asset Store</span></a></li>
-            <li className="active"><a href={`/assetissue?username=${encodeURIComponent(username)}`}><i className="bx bxs-package" /><span className="text">Asset Issue</span></a></li>
-            <li><a href={`/assetreturn?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Return</span></a></li>
-            <li><a href={`/storekeeperassetupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Updation</span></a></li>
-            <li><a href={`/viewasset?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Asset View</span></a></li>
-          </ul>
-          <ul className="side-menu">
-            <li><a href="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
-          </ul>
-        </section>
+        <a href="#" className="brand">
+          <span className="text">STOREKEEPER</span>
+        </a>
+        <ul className="side-menu top">
+          <li>
+            <a href={`/storekeeperdashboard?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-dashboard" />
+              <span className="text">Home</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/assetstore?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-shopping-bag-alt" />
+              <span className="text">Asset Store</span>
+            </a>
+          </li>
+          <li className="active">
+            <a href={`/assetissue?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-package" />
+              <span className="text">Asset Issue</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/assetreturn?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-reply" />
+              <span className="text">Asset Return</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/storekeeperassetupdation?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-reply" />
+              <span className="text">Asset Updation</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/viewasset?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-doughnut-chart" />
+              <span className="text">Asset View</span>
+            </a>
+          </li>
+        </ul>
+        <ul className="side-menu">
+          <li>
+            <a href="/" className="logout">
+              <i className="bx bxs-log-out-circle" />
+              <span className="text">Logout</span>
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      {/* Main Content */}
       <section id="content">
+        {/* Navigation Bar */}
         <nav>
           <i className="bx bx-menu" />
           <span className="head-title">Dashboard</span>
@@ -513,45 +635,79 @@ const AssetIssue = () => {
           </div>
         </nav>
 
+        {/* Tab Menu */}
         <div style={styles.menuBar}>
-          <button style={activeTab === "issue" ? styles.activeTab : styles.tab} onClick={() => setActiveTab("issue")}>
+          <button
+            style={activeTab === "issue" ? styles.activeTab : styles.tab}
+            onClick={() => setActiveTab("issue")}
+          >
             Issue
           </button>
-          <button style={activeTab === "acknowledge" ? styles.activeTab : styles.tab} onClick={() => setActiveTab("acknowledge")}>
+          <button
+            style={activeTab === "acknowledge" ? styles.activeTab : styles.tab}
+            onClick={() => setActiveTab("acknowledge")}
+          >
             Acknowledge
           </button>
         </div>
 
+        {/* Main Content Area */}
         <main>
           <div style={styles.container}>
             <h2>Asset Management System</h2>
             {isEditingRejected && (
-                  <div style={{ padding: "10px", backgroundColor: "#fff3cd", border: "1px solid #ffeeba", borderRadius: "5px", marginBottom: "15px", color: "#856404" }}>
-                    <strong>Editing Rejected Issue</strong>: Update the details below and resubmit.
-                  </div>
-                )}
+              <div
+                style={{
+                  padding: "10px",
+                  backgroundColor: "#fff3cd",
+                  border: "1px solid #ffeeba",
+                  borderRadius: "5px",
+                  marginBottom: "15px",
+                  color: "#856404",
+                }}
+              >
+                <strong>Editing Rejected Issue</strong>: Update the details below and resubmit.
+              </div>
+            )}
             {activeTab === "issue" && (
               <div style={styles.formContainer}>
+                {/* Asset Selection Form */}
                 <div style={styles.formRow}>
                   <div style={styles.inputGroup}>
                     <label>Asset Type:</label>
-                    <select value={assetType} onChange={(e) => setAssetType(e.target.value)} style={styles.input}>
+                    <select
+                      value={assetType}
+                      onChange={(e) => setAssetType(e.target.value)}
+                      style={styles.input}
+                    >
                       <option value="Permanent">Permanent</option>
                       <option value="Consumable">Consumable</option>
                     </select>
                   </div>
                   <div style={styles.inputGroup}>
                     <label>Asset Category:</label>
-                    <select value={assetCategory} onChange={(e) => setAssetCategory(e.target.value)} style={styles.input}>
+                    <select
+                      value={assetCategory}
+                      onChange={(e) => setAssetCategory(e.target.value)}
+                      style={styles.input}
+                    >
                       <option value="">Select Category</option>
-                      {(assetType === "Permanent" ? permanentAssetOptions : consumableAssetOptions).map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
+                      {(assetType === "Permanent" ? permanentAssetOptions : consumableAssetOptions).map(
+                        (option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
                   <div style={styles.inputGroup}>
                     <label>Item:</label>
-                    <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} style={styles.input}>
+                    <select
+                      value={selectedItem}
+                      onChange={(e) => setSelectedItem(e.target.value)}
+                      style={styles.input}
+                    >
                       <option value="">Select Item</option>
                       {storeItems.map((item) => (
                         <option
@@ -571,10 +727,15 @@ const AssetIssue = () => {
                   </div>
                 </div>
                 <h3>Issue Details</h3>
+                {/* Issue Items List */}
                 {issueItems.map((issue, index) => {
-                  const usedIds = issueItems.filter((_, i) => i !== index).flatMap((item) => item.selectedIds);
+                  const usedIds = issueItems
+                    .filter((_, i) => i !== index)
+                    .flatMap((item) => item.selectedIds);
                   const filteredAvailableIds = availableIds.filter((id) => !usedIds.includes(id));
-                  const usedLocations = issueItems.filter((_, i) => i !== index).map((item) => item.issuedTo);
+                  const usedLocations = issueItems
+                    .filter((_, i) => i !== index)
+                    .map((item) => item.issuedTo);
 
                   return (
                     <div key={index} style={styles.itemContainer}>
@@ -618,21 +779,23 @@ const AssetIssue = () => {
                               <input
                                 type="text"
                                 value={issue.designation}
-                                onChange={(e) => handleIssueItemChange(index, "designation", e.target.value)}
+                                onChange={(e) =>
+                                  handleIssueItemChange(index, "designation", e.target.value)
+                                }
                                 style={styles.input}
                               />
                             </div>
                             <div style={styles.inputGroup}>
-                          <label>Location:</label>
-                          <input
-                            type="text"
-                            value={issue.location}
-                            onChange={(e) => handleIssueItemChange(index, "location", e.target.value)}
-                            style={styles.input}
-                          />
-                        </div>
+                              <label>Location:</label>
+                              <input
+                                type="text"
+                                value={issue.location}
+                                onChange={(e) => handleIssueItemChange(index, "location", e.target.value)}
+                                style={styles.input}
+                              />
+                            </div>
                           </>
-                        )}                       
+                        )}
                         <div style={styles.inputGroup}>
                           <label>Quantity:</label>
                           <input
@@ -650,7 +813,10 @@ const AssetIssue = () => {
                             <label>
                               <input
                                 type="checkbox"
-                                checked={issue.selectedIds.length === filteredAvailableIds.length && filteredAvailableIds.length > 0}
+                                checked={
+                                  issue.selectedIds.length === filteredAvailableIds.length &&
+                                  filteredAvailableIds.length > 0
+                                }
                                 onChange={(e) => handleSelectAll(index, e.target.checked)}
                               />
                               Select All
@@ -661,7 +827,10 @@ const AssetIssue = () => {
                                   type="checkbox"
                                   checked={issue.selectedIds.includes(id)}
                                   onChange={(e) => handleIdSelection(index, id, e.target.checked)}
-                                  disabled={issue.selectedIds.length >= issue.quantity && !issue.selectedIds.includes(id)}
+                                  disabled={
+                                    issue.selectedIds.length >= issue.quantity &&
+                                    !issue.selectedIds.includes(id)
+                                  }
                                 />
                                 {id}
                               </label>
@@ -694,12 +863,24 @@ const AssetIssue = () => {
                         <span style={styles.assetTypeBadge}>{issue.assetType || "N/A"}</span>
                       </div>
                       <div style={styles.cardBody}>
-                        <p><strong>Category:</strong> {issue.assetCategory || "N/A"}</p>
-                        <p><strong>Sub Category:</strong> {issue.subCategory || "N/A"}</p>
-                        <p><strong>Description:</strong> {issue.itemDescription || "N/A"}</p>
-                        <p><strong>Issued To:</strong> {issue.issuedTo || "N/A"}</p>
-                        <p><strong>Location:</strong> {issue.location || "N/A"}</p>
-                        <p><strong>Quantity:</strong> {issue.quantity || "N/A"}</p>
+                        <p>
+                          <strong>Category:</strong> {issue.assetCategory || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Sub Category:</strong> {issue.subCategory || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Description:</strong> {issue.itemDescription || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Issued To:</strong> {issue.issuedTo || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Location:</strong> {issue.location || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Quantity:</strong> {issue.quantity || "N/A"}
+                        </p>
                         {issue.issuedIds && (
                           <p>
                             <strong>Item IDs:</strong>{" "}
@@ -722,7 +903,11 @@ const AssetIssue = () => {
                         )}
                         <div style={styles.actionGroup}>
                           <a
-                            href={issue.pdfUrl.startsWith("http") ? issue.pdfUrl : `${serverBaseUrl}${issue.pdfUrl}`}
+                            href={
+                              issue.pdfUrl.startsWith("http")
+                                ? issue.pdfUrl
+                                : `${serverBaseUrl}${issue.pdfUrl}`
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             style={styles.downloadLink}
@@ -736,16 +921,18 @@ const AssetIssue = () => {
                               <strong>Upload Signed Receipt:</strong>
                             </label>
                             <input
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png"
-                    onChange={(e) => handleFileChange(issue._id, e.target.files[0])}
-                    ref={(el) => (fileInputRefs.current[issue._id] = el)} // Assign ref
-                    style={styles.fileInput}
-                  />
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png"
+                              onChange={(e) => handleFileChange(issue._id, e.target.files[0])}
+                              ref={(el) => (fileInputRefs.current[issue._id] = el)}
+                              style={styles.fileInput}
+                            />
                             <button
                               onClick={() => handleAcknowledgeDone(issue._id)}
                               disabled={!uploadedFiles[issue._id]}
-                              style={uploadedFiles[issue._id] ? styles.doneButton : styles.disabledDoneButton}
+                              style={
+                                uploadedFiles[issue._id] ? styles.doneButton : styles.disabledDoneButton
+                              }
                             >
                               Done
                             </button>
@@ -758,9 +945,15 @@ const AssetIssue = () => {
                           </div>
                         ) : (
                           <div style={styles.actionGroup}>
-                            <p><strong>Signed Receipt:</strong></p>
+                            <p>
+                              <strong>Signed Receipt:</strong>
+                            </p>
                             <a
-                              href={issue.signedPdfUrl.startsWith("http") ? issue.signedPdfUrl : `${serverBaseUrl}${issue.signedPdfUrl}`}
+                              href={
+                                issue.signedPdfUrl.startsWith("http")
+                                  ? issue.signedPdfUrl
+                                  : `${serverBaseUrl}${issue.signedPdfUrl}`
+                              }
                               target="_blank"
                               rel="noopener noreferrer"
                               style={styles.viewLink}
@@ -771,7 +964,13 @@ const AssetIssue = () => {
                         )}
                       </div>
                       <div style={styles.cardFooter}>
-                        <span style={issue.acknowledged === "yes" ? styles.statusAcknowledged : styles.statusPending}>
+                        <span
+                          style={
+                            issue.acknowledged === "yes"
+                              ? styles.statusAcknowledged
+                              : styles.statusPending
+                          }
+                        >
                           {issue.acknowledged === "yes" ? "Acknowledged" : "Pending"}
                         </span>
                       </div>
@@ -787,6 +986,7 @@ const AssetIssue = () => {
   );
 };
 
+// Styles Object
 const styles = {
   menuBar: {
     width: "100%",
@@ -859,7 +1059,7 @@ const styles = {
   },
   itemRow: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr 1fr", // Adjusted for Location field
+    gridTemplateColumns: "1fr 1fr 1fr 1fr",
     gap: "15px",
     marginBottom: "15px",
   },

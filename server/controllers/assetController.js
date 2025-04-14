@@ -1679,7 +1679,6 @@ exports.getReturnedForApproval = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch returned assets" });
   }
 };
-
 exports.approveReturn = async (req, res) => {
   const { id } = req.params;
   const { condition, assetType, returnedQuantity } = req.body;
@@ -1745,6 +1744,7 @@ exports.approveReturn = async (req, res) => {
         pdfUrl: asset.pdfUrl,
         signedPdfUrl: asset.signedPdfUrl,
         originalReturnedAssetId: asset._id,
+        approved: "no", // Set approved to "no" for new exchange
       });
       await exchangedConsumable.save();
     }
@@ -1850,7 +1850,7 @@ exports.rejectReturn = async (req, res) => {
 };
 exports.return = async (req, res) => {
   try {
-    const { assetType, assetCategory, itemName, subCategory, itemDescription, location, returnQuantity, condition, returnIds } = req.body;
+    const { assetType, assetCategory, itemName, subCategory, itemDescription, location, returnQuantity,  returnIds } = req.body;
 
     // Validate assetType
     if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
@@ -1863,7 +1863,7 @@ exports.return = async (req, res) => {
     const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
 
     // Validate required fields
-    if (!assetCategory || !itemName || !itemDescription || !location || !returnQuantity || !condition) {
+    if (!assetCategory || !itemName || !itemDescription || !location || !returnQuantity ) {
       return res.status(400).json({ message: "All required fields must be provided" });
     }
 
@@ -1906,7 +1906,6 @@ exports.return = async (req, res) => {
     } else {
       await issuedItem.save();
     }
-    const status = condition === "Good" ? "returned" : "returned"; // "Good" -> "returned", "To Be Serviced" -> "service"
     // Handle all conditions by adding to Returned collection with approval pending
     if (assetType === "Permanent") {
       // Create a separate ReturnedPermanent document for each returnId
@@ -1918,7 +1917,6 @@ exports.return = async (req, res) => {
           subCategory,
           itemDescription,
           location,
-          status, // "Good" stays "returned", others go to "service"
           itemId: returnId, // Single ID for Permanent
           approved: null, // Pending approval
         });
@@ -1934,7 +1932,6 @@ exports.return = async (req, res) => {
         itemDescription,
         location,
         returnQuantity,
-        status, 
         approved: null,
       });
       await newReturned.save();
@@ -2019,25 +2016,31 @@ exports.getBuildingUpgrades = async (req, res) => {
 exports.getReturnedAssets = async (req, res) => {
   try {
     const { assetType, assetCategory, status } = req.body;
-    console.log("wnjwben");
+    console.log("Fetching returned assets:", { assetType, assetCategory, status });
+
     if (!["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ message: "Invalid assetType. Must be 'Permanent' or 'Consumable'." });
     }
 
     const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
-    const returnedAssets = await Model.find({ assetType, assetCategory, status });
+    const query = { assetType, status };
+    if (assetCategory) {
+      query.assetCategory = assetCategory;
+    }
+
+    const returnedAssets = await Model.find(query);
 
     if (!returnedAssets || returnedAssets.length === 0) {
       return res.status(400).json({ message: "No returned assets found" });
     }
-    console.log("returned");
+
+    console.log("Returned assets found:", returnedAssets.length);
     res.status(200).json(returnedAssets);
   } catch (error) {
     console.error("Failed to fetch returned assets:", error);
     res.status(500).json({ message: "Failed to fetch returned assets" });
   }
 };
-
 exports.saveReturnedPermanentStatus = async (req, res) => {
   try {
     const { _id, status } = req.body;
@@ -2426,7 +2429,7 @@ exports.requestDisposal = async (req, res) => {
         subCategory,
         itemDescription,
         itemIds: assetType === "Permanent" ? itemIds : undefined,
-        quantity: assetType === "Consumable" ? quantity : undefined,
+        quantity,
         purchaseValue,
         bookValue,
         inspectionDate,
@@ -3299,7 +3302,6 @@ exports.filterPurchase = async (req, res) => {
     res.status(500).json({ message: "Error filtering purchase assets", error: error.stack });
   }
 };
-
 exports.filterServiceReturn = async (req, res) => {
   try {
     const {
@@ -3399,7 +3401,7 @@ exports.filterServiceReturn = async (req, res) => {
         })),
       ];
     } else if (condition === "Exchanged") {
-      const exchangedConsumable = await ExchangedConsumable.find(query);
+      const exchangedConsumable = await ExchangedConsumable.find({ ...query, approved: "yes" });
       result = exchangedConsumable.map((asset) => ({
         assetType: asset.assetType,
         assetCategory: asset.assetCategory,
@@ -3421,7 +3423,7 @@ exports.filterServiceReturn = async (req, res) => {
         ...query,
         status: { $ne: "dispose" },
       });
-      const exchangedConsumable = await ExchangedConsumable.find(query);
+      const exchangedConsumable = await ExchangedConsumable.find({ ...query, approved: "yes" });
       const servicedAssets = await ServicedAsset.find(query);
 
       result = [
@@ -3638,26 +3640,29 @@ exports.uploadInvoice = async (req, res) => {
 // Get exchanged items for approval
 exports.getExchangedForApproval = async (req, res) => {
   try {
-    const exchangedItems = await ExchangedConsumable.find();
+    const exchangedItems = await ExchangedConsumable.find({ approved: "no" });
     res.json(exchangedItems);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 // Approve exchange
 exports.approveExchange = async (req, res) => {
   try {
-    console.log("entered")
+    console.log("entered");
     const exchange = await ExchangedConsumable.findById(req.params.id);
     if (!exchange) {
-      return res.status(404).json({ message: 'Exchange not found' });
+      return res.status(404).json({ message: "Exchange not found" });
     }
+
+    // Update approved status
+    exchange.approved = "yes";
+    await exchange.save();
 
     // Add quantity back to stock
     const stockItem = await StoreConsumable.findOne({
       assetCategory: exchange.assetCategory,
-      itemName: exchange.itemName
+      itemName: exchange.itemName,
     });
 
     if (stockItem) {
@@ -3665,24 +3670,27 @@ exports.approveExchange = async (req, res) => {
       await stockItem.save();
     }
 
-    // Delete the exchange record
+    // Delete the exchange record (optional, kept as per original logic)
 
-    // notification
-    storeAssetNotification(exchange, 'exchange approved', new Date());
+    // Notification
+    storeAssetNotification(exchange, "exchange approved", new Date());
 
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 // Reject exchange
 exports.rejectExchange = async (req, res) => {
   try {
     const exchange = await ExchangedConsumable.findById(req.params.id);
     if (!exchange) {
-      return res.status(404).json({ message: 'Exchange not found' });
+      return res.status(404).json({ message: "Exchange not found" });
     }
+
+    // Update approved status
+    exchange.approved = "rejected";
+    await exchange.save();
 
     const returnedConsumable = new ReturnedConsumable({
       assetType: exchange.assetType,
@@ -3695,7 +3703,7 @@ exports.rejectExchange = async (req, res) => {
       approved: "yes",
       pdfUrl: exchange.pdfUrl,
       signedPdfUrl: exchange.signedPdfUrl,
-      remark: exchange.remark
+      remark: exchange.remark,
     });
 
     await returnedConsumable.save();
@@ -3703,8 +3711,8 @@ exports.rejectExchange = async (req, res) => {
     // Delete the exchange record
     await ExchangedConsumable.findByIdAndDelete(req.params.id);
 
-    // notification
-    storeAssetNotification(exchange, 'exchange rejected', new Date());
+    // Notification
+    storeAssetNotification(exchange, "exchange rejected", new Date());
 
     res.json({ success: true });
   } catch (error) {
@@ -3944,9 +3952,15 @@ exports.rejectAsset = async (req, res) => {
             itemDescription: item.itemDescription || undefined,
             quantityReceived: item.quantityReceived || undefined,
             unitPrice: item.unitPrice || undefined,
-            overallPrice: item.overallPrice || undefined,
-            amcDate: item.amcDate || undefined,
+            totalPrice: item.totalPrice || undefined, // Added
+            amcFromDate: item.amcFromDate || undefined, // Added
+            amcToDate: item.amcToDate || undefined, // Added
+            amcCost: item.amcCost || undefined, // Added
+            amcPhotoUrl: item.amcPhotoUrl || undefined, // Added
             itemPhotoUrl: item.itemPhotoUrl || undefined,
+            warrantyNumber: item.warrantyNumber || undefined, // Added
+            warrantyValidUpto: item.warrantyValidUpto || undefined, // Added
+            warrantyPhotoUrl: item.warrantyPhotoUrl || undefined, // Added
             itemIds: item.itemIds || [],
           }))
         : [],
@@ -3959,9 +3973,11 @@ exports.rejectAsset = async (req, res) => {
       dateOfConstruction: tempAsset.dateOfConstruction || undefined,
       costOfConstruction: tempAsset.costOfConstruction || undefined,
       remarks: tempAsset.remarks || undefined,
+      approvedEstimate: tempAsset.approvedEstimate || undefined, // Added for Building
+      approvedBuildingPlanUrl: tempAsset.approvedBuildingPlanUrl || undefined, // Added for Building
+      kmzOrkmlFileUrl: tempAsset.kmzOrkmlFileUrl || undefined, // Added for Building
       rejectionRemarks,
     };
-
     const rejectedAsset = new RejectedAsset(rejectedAssetData);
     await rejectedAsset.save();
 

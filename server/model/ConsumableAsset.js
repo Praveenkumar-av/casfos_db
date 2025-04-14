@@ -18,11 +18,11 @@ const consumableSchema = new mongoose.Schema({
   supplierAddress: { type: String, required: false },
   source: {
     type: String,
-    required: true,
+    required: false,
   },
   modeOfPurchase: {
     type: String,
-    required: true,
+    required: false,
   },
   billNo: { type: String, required: false },
   receivedBy: { type: String, required: false },

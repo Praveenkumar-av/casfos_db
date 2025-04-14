@@ -7,7 +7,7 @@ const returnedConsumableSchema = new mongoose.Schema({
   subCategory: String,
   itemDescription: String,
   location: String,
-  status: { type: String, enum: ["Good","exchange", "dispose","returned"], default: null },
+  status: { type: String, enum: ["Good","exchange", "dispose","returned"],default: "returned" },
   pdfUrl: String,
   signedPdfUrl: String,
   remark: String,

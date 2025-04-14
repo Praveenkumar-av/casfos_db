@@ -769,28 +769,6 @@ const AssetStore = () => {
             itemName: "",
             customSubCategory: value === "Others" ? item.customSubCategory : "",
           };
-        } else if (field === "itemName") {
-          // Transform itemName: trim leading/trailing spaces, normalize inner spaces, capitalize first char, lowercase rest
-          const trimmedValue = value.trim(); // Remove leading/trailing spaces
-          const normalizedValue = trimmedValue.replace(/\s+/g, " "); // Replace multiple spaces with single space
-          const formattedValue = normalizedValue
-            ? normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1).toLowerCase()
-            : "";
-          updatedItem = {
-            ...updatedItem,
-            [field]: formattedValue,
-            ...(assetType === "Permanent"
-              ? { customItemName: formattedValue === "Others" ? item.customItemName : "" }
-              : {}),
-          };
-        } else if (field === "customItemName") {
-          // Transform customItemName: trim leading/trailing spaces, normalize inner spaces, capitalize first char, lowercase rest
-          const trimmedValue = value.trim(); // Remove leading/trailing spaces
-          const normalizedValue = trimmedValue.replace(/\s+/g, " "); // Replace multiple spaces with single space
-          const formattedValue = normalizedValue
-            ? normalizedValue.charAt(0).toUpperCase() + normalizedValue.slice(1).toLowerCase()
-            : "";
-          updatedItem = { ...updatedItem, [field]: formattedValue };
         } else if (field === "amcFromDate" || field === "amcToDate") {
           updatedItem[field] = value;
         } else if (field === "amcCost") {
@@ -821,63 +799,72 @@ const AssetStore = () => {
       ...(field === "subCategory" && value !== "Others" ? { customSubCategory: "" } : {})
     }));
   };
+// Utility function to format item names
+const formatItemName = (name) => {
+  if (!name || typeof name !== 'string') return ''; // Handle null/undefined/empty
+  // Trim spaces, replace multiple spaces with single, normalize case
+  const cleaned = name.trim().replace(/\s+/g, ' ');
+  // Capitalize first letter, lowercase the rest
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+};
 
-  const handleSubmitStore = async () => {
-    const validationErrors = validateStoreForm();
-    if (validationErrors.length > 0) {
-      Swal.fire({
-        icon: "warning",
-        title: "Validation Errors",
-        html: validationErrors.join("<br>"),
-      });
-      return;
-    }
+const handleSubmitStore = async () => {
+  const validationErrors = validateStoreForm();
+  if (validationErrors.length > 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "Validation Errors",
+      html: validationErrors.join("<br>"),
+    });
+    return;
+  }
 
-    let formData;
-    if (assetCategory === "Building") {
-      formData = {
-        assetType,
-        assetCategory,
-        entryDate,
-        subCategory: buildingData.subCategory === "Others" ? buildingData.customSubCategory : buildingData.subCategory,
-        location: buildingData.location,
-        type: buildingData.subCategory === "Residential Quarters" && buildingData.type === "Others" ? buildingData.customType : buildingData.type,
-        buildingNo: buildingData.buildingNo,
-        approvedEstimate: buildingData.approvedEstimate,
-        plinthArea: buildingData.plinthArea || undefined,
-        status: buildingData.status,
-        dateOfConstruction: buildingData.dateOfConstruction || undefined,
-        costOfConstruction: buildingData.costOfConstruction || undefined,
-        remarks: buildingData.remarks || undefined,
-        approvedBuildingPlanUrl: buildingData.approvedBuildingPlanUrl || undefined,
-        kmzOrkmlFileUrl: buildingData.kmzOrkmlFileUrl || undefined,
-      };
-    } else if (assetCategory === "Land") {
-      formData = {
-        assetType,
-        assetCategory,
-        entryDate,
-        subCategory: landData.subCategory === "Others" ? landData.customSubCategory : landData.subCategory,
-        location: landData.location,
-        status: landData.status,
-        dateOfPossession: landData.dateOfPossession || undefined,
-        controllerOrCustody: landData.controllerOrCustody || undefined,
-        details: landData.details || undefined,
-      };
-    } else {
-      formData = {
-        assetType,
-        assetCategory,
-        entryDate,
-        purchaseDate,
-        supplierName,
-        supplierAddress: supplierAddress || undefined,
-        source: source === "Other" && customSource ? customSource : source,
-        modeOfPurchase: modeOfPurchase === "Others" && customModeOfPurchase ? customModeOfPurchase : modeOfPurchase,
-        billNo: billNo || undefined,
-        receivedBy,
-        items: JSON.stringify(items.map((item, index) => ({
-          itemName: item.itemName === "Others" && item.customItemName ? item.customItemName : item.itemName,
+  let formData;
+  if (assetCategory === "Building") {
+    formData = {
+      assetType,
+      assetCategory,
+      entryDate,
+      subCategory: buildingData.subCategory === "Others" ? buildingData.customSubCategory : buildingData.subCategory,
+      location: buildingData.location,
+      type: buildingData.subCategory === "Residential Quarters" && buildingData.type === "Others" ? buildingData.customType : buildingData.type,
+      buildingNo: buildingData.buildingNo,
+      approvedEstimate: buildingData.approvedEstimate,
+      plinthArea: buildingData.plinthArea || undefined,
+      status: buildingData.status,
+      dateOfConstruction: buildingData.dateOfConstruction || undefined,
+      costOfConstruction: buildingData.costOfConstruction || undefined,
+      remarks: buildingData.remarks || undefined,
+      approvedBuildingPlanUrl: buildingData.approvedBuildingPlanUrl || undefined,
+      kmzOrkmlFileUrl: buildingData.kmzOrkmlFileUrl || undefined,
+    };
+  } else if (assetCategory === "Land") {
+    formData = {
+      assetType,
+      assetCategory,
+      entryDate,
+      subCategory: landData.subCategory === "Others" ? landData.customSubCategory : landData.subCategory,
+      location: landData.location,
+      status: landData.status,
+      dateOfPossession: landData.dateOfPossession || undefined,
+      controllerOrCustody: landData.controllerOrCustody || undefined,
+      details: landData.details || undefined,
+    };
+  } else {
+    formData = {
+      assetType,
+      assetCategory,
+      entryDate,
+      purchaseDate,
+      supplierName,
+      supplierAddress: supplierAddress || undefined,
+      source: source === "Other" && customSource ? customSource : source,
+      modeOfPurchase: modeOfPurchase === "Others" && customModeOfPurchase ? customModeOfPurchase : modeOfPurchase,
+      billNo: billNo || undefined,
+      receivedBy,
+      items: JSON.stringify(
+        items.map((item, index) => ({
+          itemName: formatItemName(item.itemName === "Others" && item.customItemName ? item.customItemName : item.itemName),
           subCategory: item.subCategory === "Others" && item.customSubCategory ? item.customSubCategory : item.subCategory,
           itemDescription: item.itemDescription,
           quantityReceived: item.quantityReceived,
@@ -892,78 +879,101 @@ const AssetStore = () => {
           warrantyPhotoUrl: warrantyPhotoUrls[`warrantyPhoto${index}`] || undefined,
           itemIds: item.itemIds,
           itemPhotoUrl: itemPhotoUrls[`itemPhoto${index}`] || undefined,
-        }))),
-        billPhotoUrl: billPhotoUrl || undefined,
-      };
-    }
+        }))
+      ),
+      billPhotoUrl: billPhotoUrl || undefined,
+    };
+  }
 
-    try {
-      const response = await axios.post("http://localhost:3001/api/assets/storeTempAsset", formData);
-      if (isEditingRejected && rejectedId && rejectedAction === "store") {
-        await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
-      }
-      Swal.fire({ icon: "success", title: "Success!", text: "Inventory saved successfully!" });
-      resetStoreForm();
-      setIsEditingRejected(false);
-      setRejectedAction("");
-      window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}`);
-      setActiveTab("store");
-    } catch (error) {
-      if (error.response && error.response.data) {
-        const { message, duplicateIds } = error.response.data;
-        if (duplicateIds) {
-          Swal.fire({
-            icon: "error",
-            title: "Duplicate IDs Detected",
-            html: `${message}<br>Duplicate IDs: ${duplicateIds.join(", ")}`,
-          });
-        } else if (message.includes("AMC From Date")) {
-          Swal.fire({
-            icon: "error",
-            title: "Invalid AMC Dates",
-            text: message,
-          });
-        } else if (message.includes("is not a valid")) {
-          Swal.fire({
-            icon: "error",
-            title: "Validation Error",
-            text: message,
-          });
-        } else {
-          Swal.fire({
-            icon: "error",
-            title: "Submission Failed",
-            text: message || "An unexpected error occurred.",
-          });
-        }
+  try {
+    const response = await axios.post("http://localhost:3001/api/assets/storeTempAsset", formData);
+    if (isEditingRejected && rejectedId && rejectedAction === "store") {
+      await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
+    }
+    Swal.fire({ icon: "success", title: "Success!", text: "Inventory saved successfully!" });
+    resetStoreForm();
+    setIsEditingRejected(false);
+    setRejectedAction("");
+    window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}`);
+    setActiveTab("store");
+  } catch (error) {
+    if (error.response && error.response.data) {
+      const { message, duplicateIds } = error.response.data;
+      if (duplicateIds) {
+        Swal.fire({
+          icon: "error",
+          title: "Duplicate IDs Detected",
+          html: `${message}<br>Duplicate IDs: ${duplicateIds.join(", ")}`,
+        });
+      } else if (message.includes("AMC From Date")) {
+        Swal.fire({
+          icon: "error",
+          title: "Invalid AMC Dates",
+          text: message,
+        });
+      } else if (message.includes("is not a valid")) {
+        Swal.fire({
+          icon: "error",
+          title: "Validation Error",
+          text: message,
+        });
       } else {
-        Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save inventory!" });
+        Swal.fire({
+          icon: "error",
+          title: "Submission Failed",
+          text: message || "An unexpected error occurred.",
+        });
       }
-      console.error(error);
+    } else {
+      Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save inventory!" });
     }
-  };
+    console.error(error);
+  }
+};
 
-  const resetStoreForm = () => {
-    setAssetCategory("");
-    setEntryDate("");
-    setPurchaseDate("");
-    setSupplierName("");
-    setSupplierAddress("");
-    setSource("");
-    setCustomSource("");
-    setModeOfPurchase("");
-    setCustomModeOfPurchase("");
-    setBillNo("");
-    setBillPhotoUrl("");
-    setReceivedBy("");
-    setAmcPhotoUrls({}); // Add this
-    setItems([]);
-    setBuildingData({ subCategory: "", customSubCategory: "", location: "", type: "", customType: "", buildingNo: "", approvedEstimate: "", plinthArea: "", status: "", dateOfConstruction: "", costOfConstruction: 0, remarks: "", approvedBuildingPlanUrl: "", kmzOrkmlFileUrl: "" });
-    setLandData({ subCategory: "", customSubCategory: "", location: "", status: "", dateOfPossession: "", controllerOrCustody: "", details: "" });
-    setItemPhotoUrls({});
-    setWarrantyPhotoUrls({});
-  };
-
+const resetStoreForm = () => {
+  setAssetCategory("");
+  setEntryDate("");
+  setPurchaseDate("");
+  setSupplierName("");
+  setSupplierAddress("");
+  setSource("");
+  setCustomSource("");
+  setModeOfPurchase("");
+  setCustomModeOfPurchase("");
+  setBillNo("");
+  setBillPhotoUrl("");
+  setReceivedBy("");
+  setAmcPhotoUrls({});
+  setItems([]);
+  setBuildingData({
+    subCategory: "",
+    customSubCategory: "",
+    location: "",
+    type: "",
+    customType: "",
+    buildingNo: "",
+    approvedEstimate: "",
+    plinthArea: "",
+    status: "",
+    dateOfConstruction: "",
+    costOfConstruction: 0,
+    remarks: "",
+    approvedBuildingPlanUrl: "",
+    kmzOrkmlFileUrl: "",
+  });
+  setLandData({
+    subCategory: "",
+    customSubCategory: "",
+    location: "",
+    status: "",
+    dateOfPossession: "",
+    controllerOrCustody: "",
+    details: "",
+  });
+  setItemPhotoUrls({});
+  setWarrantyPhotoUrls({});
+};
   const handleFileUpload = async (file, fieldName, index) => {
     const formData = new FormData();
     formData.append("file", file);

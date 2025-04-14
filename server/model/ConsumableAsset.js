@@ -18,12 +18,10 @@ const consumableSchema = new mongoose.Schema({
   supplierAddress: { type: String, required: false },
   source: {
     type: String,
-    enum: ["GEM", "Local", "Other"],
     required: true,
   },
   modeOfPurchase: {
     type: String,
-    enum: ["Tender", "Quotation", "Others"],
     required: true,
   },
   billNo: { type: String, required: false },

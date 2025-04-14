@@ -21,12 +21,10 @@ const permanentSchema = new mongoose.Schema({
   supplierAddress: { type: String, required: false },
   source: {
     type: String,
-    enum: ["GEM", "Local", "Other"],
     required: false,
   },
   modeOfPurchase: {
     type: String,
-    enum: ["Tender", "Quotation", "Others"],
     required: false,
   },
   billNo: { type: String, required: false },

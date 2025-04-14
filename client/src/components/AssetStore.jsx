@@ -378,18 +378,10 @@ const AssetStore = () => {
     if (assetCategory === "Building") {
       if (!buildingData.subCategory) errors.push("Building Sub Category is required.");
       if (buildingData.subCategory === "Others" && !buildingData.customSubCategory) errors.push("Custom Sub Category is required for 'Others'.");
-      if (buildingData.subCategory === "Residential Quarters" && !buildingData.type) errors.push("Building Type is required.");
-      if (!buildingData.location) errors.push("Building Location is required.");
-      if (!buildingData.buildingNo) errors.push("Building No is required.");
-      if (!buildingData.approvedEstimate) errors.push("Approved Estimate is required.");
-      if (!buildingData.status) errors.push("Building Status is required.");
       if (buildingData.dateOfConstruction && isFutureDate(buildingData.dateOfConstruction)) errors.push("Date of Construction cannot be in the future.");
     } else if (assetCategory === "Land") {
       if (!landData.subCategory) errors.push("Land Sub Category is required.");
       if (landData.subCategory === "Others" && !landData.customSubCategory) errors.push("Custom Sub Category is required for 'Others'.");
-      if (!landData.location) errors.push("Land Location is required.");
-      if (!landData.status) errors.push("Land Status is required.");
-      if (landData.dateOfPossession && isFutureDate(landData.dateOfPossession)) errors.push("Date of Possession cannot be in the future.");
     } else {
       if (!purchaseDate) errors.push("Purchase Date is required.");
       if (isFutureDate(purchaseDate)) errors.push("Purchase Date cannot be in the future.");
@@ -1794,7 +1786,7 @@ const resetStoreForm = () => {
                         <div style={styles.inputGroup}>
                           <label>Approved Estimate:</label>
                           <input
-                            type="text"
+                            type="number"
                             value={buildingData.approvedEstimate}
                             onChange={(e) => handleBuildingChange("approvedEstimate", e.target.value)}
                             style={styles.input}
@@ -1808,7 +1800,7 @@ const resetStoreForm = () => {
                           <div style={styles.inputGroup}>
                             <label>Approved Estimate:</label>
                             <input
-                              type="text"
+                              type="number"
                               value={buildingData.approvedEstimate}
                               onChange={(e) => handleBuildingChange("approvedEstimate", e.target.value)}
                               style={styles.input}

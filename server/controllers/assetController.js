@@ -535,9 +535,7 @@ exports.storeTempAsset = async (req, res) => {
     // Building-specific validation
     if (assetCategory === "Building") {
       if (!subCategory) throw new Error("Building Sub Category is required");
-      if (!location) throw new Error("Building Location is required");
       if (!buildingNo) throw new Error("Building No is required");
-      if (!status) throw new Error("Building Status is required");
       if (dateOfConstruction && new Date(dateOfConstruction) > today) throw new Error("Date of Construction cannot be in the future");
 
       assetData = {
@@ -561,8 +559,6 @@ exports.storeTempAsset = async (req, res) => {
     // Land-specific validation
     else if (assetCategory === "Land") {
       if (!subCategory) throw new Error("Land Sub Category is required");
-      if (!location) throw new Error("Land Location is required");
-      if (!status) throw new Error("Land Status is required");
       if (dateOfPossession && new Date(dateOfPossession) > today) throw new Error("Date of Possession cannot be in the future");
 
       assetData = {
@@ -581,17 +577,12 @@ exports.storeTempAsset = async (req, res) => {
     else {
       if (!purchaseDate) throw new Error("Purchase Date is required");
       if (new Date(purchaseDate) >= today) throw new Error("Purchase Date cannot be in the future");
-      if (!supplierName) throw new Error("Supplier Name is required");
-      if (!source) throw new Error("Source is required");
-      if (!modeOfPurchase) throw new Error("Mode of Purchase is required");
-      if (!receivedBy) throw new Error("Received By is required");
 
       const parsedItems = items ? JSON.parse(items) : [];
       if (parsedItems.length === 0) throw new Error("At least one item is required");
 
       // Item-specific validation
       for (const item of parsedItems) {
-        if (assetType === "Permanent" && !item.subCategory) throw new Error(`Item ${item.itemName || "unknown"}: Sub Category is required`);
         if (!item.itemName) throw new Error("Item Name is required in one or more items");
         if (!item.itemDescription) throw new Error(`Item ${item.itemName}: Item Description is required`);
 

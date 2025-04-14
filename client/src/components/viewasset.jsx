@@ -2795,8 +2795,7 @@ const AssetView = () => {
                           { label: "Date of Possession", value: selectedDetails.dateOfPossession ? new Date(selectedDetails.dateOfPossession).toLocaleDateString() : "N/A" },
                           { label: "Controller/Custody", value: selectedDetails.controllerOrCustody || "N/A" },
                           { label: "Details", value: selectedDetails.details || "N/A" },
-                          { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
-                          { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
+      
                         ].map((item, index) => (
                           <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
                             <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>
@@ -2847,8 +2846,7 @@ const AssetView = () => {
                             { label: "Warranty Valid Upto", value: selectedDetails.warrantyValidUpto ? new Date(selectedDetails.warrantyValidUpto).toLocaleDateString() : "N/A" },
                             { label: "Warranty Photo", value: selectedDetails.warrantyPhotoUrl ? <a href={selectedDetails.warrantyPhotoUrl} target="_blank" style={styles.linkStyle}>View</a> : "N/A" },
                             { label: "Item IDs", value: (selectedDetails.itemIds || []).length > 0 ? <span style={tableStyles.itemIdBox}>{selectedDetails.itemIds.join(", ")}</span> : "N/A" },
-                            { label: "Created At", value: selectedDetails.createdAt ? new Date(selectedDetails.createdAt).toLocaleDateString() : "N/A" },
-                            { label: "Updated At", value: selectedDetails.updatedAt ? new Date(selectedDetails.updatedAt).toLocaleDateString() : "N/A" },
+      
                           ].map((item, index) => (
                             <tr key={index} style={index % 2 === 0 ? tableStyles.evenRow : tableStyles.oddRow}>
                               <td style={{ fontWeight: "bold", width: "40%", verticalAlign: "top", padding: "10px", borderBottom: "1px solid #ddd" }}>{item.label}</td>

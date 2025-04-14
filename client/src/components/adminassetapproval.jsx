@@ -958,8 +958,11 @@ function AssetApproval() {
                     <tr style={componentStyles.evenRow}><td>Estimate</td><td>{item.estimate || "N/A"}</td></tr>
                     <tr style={componentStyles.oddRow}><td>Approved Estimate</td><td>{item.approvedEstimate || "N/A"}</td></tr>
                     <tr style={componentStyles.evenRow}><td>Date of Completion</td><td>{formatDate(item.dateOfCompletion)}</td></tr>
-                    <tr style={componentStyles.oddRow}><td>Warranty Period</td><td>{item.warrantyPeriod || "N/A"}</td></tr>
+                    <tr style={componentStyles.oddRow}><td>Defect Liability Period</td><td>{item.defectliabiltyPeriod || "N/A"}</td></tr>
                     <tr style={componentStyles.evenRow}><td>Execution Agency</td><td>{item.executionAgency || "N/A"}</td></tr>
+                    <tr style={componentStyles.evenRow}><td>Date of Handover</td><td>{formatDate(item.dateOfHandover) || "N/A"}</td></tr>
+                    <tr style={componentStyles.evenRow}><td>Document</td><td>{renderLink(item.documentUrl, "View Document")}</td></tr>
+
                   </tbody>
                 </table>
               </div>

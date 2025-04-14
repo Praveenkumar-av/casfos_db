@@ -82,8 +82,10 @@ const AssetStore = () => {
     estimate: 0,
     approvedEstimate: 0,
     dateOfCompletion: "",
-    warrantyPeriod: "",
-    executionAgency: ""
+    defectliabiltyPeriod: "",
+    executionAgency: "",
+    dateOfHandover: "", // Add this
+  documentUrl: "",    // Add this
   });
 
   const addUpgradeForm = () => {
@@ -94,8 +96,10 @@ const AssetStore = () => {
         estimate: 0,
         approvedEstimate: 0,
         dateOfCompletion: "",
-        warrantyPeriod: "",
-        executionAgency: ""
+        defectliabiltyPeriod: "",
+        executionAgency: "",
+        dateOfHandover: "", // Add this
+      documentUrl: "",    // Add this
       }
     ]);
   };
@@ -251,8 +255,10 @@ const AssetStore = () => {
                 estimate: upgrade.estimate || 0,
                 approvedEstimate: upgrade.approvedEstimate || 0,
                 dateOfCompletion: upgrade.dateOfCompletion ? upgrade.dateOfCompletion.split("T")[0] : "",
-                warrantyPeriod: upgrade.warrantyPeriod || "",
+                defectliabiltyPeriod: upgrade.defectliabiltyPeriod || "",
                 executionAgency: upgrade.executionAgency || "",
+                dateOfHandover: upgrade.dateOfHandover ? upgrade.dateOfHandover.split("T")[0] : "", // Add this
+      documentUrl: upgrade.documentUrl || "", // Add this
               }))
             );
           } else {
@@ -582,16 +588,30 @@ const AssetStore = () => {
       fetchBuildingUpgrades();
     }
   }, [activeTab, selectedSubCategory]);
-
+  const handleDocumentUpload = async (file, index) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const response = await axios.post("http://localhost:3001/api/assets/uploadFile", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setUpgradeForms(prev => prev.map((form, i) =>
+        i === index ? { ...form, documentUrl: response.data.fileUrl } : form
+      ));
+    } catch (error) {
+      console.error("Document upload failed:", error);
+      alert("Document upload failed. Please try again.");
+    }
+  };
   const handleUpgradeFormChange = (index, field, value) => {
     setUpgradeForms(prev => prev.map((form, i) =>
       i === index
         ? {
-          ...form,
-          [field]: field === "year" || field === "estimate" || field === "approvedEstimate"
-            ? parseFloat(value) || 0
-            : value
-        }
+            ...form,
+            [field]: field === "year" || field === "estimate" || field === "approvedEstimate"
+              ? parseFloat(value) || 0
+              : value
+          }
         : form
     ));
   };
@@ -612,8 +632,9 @@ const AssetStore = () => {
       !form.estimate ||
       !form.approvedEstimate ||
       !form.dateOfCompletion ||
-      !form.warrantyPeriod ||
-      !form.executionAgency
+      !form.defectliabiltyPeriod ||
+      !form.executionAgency ||
+      !form.dateOfHandover // Add validation for new field
     );
   
     if (invalidForms.length > 0) {
@@ -625,16 +646,7 @@ const AssetStore = () => {
       return;
     }
   
-    const futureDates = upgradeForms.some(form => isFutureDate(form.dateOfCompletion));
-    if (futureDates) {
-      Swal.fire({
-        icon: "warning",
-        title: "Warning",
-        text: "Date of Completion cannot be in the future!",
-      });
-      return;
-    }
-  
+    
     const subCategoryToSend = selectedSubCategory === "Others" ? buildingData.customSubCategory : selectedSubCategory;
   
     if (!subCategoryToSend) {
@@ -649,13 +661,22 @@ const AssetStore = () => {
     try {
       const response = await axios.post("http://localhost:3001/api/assets/addBuildingUpgrades", {
         subCategory: subCategoryToSend,
-        upgrades: upgradeForms,
+        upgrades: upgradeForms.map(form => ({
+          year: form.year,
+          estimate: form.estimate,
+          approvedEstimate: form.approvedEstimate,
+          dateOfCompletion: form.dateOfCompletion,
+          defectliabiltyPeriod: form.defectliabiltyPeriod,
+          executionAgency: form.executionAgency,
+          dateOfHandover: form.dateOfHandover, // Add this
+          documentUrl: form.documentUrl,     // Add this
+        })),
       });
-      
+  
       if (isEditingRejected && rejectedId && rejectedAction === "buildingupgrade") {
         await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
       }
-      
+  
       Swal.fire({
         icon: "success",
         title: "Success",
@@ -676,8 +697,7 @@ const AssetStore = () => {
       window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=buildingupgrade`);
     } catch (error) {
       console.error("Failed to add upgrades:", error);
-      
-      // Check if the error is due to building not found
+  
       if (error.response?.status === 404) {
         Swal.fire({
           icon: "error",
@@ -1563,11 +1583,11 @@ const AssetStore = () => {
             <span className="text">STOREKEEPER</span>
           </a>
           <ul className="side-menu top">
-            <li><a href={`/assetentrystaffdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
+            <li><a href={`/storekeeperdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
             <li  className="active"><a href={`/assetstore?username=${encodeURIComponent(username)}`}><i className="bx bxs-shopping-bag-alt" /><span className="text">Asset Store</span></a></li>
             <li><a href={`/assetissue?username=${encodeURIComponent(username)}`}><i className="bx bxs-package" /><span className="text">Asset Issue</span></a></li>
             <li><a href={`/assetreturn?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Return</span></a></li>
-            <li><a href={`/entrystaffassetupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Updation</span></a></li>
+            <li><a href={`/storekeeperassetupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Updation</span></a></li>
             <li><a href={`/viewasset?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Asset View</span></a></li>
           </ul>
           <ul className="side-menu">
@@ -2711,14 +2731,14 @@ const AssetStore = () => {
                         <div style={styles.formRow}>
                           <div style={styles.inputGroup}>
                             <label>Date of Completion:</label>
-                            <input type="date" value={form.dateOfCompletion} onChange={(e) => handleUpgradeFormChange(index, "dateOfCompletion", e.target.value)} style={styles.input} max={new Date().toISOString().split("T")[0]} />
+                            <input type="date" value={form.dateOfCompletion} onChange={(e) => handleUpgradeFormChange(index, "dateOfCompletion", e.target.value)} style={styles.input}  />
                           </div>
                           <div style={styles.inputGroup}>
-                            <label>Warranty Period:</label>
+                            <label>Defect Liability Period:</label>
                             <input
                               type="text"
-                              value={form.warrantyPeriod}
-                              onChange={(e) => handleUpgradeFormChange(index, "warrantyPeriod", e.target.value)}
+                              value={form.defectliabiltyPeriod}
+                              onChange={(e) => handleUpgradeFormChange(index, "defectliabiltyPeriod", e.target.value)}
                               style={styles.input}
                               placeholder="e.g., 1 year"
                             />
@@ -2733,6 +2753,30 @@ const AssetStore = () => {
                             />
                           </div>
                         </div>
+                        <div style={styles.formRow}>
+      <div style={styles.inputGroup}>
+        <label>Date of Handover:</label>
+        <input
+          type="date"
+          value={form.dateOfHandover}
+          onChange={(e) => handleUpgradeFormChange(index, "dateOfHandover", e.target.value)}
+          style={styles.input}
+        />
+      </div>
+      <div style={styles.inputGroup}>
+        <label>Document:</label>
+        <input
+          type="file"
+          onChange={(e) => handleDocumentUpload(e.target.files[0], index)}
+          style={styles.input}
+        />
+        {form.documentUrl && (
+          <a href={form.documentUrl} target="_blank" rel="noopener noreferrer">
+            View Document
+          </a>
+        )}
+      </div>
+    </div>
                         <div style={styles.buttonContainer}>
                           <button
                             onClick={() => removeUpgradeForm(index)}
@@ -2751,33 +2795,41 @@ const AssetStore = () => {
 
                 {/* Display Existing Upgrades */}
                 {selectedSubCategory && buildingUpgrades.length > 0 && (
-                  <div style={styles.tableContainer}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.tableHeader}>Year</th>
-                          <th style={styles.tableHeader}>Estimate</th>
-                          <th style={styles.tableHeader}>Approved Estimate</th>
-                          <th style={styles.tableHeader}>Date of Completion</th>
-                          <th style={styles.tableHeader}>Warranty Period</th>
-                          <th style={styles.tableHeader}>Execution Agency</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {buildingUpgrades.map((upgrade, index) => (
-                          <tr key={index} style={styles.tableRow}>
-                            <td style={styles.tableCell}>{upgrade.year}</td>
-                            <td style={styles.tableCell}>{upgrade.estimate}</td>
-                            <td style={styles.tableCell}>{upgrade.approvedEstimate}</td>
-                            <td style={styles.tableCell}>{new Date(upgrade.dateOfCompletion).toLocaleDateString()}</td>
-                            <td style={styles.tableCell}>{upgrade.warrantyPeriod}</td>
-                            <td style={styles.tableCell}>{upgrade.executionAgency}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+  <div style={styles.tableContainer}>
+    <table style={styles.table}>
+      <thead>
+        <tr>
+          <th style={styles.tableHeader}>Year</th>
+          <th style={styles.tableHeader}>Estimate</th>
+          <th style={styles.tableHeader}>Approved Estimate</th>
+          <th style={styles.tableHeader}>Date of Completion</th>
+          <th style={styles.tableHeader}>Defect Liability Period</th>
+          <th style={styles.tableHeader}>Execution Agency</th>
+          <th style={styles.tableHeader}>Date of Handover</th> {/* Add this */}
+          <th style={styles.tableHeader}>Document</th> {/* Add this */}
+        </tr>
+      </thead>
+      <tbody>
+        {buildingUpgrades.map((upgrade, index) => (
+          <tr key={index} style={styles.tableRow}>
+            <td style={styles.tableCell}>{upgrade.year}</td>
+            <td style={styles.tableCell}>{upgrade.estimate}</td>
+            <td style={styles.tableCell}>{upgrade.approvedEstimate}</td>
+            <td style={styles.tableCell}>{new Date(upgrade.dateOfCompletion).toLocaleDateString()}</td>
+            <td style={styles.tableCell}>{upgrade.defectliabiltyPeriod}</td>
+            <td style={styles.tableCell}>{upgrade.executionAgency}</td>
+            <td style={styles.tableCell}>{upgrade.dateOfHandover ? new Date(upgrade.dateOfHandover).toLocaleDateString() : "N/A"}</td> {/* Add this */}
+            <td style={styles.tableCell}>
+              {upgrade.documentUrl ? (
+                <a href={upgrade.documentUrl} target="_blank" rel="noopener noreferrer">View</a>
+              ) : "N/A"}
+            </td> {/* Add this */}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
 
                 {selectedSubCategory && buildingUpgrades.length === 0 && (
                   <p style={{ textAlign: "center", marginTop: "20px" }}>No upgrades found for this sub category.</p>

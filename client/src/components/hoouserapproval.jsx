@@ -11,8 +11,7 @@ function Approval() {
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
-  console.log(username);
-  
+
   useEffect(() => {
     const checkUserRole = async () => {
       try {
@@ -40,7 +39,6 @@ function Approval() {
     const fetchRegistrations = async () => {
       try {
         const response = await axios.get('http://localhost:3001/api/users/registrations');
-        console.log(response.data);
         setRegistrations(response.data);
       } catch (error) {
         console.error('Error fetching registrations', error);
@@ -64,12 +62,12 @@ function Approval() {
             return `
               <tr>
                 <td style="font-weight:bold; padding:8px; border-bottom: 1px solid #ddd;">${formattedKey}</td>
-                <td style="padding:8px; border-bottom: 1px solid #ddd;">${value}</td>
+                <td style="padding:8px; border-bottom: 1px solid #ddd;">${value || 'N/A'}</td>
               </tr>`;
           })
           .join("")}
       </table>`;
-  
+
     Swal.fire({
       title: "User Details",
       html: detailsHtml,
@@ -79,9 +77,44 @@ function Approval() {
 
   const approveAction = async (id) => {
     const selectedUser = registrations.find(reg => reg._id === id);
-  
+
+    // For assetmanager or facultyentrystaff, prompt for specific role
+    let specificRole = selectedUser.role;
+    if (selectedUser.role === 'assetmanager') {
+      const { value } = await Swal.fire({
+        title: 'Select Specific Role',
+        input: 'radio',
+        inputOptions: {
+          'assetmanager': 'Asset Manager',
+          'storekeeper': 'Storekeeper',
+        },
+        inputValidator: (value) => !value && 'You must select a role!',
+        confirmButtonText: 'Submit',
+        showCancelButton: true,
+      });
+      if (!value) return;
+      specificRole = value;
+    } else if (selectedUser.role === 'facultyentrystaff') {
+      const { value } = await Swal.fire({
+        title: 'Select Specific Role',
+        input: 'radio',
+        inputOptions: {
+          'facultyentrystaff': 'Faculty Entry Staff',
+          'facultyverifier': 'Faculty Verifier',
+        },
+        inputValidator: (value) => !value && 'You must select a role!',
+        confirmButtonText: 'Submit',
+        showCancelButton: true,
+      });
+      if (!value) return;
+      specificRole = value;
+    }
+
     try {
-      await axios.post(`http://localhost:3001/api/users/approve/${id}`);
+      await axios.post(`http://localhost:3001/api/users/approve/${id}`, {
+        access: specificRole === 'headofoffice' || specificRole === 'principal' ? ['all'] : [],
+        specificRole,
+      });
       setRegistrations(registrations.filter(reg => reg._id !== id));
       Swal.fire('Approved!', 'The user has been approved.', 'success');
     } catch (error) {
@@ -133,12 +166,12 @@ function Approval() {
           <span className="text">HEAD OF OFFICE</span>
         </a>
         <ul className="side-menu top">
-            <li ><a href={`/headofofficedashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
-            <li className="active"><a href={`/hoouserapproval?username=${encodeURIComponent(username)}`}><i className="bx bxs-shopping-bag-alt" /><span className="text">User Approval</span></a></li>
-            <li><a href={`/hoofacultyapproval?username=${encodeURIComponent(username)}`}><i className="bx bxs-package" /><span className="text">Faculty Approval</span></a></li>
-            <li><a href={`/hoofacultyupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Faculty Updation</span></a></li>
-            <li><a href={`/hoofacultyview?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty View</span></a></li>
-          </ul>
+          <li><a href={`/headofofficedashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
+          <li className="active"><a href={`/hoouserapproval?username=${encodeURIComponent(username)}`}><i className="bx bxs-shopping-bag-alt" /><span className="text">User Approval</span></a></li>
+          <li><a href={`/hoofacultyapproval?username=${encodeURIComponent(username)}`}><i className="bx bxs-package" /><span className="text">Faculty Approval</span></a></li>
+          <li><a href={`/hoofacultyupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Faculty Updation</span></a></li>
+          <li><a href={`/hoofacultyview?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty View</span></a></li>
+        </ul>
         <ul className="side-menu">
           <li>
             <a href="/" className="logout">
@@ -184,8 +217,10 @@ function Approval() {
                   <td>
                     {reg.role === 'headofoffice' ? 'Head of Office' :
                      reg.role === 'principal' ? 'Principal' :
-                     reg.role === 'assetmanagerentry' ? 'Asset Manager/Entry' :
-                     reg.role === 'facultyentrysuper' ? 'Faculty Entry/Super' :
+                     reg.role === 'assetmanager' ? 'Asset Manager' :
+                     reg.role === 'storekeeper' ? 'Storekeeper' :
+                     reg.role === 'facultyentrystaff' ? 'Faculty Entry Staff' :
+                     reg.role === 'facultyverifier' ? 'Faculty Verifier' :
                      'Viewer'}
                   </td>
                   <td>

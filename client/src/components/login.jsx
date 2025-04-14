@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from "react-router-dom";  // Added Link here
+import { useNavigate, Link } from "react-router-dom";
 import '../styles/main1.css';
 import '../styles/util.css';
 import '../fonts/font-awesome-4.7.0/css/font-awesome.min.css';
@@ -17,37 +17,19 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      let actualRole = role;
-      
-      // For combined roles, check which specific role matches the username
-      if (role === 'assetmanagerentry') {
-        console.log("Asse");
-        const assetManagerResponse = await axios.post('http://localhost:3001/api/users/checkUser', { name, role: 'assetmanager' });
-        if (assetManagerResponse.data.exists) {
-          actualRole = 'assetmanager';
-        } else {
-          actualRole = 'assetentrystaff';
-        }
-      } else if (role === 'facultyentrysuper') {
-        const facultyEntryResponse = await axios.post('http://localhost:3001/api/users/checkUser', { name, role: 'facultyentrystaff' });
-        if (facultyEntryResponse.data.exists) {
-          actualRole = 'facultyentrystaff';
-        } else {
-          actualRole = 'superintendent';
-        }
-      }
+    setMessage('');
 
+    try {
       const response = await axios.post('http://localhost:3001/api/users/login', {
         name,
         password,
-        role: actualRole,
+        role,
       });
 
       setLoading(false);
 
       if (response.data === "success") {
-        switch(actualRole) {
+        switch (role) {
           case 'headofoffice':
             navigate(`/headofofficedashboard?username=${encodeURIComponent(name)}`);
             break;
@@ -57,14 +39,14 @@ const Login = () => {
           case 'assetmanager':
             navigate(`/assetmanagerdashboard?username=${encodeURIComponent(name)}`);
             break;
-          case 'assetentrystaff':
-            navigate(`/assetentrystaffdashboard?username=${encodeURIComponent(name)}`);
+          case 'storekeeper':
+            navigate(`/storekeeperdashboard?username=${encodeURIComponent(name)}`);
             break;
           case 'facultyentrystaff':
             navigate(`/facultyentrystaffdashboard?username=${encodeURIComponent(name)}`);
             break;
-          case 'superintendent':
-            navigate(`/superintendentdashboard?username=${encodeURIComponent(name)}`);
+          case 'facultyverifier':
+            navigate(`/facultyverifierdashboard?username=${encodeURIComponent(name)}`);
             break;
           case 'viewer':
             navigate(`/viewerdashboard?username=${encodeURIComponent(name)}`);
@@ -90,14 +72,22 @@ const Login = () => {
               <img src="images/CASFOS-Coimbatore.jpg" alt="IMG" /><br /><br />
               <div>
                 <form>
-                  {['Head of Office', 'Principal', 'Asset Manager/StoreKeeper', 'Faculty Entry Staff/Verifier', 'Viewer'].map((label, index) => (
+                  {[
+                    'Head of Office',
+                    'Principal',
+                    'Asset Manager',
+                    'Storekeeper',
+                    'Faculty Entry Staff',
+                    'Faculty Verifier',
+                    'Viewer'
+                  ].map((label, index) => (
                     <label key={index} className="particles-checkbox-container">
                       <input
                         type="radio"
                         className="particles-checkbox"
-                        value={['headofoffice', 'principal', 'assetmanagerentry', 'facultyentrysuper', 'viewer'][index]}
+                        value={['headofoffice', 'principal', 'assetmanager', 'storekeeper', 'facultyentrystaff', 'facultyverifier', 'viewer'][index]}
                         name="role"
-                        checked={role === ['headofoffice', 'principal', 'assetmanagerentry', 'facultyentrysuper', 'viewer'][index]}
+                        checked={role === ['headofoffice', 'principal', 'assetmanager', 'storekeeper', 'facultyentrystaff', 'facultyverifier', 'viewer'][index]}
                         onChange={(e) => setRole(e.target.value)}
                       />
                       <span>{label}</span>

@@ -55,7 +55,7 @@ const rejectedAssetSchema = new mongoose.Schema({
     estimate: { type: Number },
     approvedEstimate: { type: Number },
     dateOfCompletion: { type: Date },
-    warrantyPeriod: { type: String },
+    defectliabiltyPeriod: { type: String },
     executionAgency: { type: String },
   }],
 

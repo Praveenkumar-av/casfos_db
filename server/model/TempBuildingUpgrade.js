@@ -24,7 +24,7 @@ const tempBuildingUpgradeSchema = new mongoose.Schema({
             type: Date,
             required: true
         },
-        warrantyPeriod: {
+        defectliabiltyPeriod: {
             type: String,
             required: true
         },
@@ -32,6 +32,14 @@ const tempBuildingUpgradeSchema = new mongoose.Schema({
             type: String,
             required: true
         },
+        dateOfHandover: { // Add this
+            type: Date,
+            required: true
+        },
+        documentUrl: { // Add this
+            type: String,
+            required: false
+        }
     }]
 
 }, { timestamps: true });

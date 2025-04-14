@@ -6,7 +6,7 @@ import Home from './components/home';
 import Dashboard from "./components/admindashboard";
 import AssetManagement from "./components/assetentry";
 import UserApproval from "./components/hoouserapproval";
-import DataDashboard from "./components/assetentrystaffdashboard";
+import DataDashboard from "./components/storekeeperdashboard";
 import AssetApproval from "./components/adminassetapproval";
 import FacultyApproval from "./components/hoofacultyapproval";
 import ViewFaculty from "./components/viewfaculty";
@@ -28,16 +28,16 @@ import AssetUpdation from "./components/AssetUpdation";
 import AssetReturn from "./components/AssetReturn";
 import HOODashboard from "./components/headofofficedashboard";
 import PrincipalFacultyUpdation from "./components/principalfacultyupdation";
-import SuperintendentFacultyView from "./components/superintendentfacultyview";
+import FacultyverifierFacultyView from "./components/facultyverifierfacultyview";
 import PrincipalFacultyView from "./components/principalfacultyview";
 import PrincipalAssetView from "./components/principalassetview";
 import ManagerAssetView from "./components/managerassetview";
-import EntryStaffAssetUpdation from "./components/entrystaffassetupdation";
+import StorekeeperAssetUpdation from "./components/storekeeperassetupdation";
 import PrincipalAssetUpdation from "./components/PrincipalAssetUpdation";
 import PrincipalDashboard from "./components/principaldashboard";
-import AssetEntryStaffDashboard from "./components/assetentrystaffdashboard";
+import StorekeeperDashboard from "./components/storekeeperdashboard";
 import AssetManagerDashboard from "./components/assetmanagerdashboard";
-import SuperintendentDashboard from "./components/superintendentdashboard";
+import FacultyverifierDashboard from "./components/facultyverifierdashboard";
 import FacultyEntryStaffDashboard from "./components/facultyentrystaffdashboard";
 import UpdateFacultyEntryPrincipal from "./components/updatefacultyentryprincipal";
 import UpdateFacultyEntryHoo from "./components/updatefacultyentryhoo";
@@ -59,12 +59,12 @@ function App() {
         <Route path="/managerassetview" element={<ManagerAssetView/>} />
         <Route path="/facultyverify" element={<FacultyVerify/>} />
         <Route path="/principaldashboard" element={<PrincipalDashboard/>} />
-        <Route path="/assetentrystaffdashboard" element={<AssetEntryStaffDashboard/>} />
+        <Route path="/storekeeperdashboard" element={<StorekeeperDashboard/>} />
         <Route path="/facultyentrystaffdashboard" element={<FacultyEntryStaffDashboard/>} />
         <Route path="/assetmanagerdashboard" element={<AssetManagerDashboard/>} />
-        <Route path="/superintendentdashboard" element={<SuperintendentDashboard/>} />
+        <Route path="/facultyverifierdashboard" element={<FacultyverifierDashboard/>} />
         <Route path="/hoofacultyview" element={<AdminFacultyView/>} />
-        <Route path="/superintendentfacultyview" element={<SuperintendentFacultyView/>} />
+        <Route path="/facultyverifierfacultyview" element={<FacultyverifierFacultyView/>} />
         <Route path="/principalfacultyview" element={<PrincipalFacultyView/>} />
 
         <Route path="/dataentrydashboard" element={<DataDashboard/>} />
@@ -82,7 +82,7 @@ function App() {
         <Route path="/updatefacultyentry" element={<UpdateFacultyEntry/>} />
         <Route path="/updatefacultyentryhoo" element={<UpdateFacultyEntryHoo/>} />
         <Route path="/updatefacultyentryprincipal" element={<UpdateFacultyEntryPrincipal/>} />
-        <Route path="/entrystaffassetupdation" element={<EntryStaffAssetUpdation/>} />
+        <Route path="/storekeeperassetupdation" element={<StorekeeperAssetUpdation/>} />
 
         <Route path="/usermanagement" element={<UserManagement/>} />
         <Route path="/ui" element={<Ui/>} />

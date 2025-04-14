@@ -465,11 +465,11 @@ const FacultyVerify = () => {
 
       <section id="sidebar">
         <a href="#" className="brand">
-          <span className="text">SUPER-INTENDENT</span>
+          <span className="text">Faculty Verifier</span>
         </a>
         <ul className="side-menu top">
           <li>
-            <a href={`/superintendentdashboard?username=${encodeURIComponent(username)}`}>
+            <a href={`/facultyverifierdashboard?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-dashboard" />
               <span className="text">Home</span>
             </a>
@@ -481,7 +481,7 @@ const FacultyVerify = () => {
             </a>
           </li>
           <li>
-            <a href={`/superintendentfacultyview?username=${encodeURIComponent(username)}`}>
+            <a href={`/facultyverifierfacultyview?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-doughnut-chart" />
               <span className="text">Faculty View</span>
             </a>

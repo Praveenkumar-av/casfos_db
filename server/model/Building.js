@@ -19,8 +19,16 @@ const buildingSchema = new mongoose.Schema({
     estimate: { type: Number, required: false },
     approvedEstimate: { type: Number, required: false },
     dateOfCompletion: { type: Date, required: false },
-    warrantyPeriod: { type: String, required: false }, 
-    executionAgency: { type: String, required: false }
+    defectliabiltyPeriod: { type: String, required: false }, 
+    executionAgency: { type: String, required: false },
+    dateOfHandover: { // Add this
+      type: Date,
+      required: false
+    },
+    documentUrl: { // Add this
+      type: String,
+      required: false
+    }
   }],
   approvedBuildingPlanUrl: { type: String },
   kmzOrkmlFileUrl: { type: String },

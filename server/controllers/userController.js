@@ -5,9 +5,9 @@ const RejectedUser = require('../model/RejectedUserModel');
 const HeadOfOfficeModel = require('../model/HeadOfOfficeModel');
 const PrincipalModel = require('../model/PrincipalModel');
 const AssetManagerModel = require('../model/AssetManagerModel');
-const AssetEntryStaffModel = require('../model/AssetEntryStaffModel');
+const storekeeperModel = require('../model/storekeeperModel');
 const FacultyEntryStaffModel = require('../model/FacultyEntryStaffModel');
-const SuperintendentModel = require('../model/SuperintendentModel');
+const facultyverifierModel = require('../model/facultyverifierModel');
 const ViewerModel = require('../model/ViewerModel');
 
 const loginUser = async (req, res) => {
@@ -29,14 +29,14 @@ const loginUser = async (req, res) => {
       case 'assetmanager':
         Model = AssetManagerModel;
         break;
-      case 'assetentrystaff':
-        Model = AssetEntryStaffModel;
+      case 'storekeeper':
+        Model = storekeeperModel;
         break;
       case 'facultyentrystaff':
         Model = FacultyEntryStaffModel;
         break;
-      case 'superintendent':
-        Model = SuperintendentModel;
+      case 'facultyverifier':
+        Model = facultyverifierModel;
         break;
       case 'viewer':
         Model = ViewerModel;
@@ -64,7 +64,6 @@ const loginUser = async (req, res) => {
 const registerUser = async (req, res) => {
   const { name, password, role, dob, designation, phone, organization, ministry } = req.body;
 
-  // Validate required fields
   if (!name || !password || !role) {
     return res.status(400).json({ message: 'Name, password, and role are required' });
   }
@@ -72,7 +71,6 @@ const registerUser = async (req, res) => {
   try {
     const existingUser = await TemporaryUser.findOne({ name });
     if (existingUser) {
-      console.log("hiii")
       return res.status(400).json({ message: "Username already in use" });
     }
 
@@ -83,7 +81,7 @@ const registerUser = async (req, res) => {
       name,
       password: hashedPassword,
       role,
-      dob: dob || undefined,           // Optional
+      dob: dob || undefined,
       designation: designation || undefined,
       phone: phone || undefined,
       organization: organization || undefined,
@@ -94,7 +92,6 @@ const registerUser = async (req, res) => {
     res.status(201).json({ message: "User registered successfully!" });
   } catch (err) {
     if (err.name === "ValidationError") {
-      console.log(err);
       const messages = Object.values(err.errors).map((error) => error.message);
       return res.status(400).json({ message: messages.join(", ") });
     }
@@ -113,35 +110,39 @@ const approveUser = async (req, res) => {
     }
 
     let Model;
-    let finalRole = user.role;
+    let finalRole = specificRole || user.role; // Use specificRole if provided, else user.role
 
-    if (user.role === 'assetmanagerentry') {
-      finalRole = specificRole === 'assetmanager' ? 'assetmanager' : 'assetentrystaff';
-      Model = finalRole === 'assetmanager' ? AssetManagerModel : AssetEntryStaffModel;
-    } else if (user.role === 'facultyentrysuper') {
-      finalRole = specificRole === 'facultyentrystaff' ? 'facultyentrystaff' : 'superintendent';
-      Model = finalRole === 'facultyentrystaff' ? FacultyEntryStaffModel : SuperintendentModel;
-    } else {
-      switch (user.role) {
-        case 'headofoffice':
-          Model = HeadOfOfficeModel;
-          break;
-        case 'principal':
-          Model = PrincipalModel;
-          break;
-        case 'viewer':
-          Model = ViewerModel;
-          break;
-        default:
-          return res.status(400).json({ message: 'Invalid role' });
-      }
+    switch (finalRole) {
+      case 'headofoffice':
+        Model = HeadOfOfficeModel;
+        break;
+      case 'principal':
+        Model = PrincipalModel;
+        break;
+      case 'assetmanager':
+        Model = AssetManagerModel;
+        break;
+      case 'storekeeper':
+        Model = storekeeperModel;
+        break;
+      case 'facultyentrystaff':
+        Model = FacultyEntryStaffModel;
+        break;
+      case 'facultyverifier':
+        Model = facultyverifierModel;
+        break;
+      case 'viewer':
+        Model = ViewerModel;
+        break;
+      default:
+        return res.status(400).json({ message: 'Invalid role' });
     }
 
     const approvedUser = new Model({
       name: user.name,
       password: user.password,
       role: finalRole,
-      dob: user.dob || undefined,           // Optional
+      dob: user.dob || undefined,
       designation: user.designation || undefined,
       phone: user.phone || undefined,
       organization: user.organization || undefined,
@@ -194,7 +195,6 @@ const rejectUser = async (req, res) => {
 };
 
 const checkUser = async (req, res) => {
-  console.log("enterd");
   const { name, role } = req.body;
 
   if (!name || !role) {
@@ -204,28 +204,38 @@ const checkUser = async (req, res) => {
   try {
     let Model;
     switch (role) {
+      case 'headofoffice':
+        Model = HeadOfOfficeModel;
+        break;
+      case 'principal':
+        Model = PrincipalModel;
+        break;
       case 'assetmanager':
         Model = AssetManagerModel;
+        break;
+      case 'storekeeper':
+        Model = storekeeperModel;
         break;
       case 'facultyentrystaff':
         Model = FacultyEntryStaffModel;
         break;
-      case 'headofoffice':
-        Model = HeadOfOfficeModel; // Added for Approval.js check
+      case 'facultyverifier':
+        Model = facultyverifierModel;
+        break;
+      case 'viewer':
+        Model = ViewerModel;
         break;
       default:
         return res.status(400).json({ message: 'Invalid role for checking' });
     }
 
     const user = await Model.findOne({ name });
-    console.log("found",user)
     res.json({ exists: !!user });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Assuming these are existing functions you might have
 const getTemporaryUsers = async (req, res) => {
   try {
     const users = await TemporaryUser.find();
@@ -235,7 +245,6 @@ const getTemporaryUsers = async (req, res) => {
   }
 };
 
-// Export all functions
 module.exports = {
   registerUser,
   loginUser,
@@ -243,5 +252,4 @@ module.exports = {
   rejectUser,
   checkUser,
   getTemporaryUsers,
-  // Add other existing exports here if any
 };

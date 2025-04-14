@@ -518,7 +518,7 @@ exports.storeTempAsset = async (req, res) => {
       dateOfPossession, controllerOrCustody, details, approvedBuildingPlanUrl,
       kmzOrkmlFileUrl
     } = req.body;
-
+    console.log(plinthArea)
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize to start of today
     const tomorrow = new Date(today);
@@ -549,7 +549,7 @@ exports.storeTempAsset = async (req, res) => {
         type: type || undefined,
         buildingNo,
         approvedEstimate: approvedEstimate ? Number(approvedEstimate) : undefined,
-        plinthArea: plinthArea ? Number(plinthArea) : undefined,
+        plinthArea: plinthArea ,
         status,
         dateOfConstruction: dateOfConstruction || undefined,
         costOfConstruction: costOfConstruction ? Number(costOfConstruction) : undefined,
@@ -4516,6 +4516,7 @@ async function storeAssetNotification(data, action, actionTime) {
       case "asset rejected":
         Object.assign(actionData, {
           supplierName: data.supplierName,
+          subCategory: data.subCategory,
           purchaseDate: data.purchaseDate,
           billNo: data.billNo,
           receivedBy: data.receivedBy,

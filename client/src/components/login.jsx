@@ -199,9 +199,7 @@ const Login = () => {
 
                 {/* Additional Links */}
                 <div className="login-links">
-                  <a href="#" className="forgot-link">
-                    Forgot Username / Password?
-                  </a>
+                
                   <Link to="/register" className="register-link">
                     Create your Account
                     <FaLongArrowAltRight />

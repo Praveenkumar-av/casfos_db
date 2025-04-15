@@ -503,7 +503,6 @@ const AssetView = () => {
       img.src = imageUrl;
     });
   };
-
   const generatePDF = async () => {
     const pdf = new jsPDF("l", "mm", "a3"); // Landscape A3 size (420mm x 297mm)
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -886,8 +885,7 @@ const AssetView = () => {
         row.assetCategory || "N/A",
         row.subCategory || "N/A",
         row.itemName || "N/A",
-        row.itemIds?.join(", ") || "N/A",
-        row.purchaseValue || "N/A",
+        row.itemIds?.length > 0 ? `${row.itemIds.join(", ")} (${row.quantity || "N/A"})` : row.quantity || "N/A",        row.purchaseValue || "N/A",
         row.bookValue || "N/A",
         row.inspectionDate ? new Date(row.inspectionDate).toLocaleDateString() : "N/A",
         row.condemnationDate ? new Date(row.condemnationDate).toLocaleDateString() : "N/A",
@@ -1231,8 +1229,7 @@ const AssetView = () => {
         row.assetCategory,
         row.subCategory,
         row.itemName,
-        row.itemIds?.join(", ") || "",
-        row.purchaseValue,
+        row.itemIds?.length > 0 ? `${row.itemIds.join(", ")} (${row.quantity || "N/A"})` : row.quantity || "",        row.purchaseValue,
         row.bookValue,
         new Date(row.inspectionDate).toLocaleDateString(),
         new Date(row.condemnationDate).toLocaleDateString(),
@@ -1452,14 +1449,19 @@ const AssetView = () => {
           <span className="text">PRINCIPAL</span>
         </a>
         <ul className="side-menu top">
-          <li>
+          <li >
             <a href={`/principaldashboard?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-dashboard" />
               <span className="text">Home</span>
             </a>
           </li>
-       
-          <li  className="active">
+          <li>
+            <a href={`/principalassetupdation?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-shopping-bag-alt" />
+              <span className="text">Asset Updation</span>
+            </a>
+          </li>
+          <li className="active">
             <a href={`/principalassetview?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-package" />
               <span className="text">Asset View</span>
@@ -2558,8 +2560,8 @@ const AssetView = () => {
           Item Name {sortConfig.key === "itemName" && (sortConfig.direction === "asc" ? "↑" : "↓")}
         </th>
         <th onClick={() => handleSort("itemIds")}>
-          Item IDs {sortConfig.key === "itemIds" && (sortConfig.direction === "asc" ? "↑" : "↓")}
-        </th>
+  Item IDs (Quantity) {sortConfig.key === "itemIds" && (sortConfig.direction === "asc" ? "↑" : "↓")}
+</th>
         <th onClick={() => handleSort("purchaseValue")}>
           Purchase Value {sortConfig.key === "purchaseValue" && (sortConfig.direction === "asc" ? "↑" : "↓")}
         </th>
@@ -2696,8 +2698,7 @@ const AssetView = () => {
                           <td>{row.assetCategory}</td>
                           <td>{row.subCategory}</td>
                           <td>{row.itemName}</td>
-                          <td>{row.itemIds?.join(", ") || ""}</td>
-                          <td>{row.purchaseValue}</td>
+                          <td>{row.itemIds?.length > 0 ? `${row.itemIds.join(", ")} (${row.quantity || "N/A"})` : row.quantity || "N/A"}</td>                                             <td>{row.purchaseValue}</td>
                           <td>{row.bookValue}</td>
                           <td>{new Date(row.inspectionDate).toLocaleDateString()}</td>
                           <td>{new Date(row.condemnationDate).toLocaleDateString()}</td>

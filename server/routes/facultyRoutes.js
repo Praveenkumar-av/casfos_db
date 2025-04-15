@@ -41,4 +41,9 @@ router.get('/notify-si-pending', facultyController.getNotifySIPending);         
 router.put('/acknowledge-si/:id', facultyController.acknowledgeSI);               // Acknowledge notification by SI
 router.get('/notify-all-true', facultyController.getNotifyAllTrue);               // Get fully acknowledged notifications
 
+
+
+router.delete('/rejected-approvals/:id', facultyController.deleteRejectedFacultyApproval); // Delete rejected approval
+router.delete('/rejected-verifications/:id', facultyController.deleteRejectedFacultyVerification); // Delete rejected verification
+router.delete('/notifications/:id', facultyController.deleteFacultyNotification); // Delete notification
 module.exports = router;

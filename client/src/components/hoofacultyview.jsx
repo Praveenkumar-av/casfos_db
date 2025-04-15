@@ -157,50 +157,50 @@ const AdminFacultyView = () => {
     domainKnowledge,
   ]);
 
-  // Render faculty details in popup
-  const renderPopupContent = (data) => {
-    const renderValue = (value, key) => {
-      if (key === "photograph" && typeof value === "string") {
-        const imageUrl = `http://localhost:3001/uploads/${value.split("\\").pop()}`;
-        return <img src={imageUrl} alt="Photograph" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "5px" }} />;
-      }
-      if (Array.isArray(value)) {
-        return (
-          <ul>
-            {value.map((item, index) => (
-              <li key={index}>{renderValue(item, key)}</li>
+ // Render faculty details in popup
+const renderPopupContent = (data) => {
+  const renderValue = (value, key) => {
+    if (key === "photograph" && typeof value === "string") {
+      const imageUrl = `http://localhost:3001/uploads/${value.split("\\").pop()}`;
+      return <img src={imageUrl} alt="Photograph" style={{ width: "100px", height: "100px", objectFit: "cover", borderRadius: "5px" }} />;
+    }
+    if (Array.isArray(value)) {
+      return (
+        <ul>
+          {value.map((item, index) => (
+            <li key={index}>{renderValue(item, key)}</li>
+          ))}
+        </ul>
+      );
+    }
+    if (typeof value === "object" && value !== null) {
+      return (
+        <ul>
+          {Object.entries(value)
+            .filter(([subKey]) => subKey !== "_id")
+            .map(([subKey, val]) => (
+              <li key={subKey}>
+                <strong>{subKey.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:</strong>{" "}
+                {renderValue(val, subKey)}
+              </li>
             ))}
-          </ul>
-        );
-      }
-      if (typeof value === "object" && value !== null) {
-        return (
-          <ul>
-            {Object.entries(value)
-              .filter(([subKey]) => subKey !== "_id")
-              .map(([subKey, val]) => (
-                <li key={subKey}>
-                  <strong>{subKey.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:</strong>{" "}
-                  {renderValue(val, subKey)}
-                </li>
-              ))}
-          </ul>
-        );
-      }
-      return value?.toString() || "-";
-    };
-
-    return Object.entries(data)
-      .filter(([key]) => key !== "_id")
-      .map(([key, value]) => (
-        <tr key={key}>
-          <td style={{ fontWeight: "bold", padding: "10px", border: "1px solid #ddd" }}>
-            {key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:
-          </td>
-          <td style={{ padding: "10px", border: "1px solid #ddd" }}>{renderValue(value, key)}</td>
-        </tr>
-      ));
+        </ul>
+      );
+    }
+    return value?.toString() || "-";
   };
+
+  return Object.entries(data)
+    .filter(([key]) => key !== "_id" && key !== "conduct") // Add condition to exclude "conduct"
+    .map(([key, value]) => (
+      <tr key={key}>
+        <td style={{ fontWeight: "bold", padding: "10px", border: "1px solid #ddd" }}>
+          {key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())}:
+        </td>
+        <td style={{ padding: "10px", border: "1px solid #ddd" }}>{renderValue(value, key)}</td>
+      </tr>
+    ));
+};
 
   // Clear all filters and reset table
   const handleClearFilter = () => {

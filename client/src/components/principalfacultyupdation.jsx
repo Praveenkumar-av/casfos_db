@@ -468,7 +468,12 @@ const PrincipalFacultyUpdation = () => {
               <span className="text">Home</span>
             </a>
           </li>
- 
+          <li>
+            <a href={`/principalassetupdation?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-shopping-bag-alt" />
+              <span className="text">Asset Updation</span>
+            </a>
+          </li>
           <li>
             <a href={`/principalassetview?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-package" />

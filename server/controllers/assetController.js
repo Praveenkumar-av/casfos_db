@@ -1,6 +1,8 @@
 const RejectedAsset = require("../model/RejectedAsset");
 const PurchasedPermanent = require("../model/PermanentAsset");
 const PurchasedConsumable = require("../model/ConsumableAsset");
+const StoreConsumable = require("../model/StoreConsumable");
+const StorePermanent = require("../model/StorePermanent");
 const DeadStockRegister = require("../model/DeadStockRegister"); 
 const ReturnedPermanent = require("../model/ReturnedPermanent");
 const ReturnedConsumable = require("../model/ReturnedConsumable");
@@ -24,13 +26,8 @@ const PendingAssetUpdate = require("../model/PendingAssetUpdate");
 const TempBuildingUpgrade = require("../model/TempBuildingUpgrade");
 const fs = require("fs").promises;
 const path = require("path");
-const serverBaseUrl = "http://localhost:3001"; // Adjust for production
-
-
-// -----------------------------------------
-// Asset Management Routes
-// Routes related to creating, updating, and retrieving assets
-// -----------------------------------------
+const mongoose = require('mongoose');
+const serverBaseUrl = "http://localhost:3001";
 exports.storeTempAsset = async (req, res) => {
   try {
     const {
@@ -1573,31 +1570,113 @@ exports.getTempDisposeAssets = async (req, res) => {
 
 exports.getAvailableDisposableQuantity = async (req, res) => {
   try {
-    const { assetType, assetCategory, itemName, subCategory, itemDescription } = req.body;
-    if (assetType === "Consumable") {
-      const returnedItems = await ReturnedConsumable.find({
-        assetCategory,
-        itemName,
-        itemDescription,
-        approved: "yes",
-        status: "dispose",
-        $or: [{ disposedEntry: "no" }, { disposedEntry: null }],    });
-      const availableQuantity = returnedItems.reduce((sum, item) => sum + (item.returnQuantity || 0), 0);
-      return res.status(200).json({ availableQuantity });
-    } else {
-      const availableItems = await ReturnedPermanent.find({
-        assetCategory,
-        itemName,
-        subCategory,
-        itemDescription,
-        approved: "yes",
-        status: "dispose",
-        $or: [{ disposedEntry: "no" }, { disposedEntry: null }],    });
+    // Trim input fields to remove extra spaces
+    let { assetType, assetCategory, itemName, subCategory, itemDescription } = req.body;
+    assetType = assetType?.trim();
+    assetCategory = assetCategory?.trim();
+    itemName = itemName?.trim();
+    subCategory = subCategory?.trim();
+    itemDescription = itemDescription?.trim();
 
-      const availableQuantity = availableItems.length;
+    // Log trimmed request body for debugging
+    console.log("Trimmed request body:", { assetType, assetCategory, itemName, subCategory, itemDescription });
+
+    if (assetType === "Consumable") {
+      // Fetch available quantity from ReturnedConsumable
+      const returnedQuery = {
+        assetCategory: assetCategory || { $exists: true },
+        itemName: itemName || { $exists: true },
+        approved: "yes",
+        status: "dispose",
+        $or: [{ disposedEntry: "no" }, { disposedEntry: null }],
+      };
+      if (itemDescription) returnedQuery.itemDescription = itemDescription;
+
+      const returnedItems = await ReturnedConsumable.find(returnedQuery);
+      const availableQuantity = returnedItems.reduce((sum, item) => sum + (item.returnQuantity || 0), 0);
+
+      // Log returned items count
+      console.log("ReturnedConsumable items found:", returnedItems.length);
+
+      // Fetch unit price from Consumable collection using aggregation to trim fields
+      const consumablePipeline = [
+        { $match: { assetCategory: assetCategory || { $exists: true } } },
+        { $unwind: "$items" },
+        {
+          $match: {
+            "items.itemName": { $regex: `^${itemName}$`, $options: "i" }, // Case-insensitive, exact match
+            ...(subCategory && { "items.subCategory": { $regex: `^${subCategory}$`, $options: "i" } }),
+            ...(itemDescription && { "items.itemDescription": { $regex: `^${itemDescription}$`, $options: "i" } }),
+          },
+        },
+        { $sort: { createdAt: -1 } }, // Most recent first
+        { $limit: 1 },
+        {
+          $project: {
+            unitPrice: "$items.unitPrice",
+          },
+        },
+      ];
+
+      const consumableResult = await Consumable.aggregate(consumablePipeline);
+      const purchaseValue = consumableResult[0]?.unitPrice || 0;
+
+      // Log aggregation result
+      console.log("Consumable aggregation result:", consumableResult);
+
       return res.status(200).json({
         availableQuantity,
-        itemIds: availableItems.map(item => item.itemId)
+        purchaseValue,
+      });
+    } else {
+      // Fetch available items from ReturnedPermanent
+      const returnedQuery = {
+        assetCategory: assetCategory || { $exists: true },
+        itemName: itemName || { $exists: true },
+        approved: "yes",
+        status: "dispose",
+        $or: [{ disposedEntry: "no" }, { disposedEntry: null }],
+      };
+      if (subCategory) returnedQuery.subCategory = subCategory;
+      if (itemDescription) returnedQuery.itemDescription = itemDescription;
+
+      const availableItems = await ReturnedPermanent.find(returnedQuery);
+      const availableQuantity = availableItems.length;
+      const itemIds = availableItems.map((item) => item.itemId);
+
+      // Log returned items count
+      console.log("ReturnedPermanent items found:", availableItems.length);
+
+      // Fetch unit price from Permanent collection using aggregation to trim fields
+      const permanentPipeline = [
+        { $match: { assetCategory: assetCategory || { $exists: true } } },
+        { $unwind: "$items" },
+        {
+          $match: {
+            "items.itemName": { $regex: `^${itemName}$`, $options: "i" },
+            ...(subCategory && { "items.subCategory": { $regex: `^${subCategory}$`, $options: "i" } }),
+            ...(itemDescription && { "items.itemDescription": { $regex: `^${itemDescription}$`, $options: "i" } }),
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        { $limit: 1 },
+        {
+          $project: {
+            unitPrice: "$items.unitPrice",
+          },
+        },
+      ];
+
+      const permanentResult = await Permanent.aggregate(permanentPipeline);
+      const purchaseValue = permanentResult[0]?.unitPrice || 0;
+
+      // Log aggregation result
+      console.log("Permanent aggregation result:", permanentResult);
+
+      return res.status(200).json({
+        availableQuantity,
+        itemIds,
+        purchaseValue,
       });
     }
   } catch (error) {
@@ -1605,8 +1684,6 @@ exports.getAvailableDisposableQuantity = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch available quantity" });
   }
 };
-
-
 
 exports.disposeAsset = async (req, res) => {
   try {
@@ -1616,26 +1693,40 @@ exports.disposeAsset = async (req, res) => {
       return res.status(404).json({ message: "Asset not found in TempDispose" });
     }
 
-    if (asset.assetCategory === "Building") {
-      // Handle building disposal (store in DisposedAsset)
-      const disposedAssetData = {
-        assetType: asset.assetType,
-        assetCategory: asset.assetCategory,
-        subCategory:asset.subCategory,
-        condemnationYear: asset.condemnationYear,
-        certificateObtained: asset.certificateObtained,
-        authority: asset.authority,
-        dateOfReferenceUrl: asset.dateOfReferenceUrl,
-        agency: asset.agency,
-        agencyReferenceNumberUrl: asset.agencyReferenceNumberUrl,
-        date: asset.date,
-        demolitionPeriod: asset.demolitionPeriod,
-        demolitionEstimate: asset.demolitionEstimate,
-        methodOfDisposal: asset.methodOfDisposal, // Include method of disposal
-      };
+    // Always save to DisposedAsset (for both Building and non-Building)
+    const disposedAssetData = {
+      assetType: asset.assetType,
+      assetCategory: asset.assetCategory,
+      subCategory: asset.subCategory,
+      condemnationYear: asset.condemnationYear,
+      certificateObtained: asset.certificateObtained,
+      authority: asset.authority,
+      dateOfReferenceUrl: asset.dateOfReferenceUrl,
+      agency: asset.agency,
+      agencyReferenceNumberUrl: asset.agencyReferenceNumberUrl,
+      date: asset.date,
+      demolitionPeriod: asset.demolitionPeriod,
+      demolitionEstimate: asset.demolitionEstimate,
+      methodOfDisposal: asset.methodOfDisposal,
+      // Non-Building specific fields
+      itemName: asset.itemName,
+      itemDescription: asset.itemDescription,
+      quantity: asset.quantity,
+      itemIds: asset.itemIds,
+      purchaseValue: asset.purchaseValue,
+      bookValue: asset.bookValue,
+      inspectionDate: asset.inspectionDate,
+      condemnationDate: asset.condemnationDate,
+      remark: asset.remark,
+      disposalValue: asset.disposalValue,
+    };
 
-      const disposedAsset = new DisposedAsset(disposedAssetData);
-      await disposedAsset.save();
+    const disposedAsset = new DisposedAsset(disposedAssetData);
+    await disposedAsset.save();
+
+    if (asset.assetCategory === "Building") {
+      // Building-specific handling (already saved to DisposedAsset above)
+      // No additional logic needed here
     } else {
       // Handle non-building disposal (store in DeadStockRegister)
       const { assetType, assetCategory, subCategory, itemName, itemDescription, quantity, itemIds, remark, methodOfDisposal } = asset;
@@ -1690,17 +1781,17 @@ exports.disposeAsset = async (req, res) => {
             itemName,
             itemDescription,
             status: "service",
-            approved:"yes"
+            approved: "yes",
           });
-          servicableQuantity = returnedAssets.length; 
+          servicableQuantity = returnedAssets.length;
         } else {
           const returnedAssets = await ReturnedConsumable.find({
             assetCategory,
             itemName,
             itemDescription,
             status: "service",
-            approved:"yes"
-        });
+            approved: "yes",
+          });
           servicableQuantity = returnedAssets.reduce((total, asset) => total + (asset.returnQuantity || 0), 0);
         }
 
@@ -2493,30 +2584,33 @@ exports.rejectIssue = async (req, res) => {
 };
 
 
-
-
 exports.approveReturn = async (req, res) => {
   const { id } = req.params;
   const { condition, assetType, returnedQuantity } = req.body;
 
   try {
+    // Validate asset type
     if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ success: false, message: "Valid asset type is required" });
     }
+
+    // Validate condition
     if (!condition || !["Good", "service", "dispose", "exchange"].includes(condition)) {
       return res.status(400).json({ success: false, message: "Valid condition (Good, service, dispose, or exchange) is required" });
     }
 
+    // Select appropriate models
     const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
     const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
 
+    // Find the returned asset
     const asset = await ReturnedModel.findById(id);
     if (!asset) {
       return res.status(404).json({ success: false, message: "Asset not found" });
     }
 
+    // Handle "Good" condition (add to stock)
     if (condition === "Good") {
-      // Add to stock
       const storeQuery = {
         assetCategory: asset.assetCategory,
         itemName: asset.itemName,
@@ -2541,14 +2635,40 @@ exports.approveReturn = async (req, res) => {
       }
       await storeItem.save();
       await ReturnedModel.deleteOne({ _id: id }); // Remove from Returned after adding to stock
+      storeAssetNotification(asset, "return approved", new Date());
       return res.status(200).json({ success: true, message: "Return approved and added to stock" });
     }
 
-    // Handle other conditions (service, dispose, exchange)
+    // Handle "dispose" condition for Consumables
+    if (assetType === "Consumable" && condition === "dispose") {
+      // Create a new entry in DisposedAsset
+      const disposedAsset = new DisposedAsset({
+        assetType: "Consumable",
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        subCategory: asset.subCategory,
+        itemDescription: asset.itemDescription,
+        quantity: returnedQuantity || asset.quantity,
+        remark: asset.remark || "Disposed from returned consumable",
+        condemnationDate: new Date(), // Set current date as condemnation date
+      });
+      await disposedAsset.save();
+
+      // Remove from ReturnedConsumable
+      await ReturnedModel.deleteOne({ _id: id });
+
+      // Store notification
+      storeAssetNotification(asset, "return approved", new Date());
+
+      return res.status(200).json({ success: true, message: "Return approved and moved to disposed assets" });
+    }
+
+    // Handle other conditions (service, dispose for Permanent, exchange)
     asset.approved = "yes";
     asset.status = condition;
     await asset.save();
 
+    // Handle "exchange" for Consumables
     if (assetType === "Consumable" && condition === "exchange") {
       const exchangedConsumable = new ExchangedConsumable({
         assetCategory: asset.assetCategory,
@@ -2565,7 +2685,8 @@ exports.approveReturn = async (req, res) => {
       await exchangedConsumable.save();
     }
 
-    storeAssetNotification(asset, "return approved", new Date());
+    // Store notification for other conditions
+    storeAssetNotification(asset, `return approved`, new Date());
 
     res.status(200).json({ success: true, message: "Return approved" });
   } catch (error) {

@@ -763,6 +763,63 @@ const getNotifyAllTrue = async (req, res) => {
   }
 };
 
+// Delete a rejected faculty approval
+const deleteRejectedFacultyApproval = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await RejectedFaculty.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Rejected approval not found" });
+    }
+    res.status(200).json({ success: true, message: "Rejected approval deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting rejected approval:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting rejected approval",
+      error: error.message,
+    });
+  }
+};
+
+// Delete a rejected faculty verification
+const deleteRejectedFacultyVerification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await RejectedFaculty.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Rejected verification not found" });
+    }
+    res.status(200).json({ success: true, message: "Rejected verification deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting rejected verification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting rejected verification",
+      error: error.message,
+    });
+  }
+};
+
+// Delete a notification
+const deleteFacultyNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await NotifyFaculty.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Notification not found" });
+    }
+    res.status(200).json({ success: true, message: "Notification deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting notification",
+      error: error.message,
+    });
+  }
+};
+
 // Export all controller functions
 module.exports = {
   saveFaculty,
@@ -788,4 +845,7 @@ module.exports = {
   getNotifySIPending,
   acknowledgeSI,
   getNotifyAllTrue,
+  deleteRejectedFacultyApproval, // New
+  deleteRejectedFacultyVerification, // New
+  deleteFacultyNotification, // New
 };

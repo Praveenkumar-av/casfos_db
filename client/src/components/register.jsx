@@ -1,26 +1,10 @@
-/**
- * Overview:
- * This is a React component for a registration page in an asset management system.
- * It allows users to create accounts with detailed personal and organizational information,
- * supporting role-based access with conditional sub-roles for specific roles.
- * The component includes:
- * - A role selection panel with radio buttons for main roles and sub-roles (e.g., Asset Manager/Storekeeper).
- * - A registration form for collecting user details (username, password, DOB, designation, phone, organization, ministry).
- * - API integration using axios to send registration data to a backend server.
- * - Navigation to the login page upon successful registration.
- * - Error handling and loading states for user feedback.
- * - Styling with CSS classes and Font Awesome icons for a modern UI.
- * 
- * The component uses React Router for navigation and state management with useState hooks.
- * It communicates with a backend API at 'http://localhost:3001/api/users/register' for user registration.
- */
-
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { FaUser, FaLock, FaEye, FaEyeSlash, FaCalendar, FaBriefcase, FaPhone, FaBuilding, FaUniversity, FaLongArrowAltRight } from 'react-icons/fa';
 import '../styles/main1.css';
+import '../fonts/font-awesome-4.7.0/css/font-awesome.min.css';
 import '../styles/util.css';
-import '../styles/font-awesome.min.css';
 
 // Define role options for selection
 const ROLE_OPTIONS = [
@@ -56,6 +40,7 @@ const Register = () => {
   const [subRole, setSubRole] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   /**
@@ -65,6 +50,13 @@ const Register = () => {
   const handleRoleChange = (selectedRole) => {
     setRole(selectedRole);
     setSubRole(''); // Reset subRole when main role changes
+  };
+
+  /**
+   * Toggles password visibility
+   */
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
   };
 
   /**
@@ -113,191 +105,228 @@ const Register = () => {
   };
 
   return (
-    <div className="limiter">
-      <div className="container-login100">
-        <div className="wrap-login100">
-          {/* Left Panel: Role Selection and Logo */}
-          <div className="login100-pic js-tilt">
-            <img src="images/CASFOS-Coimbatore.jpg" alt="CASFOS Logo" />
-            <div className="role-selection-container">
-              <form>
-                {ROLE_OPTIONS.map((option, index) => (
-                  <label key={index} className="particles-checkbox-container">
-                    <input
-                      type="radio"
-                      className="particles-checkbox"
-                      value={option.value}
-                      name="role"
-                      checked={role === option.value}
-                      onChange={() => handleRoleChange(option.value)}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </form>
-            </div>
-          </div>
-
-          {/* Right Panel: Registration Form */}
-          <div className="login100-form validate-form">
-            <p className="login100-form-title">Register</p>
-            <form onSubmit={handleRegister}>
-              {/* Username Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="text"
-                  name="name"
-                  placeholder="Username"
-                  value={name}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
+    <div className="login-container">
+      <div className="limiter">
+        <div className="container-login100">
+          <div className="wrap-login100 fade-in">
+            {/* Left Panel: Role Selection and Logo */}
+            <div className="login-left-panel" style={{ justifyContent: 'flex-start' }}>
+              <div className="login-image-container">
+                <img
+                  src="public/images/CASFOS-Coimbatore.ico"
+                  alt="CASFOS Logo"
+                  className="login-image"
                 />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-user" aria-hidden="true" />
-                </span>
               </div>
 
-              {/* Date of Birth Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="date"
-                  name="dob"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  required
-                />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-calendar" aria-hidden="true" />
-                </span>
-              </div>
-
-              {/* Designation Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="text"
-                  name="designation"
-                  placeholder="Designation"
-                  value={designation}
-                  onChange={(e) => setDesignation(e.target.value)}
-                  required
-                />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-briefcase" aria-hidden="true" />
-                </span>
-              </div>
-
-              {/* Phone Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="tel"
-                  name="phone"
-                  placeholder="Phone No"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-phone" aria-hidden="true" />
-                </span>
-              </div>
-
-              {/* Organization Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="text"
-                  name="organization"
-                  placeholder="Organization"
-                  value={organization}
-                  onChange={(e) => setOrganization(e.target.value)}
-                  required
-                />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-building" aria-hidden="true" />
-                </span>
-              </div>
-
-              {/* Ministry Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="text"
-                  name="ministry"
-                  placeholder="Ministry"
-                  value={ministry}
-                  onChange={(e) => setMinistry(e.target.value)}
-                  required
-                />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-university" aria-hidden="true" />
-                </span>
-              </div>
-
-              {/* Password Input */}
-              <div className="wrap-input100 validate-input">
-                <input
-                  className="input100"
-                  type="password"
-                  name="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <span className="focus-input100" />
-                <span className="symbol-input100">
-                  <i className="fa fa-lock" aria-hidden="true" />
-                </span>
-              </div>
-
-              {/* Conditional Sub-Role Selection */}
-              {(role === 'assetmanagerentry' || role === 'facultyentrysuper') && (
-                <div className="sub-role-container">
-                  <p className="sub-role-title">Select Role:</p>
-                  {SUB_ROLE_OPTIONS[role].map((subOption, index) => (
-                    <label
-                      key={index}
-                      className="particles-checkbox-container"
-                      style={{ marginLeft: index > 0 ? '20px' : '0' }}
-                    >
+              <div className="role-selection-container">
+                <h3 className="role-selection-title">Select Your Role</h3>
+                <form className="role-selection-form">
+                  {ROLE_OPTIONS.map((option, index) => (
+                    <label key={index} className="role-option">
                       <input
                         type="radio"
-                        className="particles-checkbox"
-                        value={subOption.value}
-                        name="subRole"
-                        checked={subRole === subOption.value}
-                        onChange={(e) => setSubRole(e.target.value)}
+                        value={option.value}
+                        name="role"
+                        checked={role === option.value}
+                        onChange={() => handleRoleChange(option.value)}
                       />
-                      <span>{subOption.label}</span>
+                      <span className="role-label">{option.label}</span>
                     </label>
                   ))}
-                </div>
-              )}
+                </form>
+              </div>
+            </div>
 
-              {/* Submit Button */}
-              <div className="container-login100-form-btn">
+            {/* Right Panel: Registration Form */}
+            <div className="login-right-panel">
+              <h1 className="login-title">Register</h1>
+              <form onSubmit={handleRegister} className="login-form">
+                {/* Username Input */}
+                <div className="input-group">
+                  <label htmlFor="username" className="input-label">
+                    Username
+                  </label>
+                  <div className="input-wrapper">
+                    <FaUser className="input-icon" />
+                    <input
+                      id="username"
+                      type="text"
+                      name="name"
+                      placeholder="Enter your username"
+                      value={name}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Date of Birth Input */}
+                <div className="input-group">
+                  <label htmlFor="dob" className="input-label">
+                    Date of Birth
+                  </label>
+                  <div className="input-wrapper">
+                    <FaCalendar className="input-icon" />
+                    <input
+                      id="dob"
+                      type="date"
+                      name="dob"
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Designation Input */}
+                <div className="input-group">
+                  <label htmlFor="designation" className="input-label">
+                    Designation
+                  </label>
+                  <div className="input-wrapper">
+                    <FaBriefcase className="input-icon" />
+                    <input
+                      id="designation"
+                      type="text"
+                      name="designation"
+                      placeholder="Enter your designation"
+                      value={designation}
+                      onChange={(e) => setDesignation(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Phone Input */}
+                <div className="input-group">
+                  <label htmlFor="phone" className="input-label">
+                    Phone No
+                  </label>
+                  <div className="input-wrapper">
+                    <FaPhone className="input-icon" />
+                    <input
+                      id="phone"
+                      type="tel"
+                      name="phone"
+                      placeholder="Enter your phone number"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Organization Input */}
+                <div className="input-group">
+                  <label htmlFor="organization" className="input-label">
+                    Organization
+                  </label>
+                  <div className="input-wrapper">
+                    <FaBuilding className="input-icon" />
+                    <input
+                      id="organization"
+                      type="text"
+                      name="organization"
+                      placeholder="Enter your organization"
+                      value={organization}
+                      onChange={(e) => setOrganization(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Ministry Input */}
+                <div className="input-group">
+                  <label htmlFor="ministry" className="input-label">
+                    Ministry
+                  </label>
+                  <div className="input-wrapper">
+                    <FaUniversity className="input-icon" />
+                    <input
+                      id="ministry"
+                      type="text"
+                      name="ministry"
+                      placeholder="Enter your ministry"
+                      value={ministry}
+                      onChange={(e) => setMinistry(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input */}
+                <div className="input-group">
+                  <label htmlFor="password" className="input-label">
+                    Password
+                  </label>
+                  <div className="input-wrapper">
+                    <FaLock className="input-icon" />
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    {showPassword ? (
+                      <FaEyeSlash
+                        className="password-toggle"
+                        onClick={togglePasswordVisibility}
+                      />
+                    ) : (
+                      <FaEye
+                        className="password-toggle"
+                        onClick={togglePasswordVisibility}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Conditional Sub-Role Selection */}
+                {(role === 'assetmanagerentry' || role === 'facultyentrysuper') && (
+                  <div className="input-group">
+                    <label className="input-label">Select Sub-Role</label>
+                    <div className="role-selection-form">
+                      {SUB_ROLE_OPTIONS[role].map((subOption, index) => (
+                        <label key={index} className="role-option">
+                          <input
+                            type="radio"
+                            value={subOption.value}
+                            name="subRole"
+                            checked={subRole === subOption.value}
+                            onChange={(e) => setSubRole(e.target.value)}
+                          />
+                          <span className="role-label">{subOption.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
                 <button
-                  className="login100-form-btn"
+                  className="login-button"
                   type="submit"
                   disabled={loading}
                 >
                   {loading ? 'Registering...' : 'Register'}
                 </button>
-              </div>
 
-              {/* Error Message */}
-              {message && <p className="error-message">{message}</p>}
-            </form>
+                {/* Error Message */}
+                {message && <p className="error-message">{message}</p>}
+
+                {/* Additional Links */}
+                <div className="login-links">
+                  <Link to="/" className="register-link">
+                    Already have an account? Login
+                    <FaLongArrowAltRight />
+                  </Link>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>

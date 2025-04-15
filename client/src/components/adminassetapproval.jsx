@@ -1215,7 +1215,6 @@ function AssetApproval() {
       <section id="content" style={componentStyles.content}>
         <nav style={componentStyles.nav}>
           <i className="bx bx-menu" />
-          <span style={componentStyles.headTitle}>Dashboard</span>
           <div style={componentStyles.usernameContainer}>
             <i className="bx bxs-user-circle" style={componentStyles.userIcon}></i>
             <span style={componentStyles.username}>{username}</span>

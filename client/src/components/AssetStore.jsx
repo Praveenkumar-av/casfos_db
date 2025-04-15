@@ -16,6 +16,7 @@ const AssetStore = () => {
   const [isEditingRejected, setIsEditingRejected] = useState(false);
   const [rejectedAction, setRejectedAction] = useState(""); // To track "service" or "disposal"
   const [customSource, setCustomSource] = useState("");
+  const [unitPurchaseValue, setUnitPurchaseValue] = useState(0);
   const [customModeOfPurchase, setCustomModeOfPurchase] = useState("");
   const [remarks, setRemarks] = useState({});
   const [signedReceipts, setSignedReceipts] = useState({}); // For storing signed receipt URLs
@@ -72,6 +73,106 @@ const AssetStore = () => {
     methodOfDisposal: "", // Add this line
     customMethodOfDisposal: "", // Added new field
   });
+  const resetAllFields = () => {
+    setIsEditingRejected(false);
+    setRejectedAction("");
+    setCustomSource("");
+    setCustomModeOfPurchase("");
+    setRemarks({});
+    setSignedReceipts({});
+    setAmcPhotoUrls({});
+    setAvailableQuantity(0);
+    setBillPhotoUrl("");
+    setItemPhotoUrls({});
+    setAssetType("Permanent");
+    setAssetCategory("");
+    setEntryDate("");
+    setPurchaseDate("");
+    setSupplierName("");
+    setServicedData({
+      itemName: "",
+      subCategory: "",
+      itemDescription: "",
+      itemIds: [],
+      serviceNo: "",
+      serviceDate: "",
+      serviceAmount: 0,
+    });
+    setSupplierAddress("");
+    setSource("");
+    setModeOfPurchase("");
+    setBillNo("");
+    setReceivedBy("");
+    setServicableItems([]);
+    setItems([]);
+    setWarrantyPhotoUrls({});
+    setBuildingData({
+      subCategory: "",
+      customSubCategory: "",
+      location: "",
+      type: "",
+      customType: "",
+      buildingNo: "",
+      approvedEstimate: "",
+      plinthArea: "",
+      status: "",
+      customStatus: "",
+      dateOfConstruction: "",
+      costOfConstruction: 0,
+      remarks: "",
+      approvedBuildingPlanUrl: "",
+      kmzOrkmlFileUrl: "",
+    });
+    setLandData({
+      subCategory: "",
+      customSubCategory: "",
+      location: "",
+      status: "",
+      customStatus: "",
+      dateOfPossession: "",
+      controllerOrCustody: "",
+      details: "",
+    });
+    setReturnedAssets([]);
+    setMaintenanceData({
+      buildingNo: "",
+      yearOfMaintenance: "",
+      cost: 0,
+      description: "",
+      custody: "",
+      agency: "",
+    });
+    setDisposableData({
+      itemName: "",
+      subCategory: "",
+      itemDescription: "",
+      itemIds: [],
+      quantity: 0,
+      purchaseValue: 0,
+      bookValue: 0,
+      inspectionDate: "",
+      condemnationDate: "",
+      remark: "",
+      disposalValue: 0,
+      condemnationYear: "",
+      certificateObtained: "",
+      authority: "",
+      dateOfReferenceUrl: "",
+      agency: "",
+      agencyReferenceNumberUrl: "",
+      date: "",
+      demolitionPeriod: "",
+      demolitionEstimate: "",
+      methodOfDisposal: "",
+      customMethodOfDisposal: "",
+    });
+    setStoreItems([]);
+    setDisposableItems([]);
+    setPurchaseValues({});
+    setSelectedSubCategory("");
+    setBuildingUpgrades([]);
+    setUpgradeForms([]);
+  };
   const [storeItems, setStoreItems] = useState([]);
   const [disposableItems, setDisposableItems] = useState([]);
   const [purchaseValues, setPurchaseValues] = useState({});
@@ -387,7 +488,9 @@ const AssetStore = () => {
     inputDate.setHours(0, 0, 0, 0); // Normalize input date
     return inputDate > today; // True if date is after today
   };
-
+  useEffect(() => {
+    resetAllFields();
+  }, [activeTab]);
   const validateStoreForm = () => {
     const today = new Date().setHours(0, 0, 0, 0);
     let errors = [];
@@ -532,13 +635,21 @@ const AssetStore = () => {
             subCategory: disposableData.subCategory,
             itemDescription: disposableData.itemDescription,
           });
-          setAvailableQuantity(response.data.availableQuantity);
+          setAvailableQuantity(response.data.availableQuantity || 0);
+          setUnitPurchaseValue(response.data.purchaseValue || 0); // Store unit purchase value
           if (assetType === "Permanent") {
             setDisposableItems(response.data.itemIds || []);
           }
         } catch (error) {
           console.error("Failed to fetch available quantity:", error);
           setAvailableQuantity(0);
+          setUnitPurchaseValue(0);
+          setDisposableData((prev) => ({ ...prev, purchaseValue: 0 }));
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "Failed to fetch available quantity or purchase value.",
+          });
         }
       };
       fetchAvailableQuantity();
@@ -558,13 +669,13 @@ const AssetStore = () => {
         })
       );
       setPurchaseValues((prev) => ({ ...prev, ...newPurchaseValues }));
-
-      // Update disposableData.purchaseValue with the average or total of fetched values
+  
+      // Calculate total purchaseValue as the sum of fetched values
       const totalPurchaseValue = Object.values(newPurchaseValues).reduce((sum, val) => sum + val, 0);
-      const averagePurchaseValue = selectedItemIds.length > 0 ? totalPurchaseValue : 0;
-      setDisposableData((prev) => ({ ...prev, purchaseValue: averagePurchaseValue }));
+      setDisposableData((prev) => ({ ...prev, purchaseValue: totalPurchaseValue }));
     } catch (error) {
-      console.error("Failed to fetch purchase values:", error);      setPurchaseValues((prev) => {
+      console.error("Failed to fetch purchase values:", error);
+      setPurchaseValues((prev) => {
         const fallback = {};
         selectedItemIds.forEach((itemId) => {
           fallback[itemId] = 0;
@@ -572,6 +683,11 @@ const AssetStore = () => {
         return { ...prev, ...fallback };
       });
       setDisposableData((prev) => ({ ...prev, purchaseValue: 0 }));
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to fetch purchase values for selected items.",
+      });
     }
   };
 
@@ -579,6 +695,9 @@ const AssetStore = () => {
   useEffect(() => {
     if (activeTab === "disposable" && assetType === "Permanent" && disposableData.itemIds.length > 0) {
       fetchPurchaseValues(disposableData.itemIds);
+    } else {
+      setPurchaseValues({});
+      setDisposableData((prev) => ({ ...prev, purchaseValue: 0 }));
     }
   }, [assetType, disposableData.itemIds, activeTab]);
 
@@ -700,16 +819,13 @@ const AssetStore = () => {
         title: "Success",
         text: "All upgrades added successfully!",
       });
-  
       const getResponse = await axios.post("http://localhost:3001/api/assets/getBuildingUpgrades", {
         subCategory: subCategoryToSend,
       });
       const buildings = getResponse.data.buildings || [];
       const upgrades = buildings.reduce((acc, building) => [...acc, ...building.upgrades], []);
       setBuildingUpgrades(upgrades);
-  
-      setUpgradeForms([]);
-      setSelectedSubCategory("");
+      resetAllFields();
       setIsEditingRejected(false);
       setRejectedAction("");
       window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=buildingupgrade`);
@@ -903,11 +1019,10 @@ const handleSubmitStore = async () => {
       await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
     }
     Swal.fire({ icon: "success", title: "Success!", text: "Inventory saved successfully!" });
-    resetStoreForm();
+    resetAllFields();
     setIsEditingRejected(false);
     setRejectedAction("");
-    window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}`);
-    setActiveTab("store");
+    window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=store`);
   } catch (error) {
     if (error.response && error.response.data) {
       const { message, duplicateIds } = error.response.data;
@@ -1282,15 +1397,7 @@ const resetStoreForm = () => {
         title: "Success!",
         text: "Maintenance submitted for approval!",
       });
-      setMaintenanceData({
-        subCategory: "", // Reset subcategory
-        buildingNo: "",
-        yearOfMaintenance: "",
-        cost: 0,
-        description: "",
-        custody: "",
-        agency: "",
-      });
+      resetAllFields();
       setIsEditingRejected(false);
       setRejectedAction("");
       window.history.replaceState(
@@ -1298,7 +1405,6 @@ const resetStoreForm = () => {
         "",
         `/assetstore?username=${encodeURIComponent(username)}&tab=serviced`
       );
-      setActiveTab("serviced");
     } catch (error) {
       Swal.fire({
         icon: "error",
@@ -1321,26 +1427,26 @@ const handleDisposableIdSelection = (itemId) => {
     } else {
       return prev; // Prevent adding more IDs than availableQuantity
     }
-    
+
     const newQuantity = assetType === "Permanent" && assetCategory !== "Building" 
       ? newItemIds.length 
       : prev.quantity; // Update quantity for permanent assets
-    
-    setPurchaseValues({}); // Reset purchaseValues for new selection
+
     return { 
       ...prev, 
       itemIds: newItemIds, 
-      quantity: newQuantity, 
+      quantity: newQuantity,
       purchaseValue: 0 // Reset purchaseValue until new fetch
     };
   });
-};
-
-const handleDisposableChange = (field, value) => {
+};const handleDisposableChange = (field, value) => {
   setDisposableData((prev) => {
     // For quantity changes
     if (field === "quantity") {
-      const newQuantity = Math.min(parseInt(value) || 0, availableQuantity);
+      const newQuantity = Math.min(
+        parseInt(value) || 0,  // Convert to number, default to 0 if NaN
+        availableQuantity     // Don't exceed available quantity
+      );
       
       // For permanent assets (non-building), quantity is controlled by itemIds.length
       if (assetType === "Permanent" && assetCategory !== "Building") {
@@ -1351,6 +1457,7 @@ const handleDisposableChange = (field, value) => {
       return {
         ...prev,
         [field]: newQuantity,
+        purchaseValue: unitPurchaseValue * newQuantity, // Calculate total purchaseValue
       };
     }
     
@@ -1359,7 +1466,7 @@ const handleDisposableChange = (field, value) => {
       return {
         ...prev,
         [field]: value,
-        ...(value !== "Other" ? { customMethodOfDisposal: "" } : {}), // Reset custom field when not "Other"
+        ...(value !== "Other" ? { customMethodOfDisposal: "" } : {}),
       };
     }
     
@@ -1418,11 +1525,10 @@ const validateDisposableSubmit = () => {
         await axios.delete(`http://localhost:3001/api/assets/rejected-asset/${rejectedId}`);
       }
       Swal.fire({ icon: "success", title: "Success!", text: "Serviced asset saved!" });
-      setServicedData({ itemName: "", subCategory: "", itemDescription: "", itemIds: [], serviceNo: "", serviceDate: "", serviceAmount: 0 });
+      resetAllFields();
       setIsEditingRejected(false);
       setRejectedAction("");
       window.history.replaceState(null, "", `/assetstore?username=${encodeURIComponent(username)}&tab=serviced`);
-      setActiveTab("serviced");
     } catch (error) {
       Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save serviced asset!" });
       console.error(error);
@@ -1487,30 +1593,12 @@ const validateDisposableSubmit = () => {
               : disposableData.methodOfDisposal,
         });
         Swal.fire({ icon: "success", title: "Success!", text: "Building condemnation request submitted!" });
-        setDisposableData({
-          itemName: "",
-          subCategory: "",
-          itemDescription: "",
-          itemIds: [],
-          quantity: 0,
-          purchaseValue: 0,
-          bookValue: 0,
-          inspectionDate: "",
-          condemnationDate: "",
-          remark: "",
-          disposalValue: 0,
-          condemnationYear: "",
-          certificateObtained: "",
-          authority: "",
-          dateOfReferenceUrl: "",
-          agency: "",
-          agencyReferenceNumberUrl: "",
-          date: "",
-          demolitionPeriod: "",
-          demolitionEstimate: "",
-          methodOfDisposal: "",
-          customMethodOfDisposal: "",
-        });
+        resetAllFields();
+        window.history.replaceState(
+          null,
+          "",
+          `/assetstore?username=${encodeURIComponent(username)}&tab=disposable`
+        );
       } catch (error) {
         Swal.fire({ icon: "error", title: "Oops...", text: "Failed to submit building condemnation request!" });
         console.error(error);
@@ -1518,7 +1606,6 @@ const validateDisposableSubmit = () => {
     } else {
       if (
         !disposableData.itemName ||
-        !disposableData.subCategory ||
         !disposableData.itemDescription ||
         disposableData.quantity <= 0 ||
         disposableData.bookValue < 0 ||
@@ -1570,33 +1657,12 @@ const validateDisposableSubmit = () => {
               : disposableData.methodOfDisposal,
         });
         Swal.fire({ icon: "success", title: "Success!", text: "Disposable asset saved!" });
-        setDisposableData({
-          itemName: "",
-          subCategory: "",
-          itemDescription: "",
-          itemIds: [],
-          quantity: 0,
-          purchaseValue: 0,
-          bookValue: 0,
-          inspectionDate: "",
-          condemnationDate: "",
-          remark: "",
-          disposalValue: 0,
-          condemnationYear: "",
-          certificateObtained: "",
-          authority: "",
-          dateOfReferenceUrl: "",
-          agency: "",
-          agencyReferenceNumberUrl: "",
-          date: "",
-          demolitionPeriod: "",
-          demolitionEstimate: "",
-          methodOfDisposal: "",
-          customMethodOfDisposal: "",
-        });
-        setDisposableItems([]);
-        setPurchaseValues({});
-        setAvailableQuantity(0);
+        resetAllFields();
+        window.history.replaceState(
+          null,
+          "",
+          `/assetstore?username=${encodeURIComponent(username)}&tab=disposable`
+        );
       } catch (error) {
         Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save disposable asset!" });
         console.error(error);
@@ -1681,7 +1747,6 @@ const validateDisposableSubmit = () => {
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
-          <span className="head-title">Dashboard</span>
           <form action="#"><div className="form-input"></div></form>
           <div style={styles.usernameContainer}>
             <i className="bx bxs-user-circle" style={styles.userIcon}></i>
@@ -2683,18 +2748,18 @@ const validateDisposableSubmit = () => {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label>Disposal Quantity:</label>
-              <input
-                type="number"
-                value={disposableData.quantity}
-                onChange={(e) => handleDisposableChange("quantity", parseInt(e.target.value) || 0)}
-                onFocus={(e) => e.target.select()}
-                max={availableQuantity}
-                min="0"
-                style={styles.input}
-                disabled={assetType === "Permanent"} // Disable for Permanent assets
-              />
-            </div>
+  <label>Disposal Quantity:</label>
+  <input
+    type="number"
+    value={disposableData.quantity}
+    onChange={(e) => handleDisposableChange("quantity", e.target.value)}
+    onFocus={(e) => e.target.select()}
+    max={availableQuantity}
+    min="1"
+    style={styles.input}
+    disabled={assetType === "Permanent" && assetCategory !== "Building"} // Disable only for Permanent non-Building
+  />
+</div>
             <div style={styles.inputGroup}>
               <label>Purchase Value:</label>
               <input
@@ -2760,21 +2825,21 @@ const validateDisposableSubmit = () => {
           </div>
           {assetType === "Permanent" && assetCategory !== "Building" && (
             <div style={styles.inputGroup}>
-              <label>Select Disposable Item IDs (Available: {availableQuantity}, Selected: {disposableData.itemIds.length}):</label>
-              <div style={styles.checkboxContainer}>
-                {disposableItems.map((id) => (
-                  <label key={id} style={styles.checkboxLabel}>
-                    <input
-                      type="checkbox"
-                      checked={disposableData.itemIds.includes(id)}
-                      onChange={() => handleDisposableIdSelection(id)}
-                      disabled={
-                        !disposableData.itemIds.includes(id) &&
-                        disposableData.itemIds.length >= availableQuantity
-                      }
-                    />
-                    {id} {purchaseValues[id] !== undefined ? `- ₹${purchaseValues[id]}` : "- Fetching..."}
-                  </label>
+             <label>Select Disposable Item IDs (Available: {availableQuantity}, Selected: {disposableData.itemIds.length}):</label>
+    <div style={styles.checkboxContainer}>
+      {disposableItems.map((id) => (
+        <label key={id} style={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={disposableData.itemIds.includes(id)}
+            onChange={() => handleDisposableIdSelection(id)}
+            disabled={
+              !disposableData.itemIds.includes(id) &&
+              disposableData.itemIds.length >= availableQuantity
+            }
+          />
+          {id} {purchaseValues[id] !== undefined ? `- ₹${purchaseValues[id]}` : "- Loading..."}
+        </label>
                 ))}
               </div>
             </div>

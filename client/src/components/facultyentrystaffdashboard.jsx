@@ -1,501 +1,474 @@
-import React, { useEffect, useState } from "react";
-import { Helmet } from "react-helmet"; // For managing document head
-import "../styles/style.css"; // General styles
-import axios from "axios"; // HTTP client for API requests
-import { useLocation, useNavigate } from "react-router-dom"; // For navigation and URL parameters
-import { Bar } from "react-chartjs-2"; // Bar chart component
-import Chart from "chart.js/auto"; // Chart.js library for visualizations
+/**
+ * Overview:
+ * This is a React component for the Faculty Entry Staff Dashboard in a faculty management system for the Central Academy for State Forest Service (CASFOS).
+ * It provides:
+ * - A sidebar for navigation to faculty entry and view sections.
+ * - A notification system displaying recent faculty-related actions (rejections, notifications) with expandable details, re-enter options, and clear functionality.
+ * - Static sections for About Us, History, How to Reach, and Contact Us, showcasing institutional information.
+ * - A hero section highlighting the institution's role.
+ * - Responsive design with a modern UI, using external CSS (dashstyle.css, style.css) and inline styles for specific elements.
+ *
+ * The component uses React Router for URL parameter parsing and navigation, axios for API calls to fetch and manage notifications, and Helmet for SEO and metadata.
+ * Notifications are fetched from a backend API at 'http://localhost:3001' for rejected approvals, verifications, and notify-all-true, sorted by timestamp, limited to 50.
+ */
 
-// FacultyEntryStaffDashboard component: Displays dashboard with notifications and analytics
+import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet';
+import axios from 'axios';
+import { useLocation, useNavigate } from 'react-router-dom';
+import '../styles/dashstyle.css';
+
+/**
+ * Constants for notification types
+ */
+const NOTIFICATION_TYPES = {
+  approvalRejection: 'approvalRejection',
+  verificationRejection: 'verificationRejection',
+  notifyFaculty: 'notifyFaculty',
+};
+
 const FacultyEntryStaffDashboard = () => {
-  // State for notifications
-  const [notifications, setNotifications] = useState([]); // List of notifications
-  const [expandedNotification, setExpandedNotification] = useState(null); // ID of expanded notification
+  // State management
+  const [notifications, setNotifications] = useState([]);
+  const [expandedNotification, setExpandedNotification] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
-  // State for dashboard analytics
-  const [internalData, setInternalData] = useState([]); // Internal faculty data
-  const [externalData, setExternalData] = useState([]); // External faculty data
-  const [selectedFacultyYear, setSelectedFacultyYear] = useState("All"); // Selected year for faculty chart
-  const [sessionData, setSessionData] = useState([]); // Session data
-  const [selectedSessionYear, setSelectedSessionYear] = useState("All"); // Selected year for session chart
-  const [sessionLabels, setSessionLabels] = useState([]); // Labels for session chart
-  const [facultyLabels, setFacultyLabels] = useState([]); // Labels for faculty chart
-  const [userCounts, setUserCounts] = useState({ adminCount: 0, dataEntryCount: 0, viewerCount: 0 }); // User role counts
-
-  // Navigation and location hooks
+  // Router and URL params
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const username = queryParams.get("username") || "Guest"; // Default to "Guest" if no username
+  const username = queryParams.get('username') || 'Guest';
+  const serverBaseUrl = 'http://localhost:3001';
 
-  // Format notification title based on type
-  const formatNotificationTitle = (notification) => {
-    if (notification.approvalRejection) {
-      return `Faculty Approval Rejected - ${notification.name}`;
-    } else if (notification.verificationRejection) {
-      return `Faculty Verification Rejected - ${notification.name}`;
-    } else if (notification.notifyprincipal && notification.notifyhoo && notification.notifysi) {
-      return `Faculty Notification - ${notification.name}`;
-    }
-    return "Unknown Notification";
-  };
-
-  // Fetch all notifications (rejections and fully acknowledged)
+  /**
+   * Fetches notifications on component mount, sorted by timestamp, limited to 50
+   */
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
         const [approvalResponse, verificationResponse, notifyResponse] = await Promise.all([
-          axios.get("http://localhost:3001/api/faculty/rejected-approvals"),
-          axios.get("http://localhost:3001/api/faculty/rejected-verifications"),
-          axios.get("http://localhost:3001/api/faculty/notify-all-true"),
+          axios.get(`${serverBaseUrl}/api/faculty/rejected-approvals`),
+          axios.get(`${serverBaseUrl}/api/faculty/rejected-verifications`),
+          axios.get(`${serverBaseUrl}/api/faculty/notify-all-true`),
         ]);
 
         const allNotifications = [
-          ...approvalResponse.data.map((n) => ({ ...n, type: "approvalRejection" })),
-          ...verificationResponse.data.map((n) => ({ ...n, type: "verificationRejection" })),
-          ...notifyResponse.data.map((n) => ({ ...n, type: "notifyFaculty" })),
+          ...approvalResponse.data.map((n) => ({ ...n, type: NOTIFICATION_TYPES.approvalRejection })),
+          ...verificationResponse.data.map((n) => ({ ...n, type: NOTIFICATION_TYPES.verificationRejection })),
+          ...notifyResponse.data.map((n) => ({ ...n, type: NOTIFICATION_TYPES.notifyFaculty })),
         ];
 
-        // Sort notifications by timestamp and limit to 10
         const sortedNotifications = allNotifications
           .map((notification) => {
             let timestamp =
-              notification.type === "approvalRejection" || notification.type === "verificationRejection"
+              notification.type === NOTIFICATION_TYPES.approvalRejection ||
+              notification.type === NOTIFICATION_TYPES.verificationRejection
                 ? notification.updatedAt || notification.notificationDate || new Date(0)
                 : notification.notificationDate || notification.updatedAt || new Date(0);
             return { ...notification, timestamp: new Date(timestamp) };
           })
-          .sort((a, b) => b.timestamp - a.timestamp) // Latest first
-          .slice(0, 10);
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, 50);
 
         setNotifications(sortedNotifications);
       } catch (error) {
-        console.error("Error fetching notifications:", error);
+        console.error('Error fetching notifications:', error);
       }
     };
     fetchNotifications();
   }, []);
 
-  // Toggle notification expansion
+  /**
+   * Clears a single notification by ID
+   * @param {string} id - Notification ID
+   */
+  const handleClearNotification = async (id, type) => {
+    try {
+      const endpoint =
+        type === NOTIFICATION_TYPES.approvalRejection || type === NOTIFICATION_TYPES.verificationRejection
+          ? `${serverBaseUrl}/api/faculty/rejected-approvals/${id}`
+          : `${serverBaseUrl}/api/faculty/notifications/${id}`;
+      await axios.delete(endpoint);
+      setNotifications(notifications.filter((notif) => notif._id !== id));
+      if (expandedNotification === id) {
+        setExpandedNotification(null);
+      }
+    } catch (error) {
+      console.error('Error clearing notification:', error);
+    }
+  };
+
+  /**
+   * Clears all notifications
+   */
+  const handleClearAll = async () => {
+    try {
+      await Promise.all([
+        axios.delete(`${serverBaseUrl}/api/faculty/rejected-approvals/all`),
+        axios.delete(`${serverBaseUrl}/api/faculty/notifications/all`),
+      ]);
+      setNotifications([]);
+      setShowNotifications(false);
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+    }
+  };
+
+  /**
+   * Toggles expansion of notification details
+   * @param {string} id - Notification ID
+   */
   const toggleExpand = (id) => {
     setExpandedNotification(expandedNotification === id ? null : id);
   };
 
-  // Navigate to faculty entry page with notification data
+  /**
+   * Toggles visibility of the notification panel
+   */
+  const toggleNotificationPanel = () => {
+    setShowNotifications(!showNotifications);
+  };
+
+  /**
+   * Formats the notification title based on type
+   * @param {Object} notification - Notification object
+   * @returns {string} - Formatted title
+   */
+  const formatNotificationTitle = (notification) => {
+    if (notification.type === NOTIFICATION_TYPES.approvalRejection) {
+      return `Faculty Approval Rejected - ${notification.name}`;
+    } else if (notification.type === NOTIFICATION_TYPES.verificationRejection) {
+      return `Faculty Verification Rejected - ${notification.name}`;
+    } else if (notification.type === NOTIFICATION_TYPES.notifyFaculty) {
+      return `Faculty Notification - ${notification.name}`;
+    }
+    return 'Unknown Notification';
+  };
+
+  /**
+   * Handles re-enter navigation
+   * @param {Object} notification - Notification object
+   */
   const handleReenter = (notification) => {
     navigate(`/facultyentry?username=${encodeURIComponent(username)}`, {
       state: { facultyData: notification },
     });
   };
 
-  // Render detailed notification content
+  /**
+   * Renders detailed information for an expanded notification
+   * @param {Object} notification - Notification object
+   * @returns {JSX.Element} - Notification details component
+   */
   const renderNotificationDetails = (notification) => {
-    const isRejection = notification.type === "approvalRejection" || notification.type === "verificationRejection";
-    const timeField = isRejection ? "updatedAt" : "notificationDate";
-    const remarksField = isRejection ? "rejectionRemarks" : "notifyremarks";
+    const isRejection =
+      notification.type === NOTIFICATION_TYPES.approvalRejection ||
+      notification.type === NOTIFICATION_TYPES.verificationRejection;
+    const timeField = isRejection ? 'updatedAt' : 'notificationDate';
+    const remarksField = isRejection ? 'rejectionRemarks' : 'notifyremarks';
 
     return (
-      <div style={styles.notificationDetails}>
+      <div className="notification-table">
         <p>
-          <strong>{isRejection ? "Rejection" : "Notification"} Time:</strong>{" "}
+          <strong>{isRejection ? 'Rejection' : 'Notification'} Time:</strong>{' '}
           {new Date(notification[timeField]).toLocaleString()}
         </p>
         <p>
-          <strong>Remarks:</strong> {notification[remarksField] || "No remarks provided"}
+          <strong>Name:</strong> {notification.name || 'N/A'}
         </p>
-        <button style={styles.reenterButton} onClick={() => handleReenter(notification)}>
-          Reenter
+        <p>
+          <strong>Remarks:</strong> {notification[remarksField] || 'No remarks provided'}
+        </p>
+        <button
+          className="update-button"
+          onClick={() => handleReenter(notification)}
+        >
+          Re-enter
         </button>
       </div>
     );
   };
 
-  // Fetch session data based on selected year
-  useEffect(() => {
-    const fetchSessionData = async () => {
-      try {
-        const url =
-          selectedSessionYear === "All"
-            ? "http://localhost:3001/api/faculty/sessions?year=All"
-            : `http://localhost:3001/api/faculty/sessions?year=${selectedSessionYear}`;
-        const sessionRes = await axios.get(url);
-        setSessionData(sessionRes.data.sessionCounts);
-        const labels =
-          selectedSessionYear === "All"
-            ? [...Array(11)].map((_, i) => (2025 + i).toString()) // Years 2025-2035
-            : [
-                "January",
-                "February",
-                "March",
-                "April",
-                "May",
-                "June",
-                "July",
-                "August",
-                "September",
-                "October",
-                "November",
-                "December",
-              ];
-        setSessionLabels(labels);
-      } catch (error) {
-        console.error("Error fetching session data:", error);
-      }
-    };
-    fetchSessionData();
-  }, [selectedSessionYear]);
-
-  // Fetch user counts for analytics
-  useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      try {
-        const userRes = await axios.get("http://localhost:3001/api/users/count");
-        setUserCounts(userRes.data.data);
-      } catch (error) {
-        console.error("Error fetching analytics data:", error);
-      }
-    };
-    fetchAnalyticsData();
-  }, []);
-
-  // Fetch faculty data based on selected year
-  useEffect(() => {
-    const fetchFacultyData = async () => {
-      try {
-        const url =
-          selectedFacultyYear === "All"
-            ? "http://localhost:3001/api/faculty/monthly?year=All"
-            : `http://localhost:3001/api/faculty/monthly?year=${selectedFacultyYear}`;
-        const facultyRes = await axios.get(url);
-        setInternalData(facultyRes.data.internal);
-        setExternalData(facultyRes.data.external);
-        const labels =
-          selectedFacultyYear === "All"
-            ? [...Array(11)].map((_, i) => (2025 + i).toString()) // Years 2025-2035
-            : [
-                "January",
-                "February",
-                "March",
-                "April",
-                "May",
-                "June",
-                "July",
-                "August",
-                "September",
-                "October",
-                "November",
-                "December",
-              ];
-        setFacultyLabels(labels);
-      } catch (error) {
-        console.error("Error fetching faculty data:", error);
-      }
-    };
-    fetchFacultyData();
-  }, [selectedFacultyYear]);
-
-  // Configuration for session chart
-  const generateSessionChartConfig = () => ({
-    labels: sessionLabels,
-    datasets: [
-      {
-        label: "Total Sessions Handled",
-        data: sessionData,
-        backgroundColor: "rgba(9, 172, 248, 0.6)",
-        borderColor: "rgb(6, 213, 254)",
-        borderWidth: 1,
-      },
-    ],
-  });
-
-  // Configuration for faculty chart
-  const generateFacultyChartConfig = () => ({
-    labels: facultyLabels,
-    datasets: [
-      {
-        label: "Internal Faculty",
-        data: internalData,
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
-        borderColor: "rgba(75, 192, 192, 1)",
-        borderWidth: 1,
-      },
-      {
-        label: "External Faculty",
-        data: externalData,
-        backgroundColor: "rgba(255, 99, 132, 0.6)",
-        borderColor: "rgba(255, 99, 132, 1)",
-        borderWidth: 1,
-      },
-    ],
-  });
-
-  // User count data for display (currently not rendered in JSX)
-  const salesData = [
-    { id: 1, value: userCounts.adminCount || "0", title: "Admin", bgColor: "#bfecff", iconColor: "#5ccbff", iconClass: "fas fa-user-shield" },
-    { id: 2, value: userCounts.dataEntryCount || "0", title: "Data Entry Staff", bgColor: "#FFF3D2", iconColor: "#FFA85C", iconClass: "fas fa-keyboard" },
-    { id: 3, value: userCounts.viewerCount || "0", title: "Data Viewer", bgColor: "#D2FFD2", iconColor: "#5CFF5C", iconClass: "fas fa-eye" },
-  ];
-
-  // Handle faculty year selection change
-  const handleFacultyYearChange = (event) => setSelectedFacultyYear(event.target.value);
-
-  // Render the dashboard
   return (
-    <>
+    <div className="dashboard-container">
+      {/* SEO and Metadata */}
       <Helmet>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-        <link rel="stylesheet" href="style.css" />
-        <title>CASFOS</title>
+        <link rel="stylesheet" href="/fontawesome/css/all.min.css" />
+        <link rel="stylesheet" href="/styles/style.css" />
+        <title>CASFOS - Faculty Entry Staff Dashboard</title>
       </Helmet>
 
-      <div>
-        <section id="sidebar">
-          <a href="#" className="brand">
-            <span className="text">FACULTY ENTRY STAFF</span>
-          </a>
-          <ul className="side-menu top">
-            <li className="active">
-              <a href={`/facultyentrydashboard?username=${encodeURIComponent(username)}`}>
-                <i className="bx bxs-dashboard" />
-                <span className="text">Home</span>
-              </a>
-            </li>
-            <li>
-              <a href={`/facultyentry?username=${encodeURIComponent(username)}`}>
-                <i className="bx bxs-doughnut-chart" />
-                <span className="text">Faculty Entry</span>
-              </a>
-            </li>
-            <li>
-              <a href={`/viewfaculty?username=${encodeURIComponent(username)}`}>
-                <i className="bx bxs-doughnut-chart" />
-                <span className="text">Faculty View</span>
-              </a>
-            </li>
-          </ul>
-          <ul className="side-menu">
-            <li>
-              <a href="/" className="logout">
-                <i className="bx bxs-log-out-circle" />
-                <span className="text">Logout</span>
-              </a>
-            </li>
-          </ul>
-        </section>
+      {/* Sidebar Navigation */}
+      <section id="sidebar">
+        <a href="#" className="brand">
+          <span className="text">FACULTY ENTRY STAFF</span>
+        </a>
+        <ul className="side-menu top">
+          <li className="active">
+            <a href={`/facultyentrydashboard?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-dashboard" />
+              <span className="text">Home</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/facultyentry?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-doughnut-chart" />
+              <span className="text">Faculty Entry</span>
+            </a>
+          </li>
+          <li>
+            <a href={`/viewfaculty?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-doughnut-chart" />
+              <span className="text">Faculty View</span>
+            </a>
+          </li>
+        </ul>
+        <ul className="side-menu">
+          <li>
+            <a href="/" className="logout">
+              <i className="bx bxs-log-out-circle" />
+              <span className="text">Logout</span>
+            </a>
+          </li>
+        </ul>
+      </section>
 
-        <section id="content">
-          <nav>
-            <i className="bx bx-menu" />
-            <span className="head-title">Dashboard</span>
-            <form action="#">
-              <div className="form-input"></div>
-            </form>
-            <div style={styles.usernameContainer}>
-              <i className="bx bxs-user-circle" style={styles.userIcon}></i>
-              <span style={styles.username}>{username}</span>
-            </div>
-          </nav>
+      {/* Main Content */}
+      <section id="content">
+        <nav>
+          <i className="bx bx-menu" />
+          <form action="#"><div className="form-input"></div></form>
 
-          <main>
-            {/* Notification Panel */}
-            <div style={styles.notificationPanel}>
-              <div style={styles.notificationHeader}>
-                <h2>Recent Notifications</h2>
-              </div>
-              {notifications.length === 0 ? (
-                <p style={styles.noNotifications}>No notifications available</p>
-              ) : (
-                <div style={styles.notificationList}>
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification._id}
-                      style={{
-                        ...styles.notificationBanner,
-                        backgroundColor:
-                          notification.type === "approvalRejection" || notification.type === "verificationRejection"
-                            ? "#f8d7da" // Red for rejections
-                            : "#d4edda", // Green for notifications
-                      }}
-                    >
-                      <div style={styles.notificationSummary}>
-                        <span style={styles.notificationTitle}>
-                          {formatNotificationTitle(notification)}
-                          <span style={styles.notificationTime}>
-                            {new Date(notification.updatedAt || notification.notificationDate).toLocaleString()}
-                          </span>
-                        </span>
-                        <div>
-                          <button style={styles.expandButton} onClick={() => toggleExpand(notification._id)}>
-                            {expandedNotification === notification._id ? "▲" : "▼"}
-                          </button>
-                        </div>
-                      </div>
-                      {expandedNotification === notification._id && renderNotificationDetails(notification)}
-                    </div>
-                  ))}
-                </div>
+          <div className="nav-right-container">
+            <div className="notification-icon-container">
+              <i className="fas fa-bell bell-icon" onClick={toggleNotificationPanel} />
+              {notifications.length > 0 && (
+                <span className="notification-badge">{notifications.length}</span>
               )}
             </div>
 
-            {/* Analytics Charts */}
-            <div
-              className="analytics-container"
-              style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: "20px", marginTop: "20px" }}
-            >
-              {/* Faculty Chart */}
-              <div style={moduleStyle}>
-                <h3 style={titleStyle}>Count of Faculties Entered</h3>
-                <div className="filters">
-                  <label style={{ marginTop: "20px" }}>
-                    Year:
-                    <select onChange={handleFacultyYearChange} value={selectedFacultyYear}>
-                      <option value="All">All</option>
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
-                    </select>
-                  </label>
-                </div>
-                <Bar data={generateFacultyChartConfig()} />
-              </div>
+            <div className="username-container">
 
-              {/* Session Chart */}
-              <div style={moduleStyle}>
-                <h3 style={titleStyle}>Total Sessions Handled</h3>
-                <div className="filters">
-                  <label style={{ marginTop: "20px" }}>
-                    Year:
-                    <select onChange={(e) => setSelectedSessionYear(e.target.value)} value={selectedSessionYear}>
-                      <option value="All">All</option>
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
-                    </select>
-                  </label>
+              <i className="bx bxs-user-circle user-icon" />
+              <span className="username">{username}</span>
+            </div>
+          </div>
+        </nav>
+
+        <main className="main-content">
+          {/* Hero Section */}
+          <section className="hero-section">
+            <div className="hero-overlay" />
+            <div className="hero-content">
+              <br />
+              <br />
+              <p>Central Academy for State Forest Service - Faculty Entry Staff Dashboard</p>
+            </div>
+          </section>
+
+          {/* About Section */}
+          <section id="about" className="content-section">
+            <div className="section-container">
+              <h2 className="section-title">About Us</h2>
+              <div className="about-content">
+                <div className="about-text">
+                  <p>
+                    The Central Academy for State Forest Service, Coimbatore (CASFOS) is a premier institution under the Directorate of Forest Education, Ministry of Environment, Forests, and Climate Change. It specializes in training Range Forest Officers and State Forest Service Officers.
+                  </p>
+                  <p>
+                    The Faculty Entry Staff play a crucial role in managing faculty data, ensuring accurate entry and verification of faculty details to support training programs. Established in 1980, CASFOS continues to uphold excellence in forestry education.
+                  </p>
                 </div>
-                <Bar data={generateSessionChartConfig()} />
+                <div className="about-image">
+                  <img
+                    src="/images/casfos_vana_vigyan.png"
+                    alt="CASFOS Emblem"
+                    className="section-image"
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
+                  />
+                </div>
               </div>
             </div>
-          </main>
-        </section>
-      </div>
-    </>
+          </section>
+
+          {/* History Section */}
+          <section id="history" className="content-section alt-bg">
+            <div className="section-container">
+              <h2 className="section-title">History of the Academy</h2>
+              <div className="history-content">
+                <div className="history-text">
+                  <p>
+                    CASFOS Coimbatore is a cornerstone of forestry education, facilitating the management of faculty data to support training initiatives.
+                  </p>
+                  <h3 className="subsection-title">Mandate</h3>
+                  <ul className="mandate-list">
+                    <li>Manage accurate entry and verification of faculty details.</li>
+                    <li>Support training programs through reliable data management.</li>
+                    <li>Contribute to workshops on forestry and environmental conservation.</li>
+                    <li>Ensure compliance with educational standards.</li>
+                  </ul>
+                  <h3 className="subsection-title">Genesis of Forest Training</h3>
+                  <p>
+                    Forestry education in India began in 1867, with a forest school established in Dehradun (1878). The Madras Forest College, founded in Coimbatore in 1912, trained foresters for South India. Revived in 1945 and renamed the Southern Forest Rangers College (SFRC) in 1955, it trained over 4,000 rangers until 1987. CASFOS Coimbatore was established in 1980 and integrated under IGNFA in 2022.
+                  </p>
+                </div>
+                <div className="history-images">
+                  <img
+                    src="/images/casfos_coimbatore_img4.jpg"
+                    alt="Historical Campus"
+                    className="section-image"
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
+                  />
+                  <img
+                    src="/images/casfos_coimbatore_img5.jpg"
+                    alt="Forest Campus"
+                    className="section-image"
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
+                  />
+                  <img
+                    src="/images/casfos_coimbatore_img3.jpg"
+                    alt="Training Facility"
+                    className="section-image"
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Reach Section */}
+          <section id="reach" className="content-section">
+            <div className="section-container">
+              <h2 className="section-title">How to Reach</h2>
+              <div className="reach-content">
+                <div className="reach-text">
+                  <p>
+                    Located in the scenic Forest Campus, R.S. Puram, Coimbatore, Tamil Nadu, CASFOS is 5 km from Coimbatore Railway Station and 12 km from Coimbatore International Airport.
+                  </p>
+                  <p>
+                    The campus hosts the Tamil Nadu Forest Academy (TNFA), the Institute of Forest Genetics & Tree Breeding (IFGTB), and the renowned GASS Museum, making it a hub for forestry education and research.
+                  </p>
+                </div>
+                <div className="map-container">
+                  <iframe
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.2649732361087!2d76.93796778831465!3d11.018735325854964!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba858dde76380d3%3A0xbe08bb837838e990!2sCentral%20Academy%20for%20State%20Forest%20Service!5e0!3m2!1sen!2sin!4v1744637852810!5m2!1sen!2sin"
+                    width="600"
+                    height="450"
+                    style={{ border: 0 }}
+                    allowFullScreen=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Contact Section */}
+          <section id="contact" className="content-section alt-bg">
+            <div className="section-container">
+              <h2 className="section-title">Contact Us</h2>
+              <div className="contact-content">
+                <div className="contact-card">
+                  <h3 className="contact-heading">
+                    Central Academy for State Forest Service <br />
+                    Directorate of Forest Education <br />
+                    Ministry of Environment, Forest and Climate Change <br />
+                    Government of India
+                  </h3>
+                  <div className="contact-info">
+                    <div className="contact-item">
+                      <i className="bx bx-envelope" />
+                      <p>
+                        <strong>Email:</strong> casfos-coimbatore@gov.in | casfoscbe-trng@gov.in
+                      </p>
+                    </div>
+                    <div className="contact-item">
+                      <i className="bx bx-phone" />
+                      <p>
+                        <strong>Phone:</strong> 0422-2450313
+                      </p>
+                    </div>
+                    <div className="contact-item">
+                      <i className="bx bx-map" />
+                      <p>
+                        <strong>Address:</strong> Forest Campus, R.S. Puram, Coimbatore - 641002, Tamil Nadu
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </section>
+
+      {/* Notification Popup */}
+      {showNotifications && (
+        <div className="popup-overlay">
+          <div className="notification-popup">
+            <div className="notification-header">
+              <h2>Recent Notifications</h2>
+              <div>
+                {notifications.length > 0 && (
+                  <button className="clear-all-button" onClick={handleClearAll}>
+                    Clear All
+                  </button>
+                )}
+                <button className="close-button" onClick={toggleNotificationPanel}>
+                  Close
+                </button>
+              </div>
+            </div>
+            {notifications.length === 0 ? (
+              <p className="no-notifications">No notifications available</p>
+            ) : (
+              <div className="notification-list">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification._id}
+                    className={`notification-banner ${
+                      notification.type === NOTIFICATION_TYPES.approvalRejection ||
+                      notification.type === NOTIFICATION_TYPES.verificationRejection
+                        ? 'rejected'
+                        : 'pending'
+                    }`}
+                  >
+                    <div className="notification-summary">
+                      <span className="notification-title">
+                        {formatNotificationTitle(notification)}
+                        <span className="notification-time">
+                          {new Date(notification.updatedAt || notification.notificationDate).toLocaleString()}
+                        </span>
+                      </span>
+                      <div>
+                        <button
+                          className="expand-button"
+                          onClick={() => toggleExpand(notification._id)}
+                        >
+                          {expandedNotification === notification._id ? '▲' : '▼'}
+                        </button>
+                        <button
+                          className="clear-button"
+                          onClick={() => handleClearNotification(notification._id, notification.type)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    {expandedNotification === notification._id && renderNotificationDetails(notification)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
-};
-
-// Inline styles for notification panel and UI elements
-const styles = {
-  notificationPanel: {
-    maxWidth: "800px",
-    margin: "20px auto",
-    padding: "20px",
-    borderRadius: "10px",
-    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-    backgroundColor: "#fff",
-    maxHeight: "500px",
-    overflowY: "auto",
-  },
-  notificationHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "15px",
-    position: "sticky",
-    top: 0,
-    backgroundColor: "#fff",
-    padding: "10px 0",
-    zIndex: 1,
-  },
-  notificationList: {
-    maxHeight: "400px",
-    overflowY: "auto",
-    paddingRight: "5px",
-  },
-  notificationBanner: {
-    padding: "15px",
-    marginBottom: "10px",
-    borderRadius: "5px",
-    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-  },
-  notificationSummary: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  notificationTitle: {
-    flex: 1,
-    fontWeight: "bold",
-    display: "flex",
-    flexDirection: "column",
-  },
-  notificationTime: {
-    fontSize: "0.8em",
-    color: "#666",
-    fontWeight: "normal",
-    marginTop: "5px",
-  },
-  expandButton: {
-    padding: "5px 10px",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    border: "none",
-    borderRadius: "5px",
-    cursor: "pointer",
-    marginRight: "10px",
-    minWidth: "30px",
-  },
-  reenterButton: {
-    padding: "5px 10px",
-    backgroundColor: "#28a745",
-    color: "#fff",
-    border: "none",
-    borderRadius: "5px",
-    cursor: "pointer",
-    marginTop: "10px",
-  },
-  notificationDetails: {
-    marginTop: "10px",
-    padding: "10px",
-    backgroundColor: "#f9f9f9",
-    borderRadius: "5px",
-    fontSize: "0.9em",
-  },
-  noNotifications: {
-    textAlign: "center",
-    color: "#666",
-    padding: "20px",
-  },
-  usernameContainer: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    fontSize: "14px",
-    color: "#555",
-  },
-  userIcon: {
-    fontSize: "30px",
-    color: "#007BFF",
-  },
-  username: {
-    fontWeight: "bold",
-    fontSize: "18px",
-  },
-};
-
-// Styles for chart modules
-const moduleStyle = {
-  width: "45%",
-  padding: "20px",
-  backgroundColor: "white",
-  borderRadius: "15px",
-  boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-  textAlign: "center",
-};
-const titleStyle = {
-  marginBottom: "15px",
-  fontSize: "1.2em",
-  color: "#28a745",
 };
 
 export default FacultyEntryStaffDashboard;

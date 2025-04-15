@@ -628,7 +628,8 @@ const AssetIssue = () => {
         {/* Navigation Bar */}
         <nav>
           <i className="bx bx-menu" />
-          <span className="head-title">Dashboard</span>
+          <form action="#"><div className="form-input"></div></form>
+
           <div style={styles.usernameContainer}>
             <i className="bx bxs-user-circle" style={styles.userIcon}></i>
             <span style={styles.username}>{username}</span>

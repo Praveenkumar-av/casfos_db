@@ -305,7 +305,7 @@ const facultyverifierFacultyView = () => {
             text-align: left;
           }
           .faculty-table th {
-            background-color: #f2f2f2;
+            background-color: #1d8823;
             fontWeight: bold;
           }
         `}</style>
@@ -314,7 +314,7 @@ const facultyverifierFacultyView = () => {
       {/* Sidebar */}
       <section id="sidebar">
         <a href="#" className="brand">
-          <span className="text">Faculty Verifier</span>
+          <span className="text">FACULTY VERIFIER</span>
         </a>
         <ul className="side-menu top">
           <li>

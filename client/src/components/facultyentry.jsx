@@ -1,22 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Helmet } from "react-helmet"; // For managing document head
-import "../styles/style.css"; // General styles
-import axios from "axios"; // HTTP client for API requests
-import "../styles/facultymanagement.css"; // Component-specific styles
-import { useLocation } from "react-router-dom"; // For accessing URL parameters and state
-import Swal from "sweetalert2"; // For displaying alerts
+import { Helmet } from "react-helmet";
+import "../styles/style.css";
+import axios from "axios";
+import "../styles/facultymanagement.css";
+import { useLocation } from "react-router-dom";
+import Swal from "sweetalert2";
 
-// FacultyManagement component: Handles faculty data entry and management
 const FacultyManagement = () => {
-  // State for faculty type selection
   const [facultyType, setFacultyType] = useState("");
-  // State to track if form is being saved
   const [isSaved, setIsSaved] = useState(false);
-  // State for auto-save status display
   const [savingStatus, setSavingStatus] = useState("");
-  // State for photograph preview URL
   const [imagePreview, setImagePreview] = useState(null);
-  // State for faculty form data
   const [facultyData, setFacultyData] = useState({
     name: "",
     cadre: "",
@@ -48,16 +42,13 @@ const FacultyManagement = () => {
     modulesHandled: [],
     otherResponsibilities: [],
   });
-  // State for domain expertise (major and minor domains)
   const [domainExpertise, setDomainExpertise] = useState([{ major: "", minors: [] }]);
 
-  // Get username and staffid from URL query parameters
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
   const staffid = username.toString();
 
-  // Domain options for major and minor domain selection
   const domainOptions = {
     "Forest & Wildlife": [
       "Silviculture",
@@ -140,7 +131,6 @@ const FacultyManagement = () => {
     ],
   };
 
-  // Load rejected faculty data from location state on mount
   useEffect(() => {
     if (location.state && location.state.facultyData) {
       const rejectedFaculty = location.state.facultyData;
@@ -178,7 +168,6 @@ const FacultyManagement = () => {
         otherResponsibilities: rejectedFaculty.otherResponsibilities || [],
       });
 
-      // Populate domain expertise from rejected data
       if (rejectedFaculty.majorDomains && rejectedFaculty.majorDomains.length > 0) {
         const newDomainExpertise = rejectedFaculty.majorDomains.map((major) => ({
           major,
@@ -187,14 +176,12 @@ const FacultyManagement = () => {
         setDomainExpertise(newDomainExpertise.length > 0 ? newDomainExpertise : [{ major: "", minors: [] }]);
       }
 
-      // Set image preview if photograph exists
       if (rejectedFaculty.photograph) {
         setImagePreview(rejectedFaculty.photograph);
       }
     }
   }, [location.state]);
 
-  // Handle faculty type selection change
   const handleFacultyTypeChange = (e) => {
     setFacultyType(e.target.value);
     setFacultyData({
@@ -209,7 +196,6 @@ const FacultyManagement = () => {
     autoSaveFacultyData();
   };
 
-  // Handle input changes for various fields
   const handleInputChange = (e, fieldType = "", index = -1) => {
     const { name, value } = e.target;
     if (fieldType === "coursesHandled") {
@@ -230,7 +216,6 @@ const FacultyManagement = () => {
     autoSaveFacultyData();
   };
 
-  // Handle major domain selection
   const handleMajorDomainChange = (index, value) => {
     const updatedExpertise = [...domainExpertise];
     updatedExpertise[index] = { major: value, minors: [] };
@@ -238,7 +223,6 @@ const FacultyManagement = () => {
     updateFacultyData(updatedExpertise);
   };
 
-  // Handle minor domain checkbox changes
   const handleMinorDomainChange = (index, subDomain, checked) => {
     const updatedExpertise = [...domainExpertise];
     if (checked) {
@@ -250,7 +234,6 @@ const FacultyManagement = () => {
     updateFacultyData(updatedExpertise);
   };
 
-  // Update facultyData with domain expertise
   const updateFacultyData = (expertise) => {
     const majorDomains = expertise.map((e) => e.major).filter(Boolean);
     const minorDomains = expertise.flatMap((e) => e.minors);
@@ -262,19 +245,16 @@ const FacultyManagement = () => {
     autoSaveFacultyData();
   };
 
-  // Add new domain expertise entry
   const handleAddDomainExpertise = () => {
     setDomainExpertise([...domainExpertise, { major: "", minors: [] }]);
   };
 
-  // Remove domain expertise entry
   const handleRemoveDomainExpertise = (index) => {
     const updatedExpertise = domainExpertise.filter((_, i) => i !== index);
     setDomainExpertise(updatedExpertise);
     updateFacultyData(updatedExpertise);
   };
 
-  // Add new responsibility entry
   const handleAddResponsibility = () => {
     setFacultyData({
       ...facultyData,
@@ -282,13 +262,11 @@ const FacultyManagement = () => {
     });
   };
 
-  // Remove responsibility entry
   const handleRemoveResponsibility = (index) => {
     const updatedResponsibilities = (facultyData.otherResponsibilities || []).filter((_, i) => i !== index);
     setFacultyData({ ...facultyData, otherResponsibilities: updatedResponsibilities });
   };
 
-  // Add new module entry
   const handleAddModule = () => {
     setFacultyData({
       ...facultyData,
@@ -296,13 +274,11 @@ const FacultyManagement = () => {
     });
   };
 
-  // Remove module entry
   const handleRemoveModule = (index) => {
     const updatedModules = (facultyData.modulesHandled || []).filter((_, i) => i !== index);
     setFacultyData({ ...facultyData, modulesHandled: updatedModules });
   };
 
-  // Add new publication entry
   const handleAddPublication = () => {
     setFacultyData((prevState) => ({
       ...prevState,
@@ -313,13 +289,11 @@ const FacultyManagement = () => {
     }));
   };
 
-  // Remove publication entry
   const handleRemovePublication = (index) => {
     const updatedPublications = (facultyData.publications || []).filter((_, i) => i !== index);
     setFacultyData({ ...facultyData, publications: updatedPublications });
   };
 
-  // Add new education entry
   const handleAddEducation = () => {
     setFacultyData((prevState) => ({
       ...prevState,
@@ -330,13 +304,11 @@ const FacultyManagement = () => {
     }));
   };
 
-  // Remove education entry
   const handleRemoveEducation = (index) => {
     const updatedEducation = (facultyData.educationDetails || []).filter((_, i) => i !== index);
     setFacultyData({ ...facultyData, educationDetails: updatedEducation });
   };
 
-  // Add new course entry
   const handleAddCourse = () => {
     setFacultyData({
       ...facultyData,
@@ -347,17 +319,15 @@ const FacultyManagement = () => {
     });
   };
 
-  // Remove course entry
   const handleRemoveCourse = (index) => {
     const updatedCourses = (facultyData.coursesHandled || []).filter((_, i) => i !== index);
     setFacultyData({ ...facultyData, coursesHandled: updatedCourses });
   };
 
-  // Handle photograph file upload
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 50 * 1024) { // 50KB limit
+      if (file.size > 50 * 1024) {
         Swal.fire({
           icon: "error",
           title: "File Size Error",
@@ -371,50 +341,91 @@ const FacultyManagement = () => {
     }
   };
 
-  // Validate form data before submission
   const validateForm = () => {
     const errors = [];
 
-    if (!facultyType) errors.push("Faculty Type is required.");
-    if (!facultyData.name.trim()) errors.push("Name is required.");
-    if (facultyData.mobileNumber && !/^\d{10}$/.test(facultyData.mobileNumber)) {
+    // Required fields
+    if (!facultyType) {
+      errors.push("Faculty Type is required.");
+    }
+    if (!facultyData.name.trim()) {
+      errors.push("Name is required.");
+    }
+    if (!facultyData.mobileNumber) {
+      errors.push("Mobile Number is required.");
+    } else if (!/^\d{10}$/.test(facultyData.mobileNumber)) {
       errors.push("Mobile Number must be exactly 10 digits.");
     }
-    if (facultyData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(facultyData.email)) {
-      errors.push("Please enter a valid Email Address.");
+    if (!facultyData.email) {
+      errors.push("Email Address is required.");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(facultyData.email)) {
+      errors.push("Please enter a valid Email Address (e.g., example@domain.com).");
     }
+
+    // Optional fields - only validate if provided
     if (facultyData.yearOfAllotment && !/^\d{4}$/.test(facultyData.yearOfAllotment)) {
-      errors.push("Year of Allotment must be a valid 4-digit year.");
+      errors.push("Year of Allotment must be a valid 4-digit year (e.g., 2020).");
     }
-    if ((facultyType === "external" || facultyType === "contract") && !facultyData.institution.trim()) {
-      errors.push("Institution Name is required for External/Contract Faculty.");
+
+    if (facultyData.cadre && !facultyData.cadre.trim()) {
+      errors.push("Cadre cannot be empty if provided.");
+    }
+
+    if ((facultyType === "external" || facultyType === "contract") && facultyData.institution && !facultyData.institution.trim()) {
+      errors.push("Institution Name cannot be empty if provided.");
     }
 
     facultyData.educationDetails.forEach((edu, index) => {
-      if (edu.degree.trim() && (!edu.specialization.trim() || !edu.institutionName.trim())) {
-        errors.push(`Education ${index + 1}: Specialization and Institution Name are required if Degree is provided.`);
+      if (edu.degree.trim()) {
+        if (!edu.specialization.trim()) {
+          errors.push(`Education ${index + 1}: Specialization is required if Degree is provided.`);
+        }
+        if (!edu.institutionName.trim()) {
+          errors.push(`Education ${index + 1}: Institution Name is required if Degree is provided.`);
+        }
       }
     });
 
     facultyData.publications.forEach((pub, index) => {
-      if (pub.typeOfPublication && (!pub.title.trim() || !pub.dateOfPublication)) {
-        errors.push(`Publication ${index + 1}: Title and Date of Publication are required if Type is selected.`);
+      if (pub.typeOfPublication) {
+        if (!pub.title.trim()) {
+          errors.push(`Publication ${index + 1}: Title is required if Type of Publication is selected.`);
+        }
+        if (!pub.dateOfPublication) {
+          errors.push(`Publication ${index + 1}: Date of Publication is required if Type of Publication is selected.`);
+        }
       }
     });
 
     facultyData.coursesHandled.forEach((course, index) => {
-      if (course.courseType && (!course.batchno || !course.title.trim())) {
-        errors.push(`Course ${index + 1}: Batch Number and Title are required if Course Type is selected.`);
+      if (course.courseType) {
+        if (!course.batchno) {
+          errors.push(`Course ${index + 1}: Batch Number is required if Course Type is selected.`);
+        }
+        if (!course.title.trim()) {
+          errors.push(`Course ${index + 1}: Title is required if Course Type is selected.`);
+        }
       }
       if (course.feedbackRating && (course.feedbackRating < 1 || course.feedbackRating > 10)) {
         errors.push(`Course ${index + 1}: Feedback Rating must be between 1 and 10.`);
       }
     });
 
+    facultyData.modulesHandled.forEach((module, index) => {
+      if (module && !module.trim()) {
+        errors.push(`Module ${index + 1}: Module name cannot be empty if provided.`);
+      }
+    });
+
+    facultyData.otherResponsibilities.forEach((resp, index) => {
+      if (resp.responsibility && !resp.responsibility.trim()) {
+        errors.push(`Responsibility ${index + 1}: Responsibility cannot be empty if provided.`);
+      }
+    });
+
     return errors;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaved(true);
@@ -444,7 +455,6 @@ const FacultyManagement = () => {
           title: "Success!",
           text: "Faculty data saved successfully!",
         });
-        // Reset form
         setFacultyData({
           name: "",
           cadre: "",
@@ -482,22 +492,24 @@ const FacultyManagement = () => {
       } else {
         Swal.fire({
           icon: "error",
-          title: "Oops...",
-          text: "Failed to save faculty data.",
+          title: "Failed to Save",
+          text: response.data.message || "Failed to save faculty data. Please try again.",
         });
       }
     } catch (error) {
       console.error("Error saving faculty data:", error);
+      const errorMessage = error.response?.data?.message || 
+        error.message === "Network Error" ? "Unable to connect to the server. Please check your network connection." :
+        "An unexpected error occurred while saving the data.";
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "An error occurred while saving the data.",
+        text: errorMessage,
       });
     }
     setIsSaved(false);
   };
 
-  // Auto-save faculty data to backend
   const autoSaveFacultyData = async () => {
     if (!facultyType || isSaved) return;
     setSavingStatus("Saving...");
@@ -510,11 +522,11 @@ const FacultyManagement = () => {
       setSavingStatus("Draft Saved");
     } catch (error) {
       console.error("Auto-save error:", error);
-      setSavingStatus("Failed to Save");
+      const errorMessage = error.response?.data?.message || "Failed to auto-save draft.";
+      setSavingStatus(errorMessage);
     }
   };
 
-  // Load auto-saved data and cleanup image preview on mount/unmount
   useEffect(() => {
     const fetchAutoSavedFacultyData = async () => {
       if (location.state && location.state.facultyData) return;
@@ -572,7 +584,6 @@ const FacultyManagement = () => {
     };
     fetchAutoSavedFacultyData();
 
-    // Cleanup image preview URL on unmount
     return () => {
       if (imagePreview) {
         URL.revokeObjectURL(imagePreview);
@@ -580,15 +591,13 @@ const FacultyManagement = () => {
     };
   }, []);
 
-  // Auto-save interval
   useEffect(() => {
     const interval = setInterval(() => {
       autoSaveFacultyData();
-    }, 10000); // Every 10 seconds
+    }, 10000);
     return () => clearInterval(interval);
   }, [facultyType, facultyData]);
 
-  // Render the component
   return (
     <>
       <Helmet>
@@ -635,7 +644,6 @@ const FacultyManagement = () => {
         <section id="content">
           <nav>
             <i className="bx bx-menu" />
-            <span className="head-title">Dashboard</span>
             <form action="#">
               <div className="form-input"></div>
             </form>
@@ -666,7 +674,7 @@ const FacultyManagement = () => {
                           <span>{savingStatus}</span>
                         </div>
                       )}
-                      {savingStatus === "Failed to Save" && (
+                      {savingStatus && savingStatus !== "Saving..." && savingStatus !== "Draft Saved" && (
                         <div>
                           <i className="bx bx-error-circle" style={styles.errorIcon}></i>
                           <span>{savingStatus}</span>
@@ -677,7 +685,7 @@ const FacultyManagement = () => {
 
                   <form onSubmit={handleSubmit}>
                     <div>
-                      <label htmlFor="facultyType">Faculty Type:</label>
+                      <label htmlFor="facultyType">Faculty Type <span style={{ color: "red" }}>*</span>:</label>
                       <select id="facultyType" value={facultyType} onChange={handleFacultyTypeChange}>
                         <option value="" disabled>Select Faculty Type</option>
                         <option value="internal">Internal Faculty</option>
@@ -686,11 +694,10 @@ const FacultyManagement = () => {
                       </select>
                     </div>
 
-                    {/* Internal Faculty Form */}
                     {facultyType === "internal" && (
                       <div>
                         <h3>Internal Faculty Details</h3>
-                        <label htmlFor="name">Name:</label>
+                        <label htmlFor="name">Name <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="text"
                           id="name"
@@ -749,7 +756,7 @@ const FacultyManagement = () => {
                           value={facultyData.dateOfBirth}
                           onChange={handleInputChange}
                         />
-                        <label htmlFor="mobileNumber">Mobile Number:</label>
+                        <label htmlFor="mobileNumber">Mobile Number <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="text"
                           id="mobileNumber"
@@ -776,7 +783,7 @@ const FacultyManagement = () => {
                           value={facultyData.permanentAddress}
                           onChange={handleInputChange}
                         />
-                        <label htmlFor="email">Email Address:</label>
+                        <label htmlFor="email">Email Address <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="email"
                           id="email"
@@ -1086,11 +1093,10 @@ const FacultyManagement = () => {
                       </div>
                     )}
 
-                    {/* External Faculty Form */}
                     {facultyType === "external" && (
                       <div>
                         <h3>External Faculty Details</h3>
-                        <label htmlFor="name">Name:</label>
+                        <label htmlFor="name">Name <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="text"
                           name="name"
@@ -1114,7 +1120,7 @@ const FacultyManagement = () => {
                           value={facultyData.yearOfAllotment}
                           onChange={handleInputChange}
                         />
-                        <label htmlFor="mobileNumber">Mobile Number:</label>
+                        <label htmlFor="mobileNumber">Mobile Number <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="text"
                           name="mobileNumber"
@@ -1138,7 +1144,7 @@ const FacultyManagement = () => {
                           value={facultyData.permanentAddress}
                           onChange={handleInputChange}
                         />
-                        <label htmlFor="email">Email Address:</label>
+                        <label htmlFor="email">Email Address <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="email"
                           name="email"
@@ -1329,11 +1335,10 @@ const FacultyManagement = () => {
                       </div>
                     )}
 
-                    {/* Contract Faculty Form */}
                     {facultyType === "contract" && (
                       <div>
                         <h3>Contract Faculty Details</h3>
-                        <label htmlFor="name">Name:</label>
+                        <label htmlFor="name">Name <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="text"
                           name="name"
@@ -1357,7 +1362,7 @@ const FacultyManagement = () => {
                           value={facultyData.yearOfAllotment}
                           onChange={handleInputChange}
                         />
-                        <label htmlFor="mobileNumber">Mobile Number:</label>
+                        <label htmlFor="mobileNumber">Mobile Number <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="text"
                           name="mobileNumber"
@@ -1381,7 +1386,7 @@ const FacultyManagement = () => {
                           value={facultyData.permanentAddress}
                           onChange={handleInputChange}
                         />
-                        <label htmlFor="email">Email Address:</label>
+                        <label htmlFor="email">Email Address <span style={{ color: "red" }}>*</span>:</label>
                         <input
                           type="email"
                           name="email"
@@ -1572,7 +1577,9 @@ const FacultyManagement = () => {
                       </div>
                     )}
 
-                    <button type="submit">Save</button>
+                    <button type="submit" disabled={isSaved}>
+                      {isSaved ? "Saving..." : "Save"}
+                    </button>
                   </form>
                 </div>
               </div>
@@ -1584,7 +1591,6 @@ const FacultyManagement = () => {
   );
 };
 
-// Styles object for inline styling
 const styles = {
   savingStatus: {
     marginTop: "10px",

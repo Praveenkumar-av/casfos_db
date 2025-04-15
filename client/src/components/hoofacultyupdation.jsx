@@ -3,6 +3,7 @@ import "../styles/style.css"; // General styles
 import axios from "axios"; // HTTP client for API requests
 import { useLocation, useNavigate } from "react-router-dom"; // For navigation and URL parameters
 import "../styles/viewFaculty.css"; // Component-specific styles
+import Swal from "sweetalert2"; // Added SweetAlert2 import
 
 // FacultyUpdation component: Allows Head of Office to filter, view, update, and delete faculty records
 const FacultyUpdation = () => {
@@ -22,7 +23,6 @@ const FacultyUpdation = () => {
   const [totalFaculties, setTotalFaculties] = useState(0); // Total number of filtered faculties
   const [message, setMessage] = useState(""); // Message for no records found
   const [selectedFaculty, setSelectedFaculty] = useState(null); // Faculty selected for detailed view
-  const [deleteConfirmation, setDeleteConfirmation] = useState(null); // Faculty ID for delete confirmation
   const [deleteStatus, setDeleteStatus] = useState({}); // Deletion status per faculty
 
   // Domain options for major and minor domains dropdowns
@@ -127,19 +127,36 @@ const FacultyUpdation = () => {
     }
   };
 
-  // Initiate faculty deletion with confirmation
+  // Initiate faculty deletion with SweetAlert2 confirmation
   const handleDeleteFaculty = (facultyId) => {
-    setDeleteConfirmation(facultyId);
+    Swal.fire({
+      icon: "warning",
+      title: "Are you sure?",
+      text: "Do you want to delete this faculty record?",
+      showCancelButton: true,
+      confirmButtonText: "Yes",
+      cancelButtonText: "No",
+      confirmButtonColor: "#28a745",
+      cancelButtonColor: "#dc3545",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        confirmDelete(facultyId);
+      }
+    });
   };
 
-  // Confirm and perform faculty deletion
+  // Perform faculty deletion with SweetAlert2 feedback
   const confirmDelete = async (facultyId) => {
-    setDeleteConfirmation(null);
     setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Deleting..." }));
 
     try {
       const response = await axios.delete(`http://localhost:3001/api/faculty/delete/${facultyId}`);
       if (response.data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: "Faculty deleted successfully!",
+        });
         setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Deleted" }));
         setTableData((prevData) => prevData.filter((faculty) => faculty._id !== facultyId));
         setTotalFaculties((prev) => prev - 1);
@@ -147,17 +164,27 @@ const FacultyUpdation = () => {
           setDeleteStatus((prev) => ({ ...prev, [facultyId]: "" }));
         }, 2000);
       } else {
+        Swal.fire({
+          icon: "error",
+          title: "Failed to Delete",
+          text: response.data.message || "Failed to delete faculty. Please try again.",
+        });
         setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Failed to Delete" }));
       }
     } catch (error) {
-      setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Failed to Delete" }));
       console.error("Error deleting faculty:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        (error.message === "Network Error"
+          ? "Unable to connect to the server. Please check your network connection."
+          : "An unexpected error occurred while deleting the faculty.");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMessage,
+      });
+      setDeleteStatus((prev) => ({ ...prev, [facultyId]: "Failed to Delete" }));
     }
-  };
-
-  // Cancel deletion
-  const cancelDelete = () => {
-    setDeleteConfirmation(null);
   };
 
   // Apply filters and fetch faculty data
@@ -401,64 +428,6 @@ const FacultyUpdation = () => {
     },
   };
 
-  // Inline styles for delete confirmation popup
-  const confirmationStyles = {
-    confirmationPopup: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "rgba(0, 0, 0, 0.5)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 1001,
-    },
-    confirmationContent: {
-      background: "white",
-      padding: "20px",
-      borderRadius: "10px",
-      textAlign: "center",
-      width: "90%",
-      maxWidth: "400px",
-      animation: "fadeIn 0.3s ease-out",
-    },
-    confirmationText: {
-      marginBottom: "20px",
-      fontSize: "16px",
-      color: "#333",
-    },
-    confirmationButtons: {
-      display: "flex",
-      justifyContent: "space-around",
-    },
-    yesButton: {
-      padding: "8px 16px",
-      backgroundColor: "#28a745",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    yesButtonHover: {
-      backgroundColor: "#218838",
-    },
-    cancelButton: {
-      padding: "8px 16px",
-      backgroundColor: "#dc3545",
-      color: "white",
-      border: "none",
-      borderRadius: "4px",
-      cursor: "pointer",
-      transition: "background-color 0.2s",
-    },
-    cancelButtonHover: {
-      backgroundColor: "#c82333",
-    },
-  };
-
   // General inline styles
   const styles = {
     usernameContainer: {
@@ -565,7 +534,6 @@ const FacultyUpdation = () => {
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
-          <span className="head-title">Dashboard</span>
           <form action="#">
             <div className="form-input"></div>
           </form>
@@ -895,33 +863,6 @@ const FacultyUpdation = () => {
             >
               Close
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Popup */}
-      {deleteConfirmation && (
-        <div style={confirmationStyles.confirmationPopup}>
-          <div style={confirmationStyles.confirmationContent}>
-            <p style={confirmationStyles.confirmationText}>Are you sure you want to delete this faculty?</p>
-            <div style={confirmationStyles.confirmationButtons}>
-              <button
-                style={confirmationStyles.yesButton}
-                onClick={() => confirmDelete(deleteConfirmation)}
-                onMouseOver={(e) => (e.target.style.backgroundColor = confirmationStyles.yesButtonHover.backgroundColor)}
-                onMouseOut={(e) => (e.target.style.backgroundColor = confirmationStyles.yesButton.backgroundColor)}
-              >
-                Yes
-              </button>
-              <button
-                style={confirmationStyles.cancelButton}
-                onClick={cancelDelete}
-                onMouseOver={(e) => (e.target.style.backgroundColor = confirmationStyles.cancelButtonHover.backgroundColor)}
-                onMouseOut={(e) => (e.target.style.backgroundColor = confirmationStyles.cancelButton.backgroundColor)}
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}

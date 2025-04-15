@@ -109,60 +109,53 @@ const StorekeeperDashboard = () => {
   const formatNotificationTitle = (notification) => {
     const { action, assetCategory, itemNames, subCategory, condition } = notification;
     const itemName = itemNames?.[0] || subCategory || assetCategory || 'item';
-
-    if (assetCategory === 'Building' || assetCategory === 'Land') {
-      if (action === 'asset approved') {
-        return `Asset Manager approved ${assetCategory} entry`;
-      } else if (action === 'asset rejected') {
-        return `Asset Manager rejected ${assetCategory} entry`;
-      }
-    }
-
+  
     switch (action) {
-      case 'asset approved':
+      case "asset approved":
         return `Asset Manager approved purchased ${assetCategory || 'assets'}`;
-      case 'asset rejected':
+      case "asset rejected":
         return `Asset Manager rejected ${itemName} purchase`;
-      case 'issue approved':
+      case "issue approved":
         return `Asset Manager approved issuing ${itemName}`;
-      case 'issue rejected':
+      case "issue rejected":
         return `Asset Manager rejected issuing ${itemName}`;
-      case 'service approved':
+      case "service approved":
         return `Asset Manager approved ${itemName} for service`;
-      case 'service rejected':
+      case "service rejected":
         return `Asset Manager rejected ${itemName} for service`;
-      case 'return approved':
+      case "return approved":
         return `Asset Manager approved ${itemName} return for ${condition || 'N/A'}`;
-      case 'return rejected':
+      case "return rejected":
         return `Asset Manager rejected ${itemName} return for ${condition || 'N/A'}`;
-      case 'exchange approved':
+      case "exchange approved":
         return `Asset Manager exchanged ${itemName}`;
-      case 'exchange rejected':
+      case "exchange rejected":
         return `Asset Manager cancelled exchange ${itemName}`;
-      case 'asset disposal approved':
+      case "asset disposal approved":
         return `Asset Manager approved disposing ${itemName}`;
-      case 'asset disposal cancelled':
+      case "asset disposal cancelled":
         return `Asset Manager cancelled ${itemName} for disposal`;
-      case 'condition changed':
+      case "condition changed":
         return `Asset Manager changed returned asset condition of ${itemName}`;
-      case 'asset updation approved':
+      case "asset updation approved":
         return `Asset Manager approved update for ${itemName}`;
-      case 'asset updation rejected':
+      case "asset updation rejected":
         return `Asset Manager rejected update for ${itemName}`;
-      case 'building upgrade approved':
+      case "building upgrade approved":
         return `Asset Manager approved building upgrade for ${itemName}`;
-      case 'building upgrade rejected':
+      case "building upgrade rejected":
         return `Asset Manager rejected building upgrade for ${itemName}`;
-      case 'building disposal cancelled':
+      case "building disposal cancelled":
         return `Asset Manager cancelled building disposal for ${itemName}`;
-      case 'building maintenance approved':
-        return `Asset Manager approved maintenance for ${itemName}`;
-      case 'building maintenance rejected':
-        return `Asset Manager rejected maintenance for ${itemName}`;
+        case "building maintenance approved":
+      return `Asset Manager approved maintenance for ${itemName}`;
+    case "building maintenance rejected":
+      return `Asset Manager rejected maintenance for ${itemName}`;
       default:
-        return `${action} - ${assetCategory || 'Unknown'}`;
+        return `${action} - ${assetCategory}`;
     }
   };
+
 
   /**
    * Renders detailed information for an expanded notification
@@ -182,211 +175,107 @@ const StorekeeperDashboard = () => {
       subCategory,
       quantity,
       location,
+      supplierName,
+      purchaseDate,
+      billNo,
+      receivedBy,
       rejectionRemarks,
       condition,
       changedCondition,
-      type,
-      buildingNo,
     } = notification;
-
+  
     return (
-      <div className="notification-details">
-        <p>
-          <strong>Action Time:</strong> {new Date(actionTime).toLocaleString()}
-        </p>
-        {(action.includes('asset approved') || action.includes('asset rejected')) &&
-        assetCategory === 'Building' ? (
+      <div className='notification-table'>
+        <p><strong>Action Time:</strong> {new Date(actionTime).toLocaleString()}</p>
+        {action.includes("asset approved") || action.includes("asset rejected") ? (
           <>
-            <p>
-              <strong>Asset Type:</strong> {assetType || 'N/A'}
-            </p>
-            <p>
-              <strong>Asset Category:</strong> {assetCategory || 'N/A'}
-            </p>
-            <p>
-              <strong>Sub Category:</strong> {subCategory || 'N/A'}
-            </p>
-            {type && (
-              <p>
-                <strong>Type:</strong> {type}
-              </p>
-            )}
-            {buildingNo && (
-              <p>
-                <strong>Building No:</strong> {buildingNo}
-              </p>
-            )}
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
+            <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
+            <p><strong>Supplier Name:</strong> {supplierName || "N/A"}</p>
+            <p><strong>Purchase Date:</strong> {purchaseDate ? new Date(purchaseDate).toLocaleDateString() : "N/A"}</p>
+            <p><strong>Bill No:</strong> {billNo || "N/A"}</p>
+            <p><strong>Received By:</strong> {receivedBy || "N/A"}</p>
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) : (action.includes('asset approved') || action.includes('asset rejected')) &&
-          assetCategory === 'Land' ? (
+        ) : action.includes("building maintenance approved") || action.includes("building maintenance rejected") ? (
           <>
-            <p>
-              <strong>Asset Type:</strong> {assetType || 'N/A'}
-            </p>
-            <p>
-              <strong>Asset Category:</strong> {assetCategory || 'N/A'}
-            </p>
-            <p>
-              <strong>Sub Category:</strong> {subCategory || 'N/A'}
-            </p>
-            <p>
-              <strong>Location:</strong> {location || 'N/A'}
-            </p>
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
+            <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
+            <p><strong>Sub Category:</strong> {subCategory || "N/A"}</p>
+            <p><strong>Location:</strong> {location || "N/A"}</p>
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) : action.includes('building maintenance') ? (
+        ) : action.includes("issue") || action.includes("service") || action.includes("exchange") ? (
           <>
-            <p>
-              <strong>Asset Type:</strong> {assetType || 'N/A'}
-            </p>
-            <p>
-              <strong>Asset Category:</strong> {assetCategory || 'N/A'}
-            </p>
-            <p>
-              <strong>Sub Category:</strong> {subCategory || 'N/A'}
-            </p>
-            <p>
-              <strong>Location:</strong> {location || 'N/A'}
-            </p>
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
+            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
+            {quantity && <p><strong>Quantity:</strong> {quantity}</p>}
+            {location && <p><strong>Location:</strong> {location}</p>}
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) : action.includes('issue') || action.includes('service') || action.includes('exchange') ? (
+        ) : action.includes("return") ? (
           <>
-            <p>
-              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
-            </p>
-            <p>
-              <strong>Subcategory:</strong> {subCategory || 'N/A'}
-            </p>
-            {quantity && (
-              <p>
-                <strong>Quantity:</strong> {quantity}
-              </p>
-            )}
-            {location && (
-              <p>
-                <strong>Location:</strong> {location}
-              </p>
-            )}
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
+            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
+            <p><strong>Returned From:</strong> {location || "N/A"}</p>
+            <p><strong>Condition:</strong> {condition || "N/A"}</p>
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) : action.includes('return') ? (
+        ) : action.includes("building disposal cancelled") ? (
           <>
-            <p>
-              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
-            </p>
-            <p>
-              <strong>Subcategory:</strong> {subCategory || 'N/A'}
-            </p>
-            <p>
-              <strong>Returned From:</strong> {location || 'N/A'}
-            </p>
-            <p>
-              <strong>Condition:</strong> {condition || 'N/A'}
-            </p>
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) : action.includes('building disposal cancelled') ? (
+        ) : action.includes("asset disposal") ? (
           <>
-            <p>
-              <strong>Subcategory:</strong> {subCategory || 'N/A'}
-            </p>
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
-        ) : action.includes('asset disposal') ? (
+        ) : action.includes("condition changed") ? (
           <>
-            <p>
-              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
-            </p>
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
-          </>
-        ) : action.includes('condition changed') ? (
-          <>
-            <p>
-              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
-            </p>
-            <p>
-              <strong>Returned From:</strong> {location || 'N/A'}
-            </p>
-            <p>
-              <strong>Initial Condition:</strong> {condition || 'N/A'}
-            </p>
-            <p>
-              <strong>Changed Condition:</strong> {changedCondition || 'N/A'}
-            </p>
+            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
+            <p><strong>Returned From:</strong> {location || "N/A"}</p>
+            <p><strong>Initial Condition:</strong> {condition || "N/A"}</p>
+            <p><strong>Changed Condition:</strong> {changedCondition || "N/A"}</p>
           </>
         ) : (
           <>
-            <p>
-              <strong>Item:</strong> {itemName || itemNames?.join(', ') || subCategory || 'N/A'}
-            </p>
-            {quantity && (
-              <p>
-                <strong>Quantity:</strong> {quantity}
-              </p>
-            )}
-            {location && (
-              <p>
-                <strong>Location:</strong> {location}
-              </p>
-            )}
-            {rejectionRemarks && (
-              <p>
-                <strong>Remarks:</strong> {rejectionRemarks}
-              </p>
-            )}
+            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || subCategory || "N/A"}</p>
+            {quantity && <p><strong>Quantity:</strong> {quantity}</p>}
+            {location && <p><strong>Location:</strong> {location}</p>}
+            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
         )}
+  
 
-        {(action.includes('rejected') || action.includes('cancelled')) && !action.includes('return') && (
+        {action.includes("rejected") || action.includes("cancelled")? (
           <button
-            className="update-button"
+            className='update-button'
             onClick={() => {
-              const key = Object.keys(NOTIFICATION_TABS).find((k) => action.includes(k)) || 'assetstore';
-              const tab = NOTIFICATION_TABS[key];
-              const redirectUrl =
-                tab === 'storekeeperassetupdation'
-                  ? `/storekeeperassetupdation?username=${encodeURIComponent(
-                      username
-                    )}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`
-                  : `/assetstore?username=${encodeURIComponent(
-                      username
-                    )}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
-              window.location.href = redirectUrl;
+              let tab = "";
+              if (action.includes("building maintenance")) tab = "service";
+              else if (action.includes("building upgrade")) tab = "building-upgrade";
+              else if (action.includes("building disposal")) tab = "disposable";
+              else if (action.includes("return")) tab = "returned";
+              else if (action.includes("issue")) 
+              {
+                window.location.href = `/assetissue?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
+                return;
+              }
+              else if (action.includes("service")) tab = "assetstore";
+              else if (action.includes("updation")) {
+                // Redirect to EntryStaffAssetUpdation with rejectedId and assetType
+                window.location.href = `/entrystaffassetupdation?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
+                return;
+              }              
+
+  
+              window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
             }}
           >
             Update
           </button>
-        )}
+        ) : null}
       </div>
     );
   };

@@ -1449,18 +1449,36 @@ const AssetView = () => {
       <link href="https://unpkg.com/boxicons@2.0.9/css/boxicons.min.css" rel="stylesheet" />
       <section id="sidebar">
           <a href="#" className="brand">
-            <span className="text">STOREKEEPER</span>
+            <span className="text">VIEWER</span>
           </a>
           <ul className="side-menu top">
-            <li ><a href={`/storekeeperdashboard?username=${encodeURIComponent(username)}`}><i className="bx bxs-dashboard" /><span className="text">Home</span></a></li>
-            <li ><a href={`/assetstore?username=${encodeURIComponent(username)}`}><i className="bx bxs-shopping-bag-alt" /><span className="text">Asset Store</span></a></li>
-            <li><a href={`/assetissue?username=${encodeURIComponent(username)}`}><i className="bx bxs-package" /><span className="text">Asset Issue</span></a></li>
-            <li><a href={`/assetreturn?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Return</span></a></li>
-            <li><a href={`/storekeeperassetupdation?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset Updation</span></a></li>
-            <li className="active"><a href={`/viewasset?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Asset View</span></a></li>
+            <li >
+            <a href={`/viewerdashboard?username=${encodeURIComponent(username)}`}>
+                <i className="bx bxs-dashboard" />
+                <span className="text">Home</span>
+              </a>
+            </li>
+            <li className="active">
+            <a href={`/viewerassetview?username=${encodeURIComponent(username)}`}>
+            <i className="bx bxs-shopping-bag-alt" />
+                <span className="text">Asset View</span>
+              </a>
+            </li>
+            <li>
+            <a href={`/viewerfacultyview?username=${encodeURIComponent(username)}`}>
+                <i className="bx bxs-doughnut-chart" />
+                <span className="text">Faculty View</span>
+              </a>
+            </li>
+            
           </ul>
           <ul className="side-menu">
-            <li><a href="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
+            <li>
+              <a href="/" className="logout">
+                <i className="bx bxs-log-out-circle" />
+                <span className="text">Logout</span>
+              </a>
+            </li>
           </ul>
         </section>
 

@@ -38,6 +38,8 @@ import FacultyEntryStaffDashboard from "./components/facultyentrystaffdashboard"
 import UpdateFacultyEntryPrincipal from "./components/updatefacultyentryprincipal";
 import UpdateFacultyEntryHoo from "./components/updatefacultyentryhoo";
 import AddConduct from './components/addconduct';
+import AssetView from "./components/ViewerAssetview";
+import FacultyView from "./components/Viewerfacultyview";
 
 function App() {
   return (
@@ -50,6 +52,9 @@ function App() {
         <Route path="/adminassetapproval" element={<AssetApproval/>} />
         <Route path="/hooassetview" element={<HOOAssetView/>} />
         <Route path="/principalassetview" element={<PrincipalAssetView/>} />
+        <Route path="/viewerassetview" element={< AssetView/>}/>
+        <Route path="/viewerfacultyview" element={< FacultyView/>}/>
+
         <Route path="/managerassetview" element={<ManagerAssetView/>} />
         <Route path="/facultyverify" element={<FacultyVerify/>} />
         <Route path="/principaldashboard" element={<PrincipalDashboard/>} />

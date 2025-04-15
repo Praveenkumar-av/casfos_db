@@ -202,7 +202,6 @@ const UserManagement = () => {
                     {/* NAVBAR */}
                     <nav>
                         <i className="bx bx-menu" />
-                        <span className="head-title">Dashboard</span>
                         <form action="#">
                             <div className="form-input"></div>
                         </form>

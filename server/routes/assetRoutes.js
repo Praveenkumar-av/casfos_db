@@ -8,11 +8,8 @@ const pdfUpload = require("../middleware/pdfUpload"); // Middleware for PDF uplo
 // Asset Management Routes
 // Routes related to creating, updating, and retrieving assets
 // -----------------------------------------
-router.post("/save", AssetController.saveAsset); // Save a new asset
-router.post("/store", upload.array("files"), AssetController.store); // Store assets with image uploads
 router.post("/storeTempAsset", AssetController.storeTempAsset); // Store temporary asset
 router.get("/getAllAssets", AssetController.getAllAssets); // Fetch all assets
-router.post("/deleteAssetData", AssetController.deleteAssetData); // Delete asset data
 
 // Permanent Assets
 router.get("/permanent", AssetController.getAllPermanentAssets); // Fetch all permanent assets
@@ -73,7 +70,6 @@ router.post("/saveMaintenanceTemp", AssetController.saveMaintenanceTemp); // Sav
 router.get("/getPendingMaintenance", AssetController.getPendingMaintenance); // Fetch pending maintenance requests
 router.post("/getServicableItems", AssetController.getServicableItems); // Fetch serviceable items
 router.get("/getTempServiced", AssetController.getTempServiced); // Fetch temporary serviced assets
-router.get("/amcmonitor", AssetController.amcmonitor); // Monitor Annual Maintenance Contract (AMC)
 
 // -----------------------------------------
 // Disposal Routes

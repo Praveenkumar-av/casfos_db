@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "../styles/style.css";
+import "../styles/AssetApproval.css"
 import { useLocation, Link } from "react-router-dom";
 import Swal from "sweetalert2";
 
@@ -12,7 +13,7 @@ function AssetApproval() {
   const [issueAssets, setIssueAssets] = useState([]); // New state for issued assets
   const [popupData, setPopupData] = useState(null);
   const [buildingUpgrades, setBuildingUpgrades] = useState([]);
-  const [pendingUpdates, setPendingUpdates] = useState([]); // New state for pending updates
+  const [pendingUpdates, setPendingUpdates] = useState([]); 
   const [serviceAssets, setServiceAssets] = useState([]); // New state for service assets
   const [activeTab, setActiveTab] = useState("purchased");
   const [buildingMaintenance, setBuildingMaintenance] = useState([]); // New state for building maintenance
@@ -1236,7 +1237,7 @@ function AssetApproval() {
 
         <div style={componentStyles.container}>
           {activeTab === "maintenance" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Sub Catgory</th>
@@ -1271,7 +1272,7 @@ function AssetApproval() {
             </table>
           )}
           {activeTab === "updation" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Asset Type</th>
@@ -1298,7 +1299,7 @@ function AssetApproval() {
             </table>
           )}
           {activeTab === "exchange" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Asset Category</th>
@@ -1327,7 +1328,7 @@ function AssetApproval() {
             </table>
           )}
           {activeTab === "service" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Asset Type</th>
@@ -1358,7 +1359,7 @@ function AssetApproval() {
             </table>
           )}
           {activeTab === "purchased" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Asset Type</th>
@@ -1468,7 +1469,7 @@ function AssetApproval() {
             </>
           )}
           {activeTab === "disposal" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Asset Type</th>
@@ -1499,7 +1500,7 @@ function AssetApproval() {
             </table>
           )}
           {activeTab === "buildingUpgradation" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Sub Category</th>
@@ -1529,7 +1530,7 @@ function AssetApproval() {
             </table>
           )}
           {activeTab === "issue" && (
-            <table style={componentStyles.advancedTable}>
+            <table className="advanced-table">
               <thead>
                 <tr>
                   <th>Asset Type</th>

@@ -2,9 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import Login from "./components/login"; 
 import Register from "./components/register"; 
-import Home from './components/home';
 import Dashboard from "./components/admindashboard";
-import AssetManagement from "./components/assetentry";
 import UserApproval from "./components/hoouserapproval";
 import DataDashboard from "./components/storekeeperdashboard";
 import AssetApproval from "./components/adminassetapproval";
@@ -13,8 +11,6 @@ import ViewFaculty from "./components/viewfaculty";
 import ViewAsset from "./components/viewasset";
 import ViewerDashboard from "./components/viewerdashboard";
 import FacultyManagement from "./components/facultyentry";
-import RejectedAsset from "./components/rejectedassets";
-import Analytics from "./components/analytics";
 import Ui from "./components/ui";
 import FacultyVerify from "./components/facultyverify";
 import FacultyUpdation from "./components/hoofacultyupdation";
@@ -49,9 +45,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/home" element={<Home />} />
         <Route path="/admindashboard" element={<Dashboard/>} />
-        <Route path="/assetentry" element={<AssetManagement/>} />
         <Route path="/hoouserapproval" element={<UserApproval/>} />
         <Route path="/adminassetapproval" element={<AssetApproval/>} />
         <Route path="/hooassetview" element={<HOOAssetView/>} />
@@ -74,8 +68,6 @@ function App() {
         <Route path="/facultyentry" element={<FacultyManagement/>} />
         <Route path="/hoofacultyapproval" element={<FacultyApproval/>} />
         
-        <Route path="/rejectedassets" element={<RejectedAsset/>} />
-        <Route path="/analytics" element={<Analytics/>} />
         <Route path="/principalfacultyupdation" element={<PrincipalFacultyUpdation/>} />
 
         <Route path="/hoofacultyupdation" element={<FacultyUpdation/>} />

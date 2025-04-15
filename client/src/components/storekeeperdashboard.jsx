@@ -1,118 +1,174 @@
-import React, { useEffect, useState } from "react";
-import { Helmet } from "react-helmet";
-import "../styles/dashstyle.css";
+/**
+ * Overview:
+ * This is a React component for the Storekeeper Dashboard in an asset management system for the Central Academy for State Forest Service (CASFOS).
+ * It serves as the main interface for storekeepers, providing:
+ * - A sidebar for navigation to various asset management sections (Asset Store, Issue, Return, Updation, View).
+ * - A notification system to display recent asset-related actions (approvals, rejections, etc.) with expandable details and clear options.
+ * - Static sections for About Us, History, How to Reach, and Contact Us, showcasing institutional information.
+ * - A hero section with placeholder statistics for total assets, issued, returned, and in maintenance.
+ * - Responsive design with a modern UI, using external CSS (dashstyle.css, style.css) and inline styles for specific elements.
+ * 
+ * The component uses React Router for URL parameter parsing, axios for API calls to fetch and manage notifications, and Helmet for SEO and metadata.
+ * Notifications are fetched from a backend API at 'http://localhost:3001' and limited to the 50 most recent, sorted by action time.
+ */
 
-import axios from "axios";
-import { useLocation } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet';
+import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+import '../styles/dashstyle.css';
+
+/**
+ * Constants for notification actions and their corresponding tabs for redirection
+ */
+const NOTIFICATION_TABS = {
+  'building maintenance': 'service',
+  'building upgrade': 'building-upgrade',
+  'building disposal': 'disposable',
+  issue: 'assetissue',
+  service: 'assetstore',
+  updation: 'storekeeperassetupdation',
+};
 
 const StorekeeperDashboard = () => {
+  // State management
   const [notifications, setNotifications] = useState([]);
   const [expandedNotification, setExpandedNotification] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Router and URL params
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const username = queryParams.get("username") || "Guest";
+  const username = queryParams.get('username') || 'Guest';
+  const serverBaseUrl = 'http://localhost:3001';
 
+  /**
+   * Fetches notifications on component mount, sorted by action time, limited to 50
+   */
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await axios.get("http://localhost:3001/api/assets/get-asset-notification");
+        const response = await axios.get(`${serverBaseUrl}/api/assets/get-asset-notification`);
         const sortedNotifications = response.data
           .sort((a, b) => new Date(b.actionTime) - new Date(a.actionTime))
           .slice(0, 50);
         setNotifications(sortedNotifications);
       } catch (error) {
-        console.error("Error fetching notifications:", error);
+        console.error('Error fetching notifications:', error);
       }
     };
     fetchNotifications();
   }, []);
 
+  /**
+   * Clears a single notification by ID
+   * @param {string} id - Notification ID
+   */
   const handleClearNotification = async (id) => {
     try {
-      await axios.delete(`http://localhost:3001/api/assets/delete-asset-notification/${id}`);
+      await axios.delete(`${serverBaseUrl}/api/assets/delete-asset-notification/${id}`);
       setNotifications(notifications.filter((notif) => notif._id !== id));
     } catch (error) {
-      console.error("Error clearing notification:", error);
+      console.error('Error clearing notification:', error);
     }
   };
 
+  /**
+   * Clears all notifications
+   */
   const handleClearAll = async () => {
     try {
-      await axios.delete("http://localhost:3001/api/assets/delete-all-asset-notification");
+      await axios.delete(`${serverBaseUrl}/api/assets/delete-all-asset-notification`);
       setNotifications([]);
       setShowNotifications(false);
     } catch (error) {
-      console.error("Error clearing all notifications:", error);
+      console.error('Error clearing all notifications:', error);
     }
   };
 
+  /**
+   * Toggles expansion of notification details
+   * @param {string} id - Notification ID
+   */
   const toggleExpand = (id) => {
     setExpandedNotification(expandedNotification === id ? null : id);
   };
 
+  /**
+   * Toggles visibility of the notification panel
+   */
   const toggleNotificationPanel = () => {
     setShowNotifications(!showNotifications);
   };
 
+  /**
+   * Formats the notification title based on action and asset details
+   * @param {Object} notification - Notification object
+   * @returns {string} - Formatted title
+   */
   const formatNotificationTitle = (notification) => {
     const { action, assetCategory, itemNames, subCategory, condition } = notification;
-    const itemName = itemNames?.[0] || subCategory || assetCategory || "item";
+    const itemName = itemNames?.[0] || subCategory || assetCategory || 'item';
 
-    if (assetCategory === "Building" || assetCategory === "Land") {
-      if (action === "asset approved") {
+    if (assetCategory === 'Building' || assetCategory === 'Land') {
+      if (action === 'asset approved') {
         return `Asset Manager approved ${assetCategory} entry`;
-      } else if (action === "asset rejected") {
+      } else if (action === 'asset rejected') {
         return `Asset Manager rejected ${assetCategory} entry`;
       }
     }
 
     switch (action) {
-      case "asset approved":
-        return `Asset Manager approved purchased ${assetCategory || "assets"}`;
-      case "asset rejected":
+      case 'asset approved':
+        return `Asset Manager approved purchased ${assetCategory || 'assets'}`;
+      case 'asset rejected':
         return `Asset Manager rejected ${itemName} purchase`;
-      case "issue approved":
+      case 'issue approved':
         return `Asset Manager approved issuing ${itemName}`;
-      case "issue rejected":
+      case 'issue rejected':
         return `Asset Manager rejected issuing ${itemName}`;
-      case "service approved":
+      case 'service approved':
         return `Asset Manager approved ${itemName} for service`;
-      case "service rejected":
+      case 'service rejected':
         return `Asset Manager rejected ${itemName} for service`;
-      case "return approved":
-        return `Asset Manager approved ${itemName} return for ${condition || "N/A"}`;
-      case "return rejected":
-        return `Asset Manager rejected ${itemName} return for ${condition || "N/A"}`;
-      case "exchange approved":
+      case 'return approved':
+        return `Asset Manager approved ${itemName} return for ${condition || 'N/A'}`;
+      case 'return rejected':
+        return `Asset Manager rejected ${itemName} return for ${condition || 'N/A'}`;
+      case 'exchange approved':
         return `Asset Manager exchanged ${itemName}`;
-      case "exchange rejected":
+      case 'exchange rejected':
         return `Asset Manager cancelled exchange ${itemName}`;
-      case "asset disposal approved":
+      case 'asset disposal approved':
         return `Asset Manager approved disposing ${itemName}`;
-      case "asset disposal cancelled":
+      case 'asset disposal cancelled':
         return `Asset Manager cancelled ${itemName} for disposal`;
-      case "condition changed":
+      case 'condition changed':
         return `Asset Manager changed returned asset condition of ${itemName}`;
-      case "asset updation approved":
+      case 'asset updation approved':
         return `Asset Manager approved update for ${itemName}`;
-      case "asset updation rejected":
+      case 'asset updation rejected':
         return `Asset Manager rejected update for ${itemName}`;
-      case "building upgrade approved":
+      case 'building upgrade approved':
         return `Asset Manager approved building upgrade for ${itemName}`;
-      case "building upgrade rejected":
+      case 'building upgrade rejected':
         return `Asset Manager rejected building upgrade for ${itemName}`;
-      case "building disposal cancelled":
+      case 'building disposal cancelled':
         return `Asset Manager cancelled building disposal for ${itemName}`;
-      case "building maintenance approved":
+      case 'building maintenance approved':
         return `Asset Manager approved maintenance for ${itemName}`;
-      case "building maintenance rejected":
+      case 'building maintenance rejected':
         return `Asset Manager rejected maintenance for ${itemName}`;
       default:
-        return `${action} - ${assetCategory}`;
+        return `${action} - ${assetCategory || 'Unknown'}`;
     }
   };
 
+  /**
+   * Renders detailed information for an expanded notification
+   * @param {Object} notification - Notification object
+   * @returns {JSX.Element} - Notification details component
+   */
   const renderNotificationDetails = (notification) => {
     const {
       _id,
@@ -126,119 +182,218 @@ const StorekeeperDashboard = () => {
       subCategory,
       quantity,
       location,
-      supplierName,
-      purchaseDate,
-      billNo,
-      receivedBy,
       rejectionRemarks,
       condition,
       changedCondition,
       type,
       buildingNo,
     } = notification;
-  
+
     return (
       <div className="notification-details">
-        <p><strong>Action Time:</strong> {new Date(actionTime).toLocaleString()}</p>
-        {(action.includes("asset approved") || action.includes("asset rejected")) &&
-        assetCategory === "Building" ? (
+        <p>
+          <strong>Action Time:</strong> {new Date(actionTime).toLocaleString()}
+        </p>
+        {(action.includes('asset approved') || action.includes('asset rejected')) &&
+        assetCategory === 'Building' ? (
           <>
-            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
-            <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
-            <p><strong>Sub Category:</strong> {subCategory || "N/A"}</p>
-            {type && <p><strong>Type:</strong> {type || "N/A"}</p>}
-            {buildingNo && <p><strong>Building No:</strong> {buildingNo || "N/A"}</p>}
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Asset Type:</strong> {assetType || 'N/A'}
+            </p>
+            <p>
+              <strong>Asset Category:</strong> {assetCategory || 'N/A'}
+            </p>
+            <p>
+              <strong>Sub Category:</strong> {subCategory || 'N/A'}
+            </p>
+            {type && (
+              <p>
+                <strong>Type:</strong> {type}
+              </p>
+            )}
+            {buildingNo && (
+              <p>
+                <strong>Building No:</strong> {buildingNo}
+              </p>
+            )}
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : (action.includes("asset approved") || action.includes("asset rejected")) &&
-          assetCategory === "Land" ? (
+        ) : (action.includes('asset approved') || action.includes('asset rejected')) &&
+          assetCategory === 'Land' ? (
           <>
-            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
-            <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
-            <p><strong>Sub Category:</strong> {subCategory || "N/A"}</p>
-            <p><strong>Location:</strong> {location || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Asset Type:</strong> {assetType || 'N/A'}
+            </p>
+            <p>
+              <strong>Asset Category:</strong> {assetCategory || 'N/A'}
+            </p>
+            <p>
+              <strong>Sub Category:</strong> {subCategory || 'N/A'}
+            </p>
+            <p>
+              <strong>Location:</strong> {location || 'N/A'}
+            </p>
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : action.includes("building maintenance approved") || action.includes("building maintenance rejected") ? (
+        ) : action.includes('building maintenance') ? (
           <>
-            <p><strong>Asset Type:</strong> {assetType || "N/A"}</p>
-            <p><strong>Asset Category:</strong> {assetCategory || "N/A"}</p>
-            <p><strong>Sub Category:</strong> {subCategory || "N/A"}</p>
-            <p><strong>Location:</strong> {location || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Asset Type:</strong> {assetType || 'N/A'}
+            </p>
+            <p>
+              <strong>Asset Category:</strong> {assetCategory || 'N/A'}
+            </p>
+            <p>
+              <strong>Sub Category:</strong> {subCategory || 'N/A'}
+            </p>
+            <p>
+              <strong>Location:</strong> {location || 'N/A'}
+            </p>
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : action.includes("issue") || action.includes("service") || action.includes("exchange") ? (
+        ) : action.includes('issue') || action.includes('service') || action.includes('exchange') ? (
           <>
-            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
-            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
-            {quantity && <p><strong>Quantity:</strong> {quantity}</p>}
-            {location && <p><strong>Location:</strong> {location}</p>}
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
+            </p>
+            <p>
+              <strong>Subcategory:</strong> {subCategory || 'N/A'}
+            </p>
+            {quantity && (
+              <p>
+                <strong>Quantity:</strong> {quantity}
+              </p>
+            )}
+            {location && (
+              <p>
+                <strong>Location:</strong> {location}
+              </p>
+            )}
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : action.includes("return") ? (
+        ) : action.includes('return') ? (
           <>
-            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
-            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
-            <p><strong>Returned From:</strong> {location || "N/A"}</p>
-            <p><strong>Condition:</strong> {condition || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
+            </p>
+            <p>
+              <strong>Subcategory:</strong> {subCategory || 'N/A'}
+            </p>
+            <p>
+              <strong>Returned From:</strong> {location || 'N/A'}
+            </p>
+            <p>
+              <strong>Condition:</strong> {condition || 'N/A'}
+            </p>
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : action.includes("building disposal cancelled") ? (
+        ) : action.includes('building disposal cancelled') ? (
           <>
-            <p><strong>Subcategory:</strong> {subCategory || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Subcategory:</strong> {subCategory || 'N/A'}
+            </p>
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : action.includes("asset disposal") ? (
+        ) : action.includes('asset disposal') ? (
           <>
-            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
+            </p>
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
-        ) : action.includes("condition changed") ? (
+        ) : action.includes('condition changed') ? (
           <>
-            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || "N/A"}</p>
-            <p><strong>Returned From:</strong> {location || "N/A"}</p>
-            <p><strong>Initial Condition:</strong> {condition || "N/A"}</p>
-            <p><strong>Changed Condition:</strong> {changedCondition || "N/A"}</p>
+            <p>
+              <strong>Item:</strong> {itemName || itemNames?.join(', ') || 'N/A'}
+            </p>
+            <p>
+              <strong>Returned From:</strong> {location || 'N/A'}
+            </p>
+            <p>
+              <strong>Initial Condition:</strong> {condition || 'N/A'}
+            </p>
+            <p>
+              <strong>Changed Condition:</strong> {changedCondition || 'N/A'}
+            </p>
           </>
         ) : (
           <>
-            <p><strong>Item:</strong> {itemName || itemNames?.join(", ") || subCategory || "N/A"}</p>
-            {quantity && <p><strong>Quantity:</strong> {quantity}</p>}
-            {location && <p><strong>Location:</strong> {location}</p>}
-            {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
+            <p>
+              <strong>Item:</strong> {itemName || itemNames?.join(', ') || subCategory || 'N/A'}
+            </p>
+            {quantity && (
+              <p>
+                <strong>Quantity:</strong> {quantity}
+              </p>
+            )}
+            {location && (
+              <p>
+                <strong>Location:</strong> {location}
+              </p>
+            )}
+            {rejectionRemarks && (
+              <p>
+                <strong>Remarks:</strong> {rejectionRemarks}
+              </p>
+            )}
           </>
         )}
-  
-        {(action.includes("rejected") || action.includes("cancelled")) && !action.includes("return") ? (
+
+        {(action.includes('rejected') || action.includes('cancelled')) && !action.includes('return') && (
           <button
             className="update-button"
             onClick={() => {
-              let tab = "";
-              if (action.includes("building maintenance")) tab = "service";
-              else if (action.includes("building upgrade")) tab = "building-upgrade";
-              else if (action.includes("building disposal")) tab = "disposable";
-              else if (action.includes("issue")) tab = "assetissue";
-              else if (action.includes("service")) tab = "assetstore";
-              else if (action.includes("updation")) {
-                window.location.href = `/storekeeperassetupdation?username=${encodeURIComponent(
-                  username
-                )}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
-                return;
-              }
-  
-              window.location.href = `/assetstore?username=${encodeURIComponent(
-                username
-              )}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
+              const key = Object.keys(NOTIFICATION_TABS).find((k) => action.includes(k)) || 'assetstore';
+              const tab = NOTIFICATION_TABS[key];
+              const redirectUrl =
+                tab === 'storekeeperassetupdation'
+                  ? `/storekeeperassetupdation?username=${encodeURIComponent(
+                      username
+                    )}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`
+                  : `/assetstore?username=${encodeURIComponent(
+                      username
+                    )}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
+              window.location.href = redirectUrl;
             }}
           >
             Update
           </button>
-        ) : null}
+        )}
       </div>
     );
   };
+
   return (
     <div className="dashboard-container">
+      {/* SEO and Metadata */}
       <Helmet>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -248,6 +403,7 @@ const StorekeeperDashboard = () => {
         <title>CASFOS - Storekeeper Dashboard</title>
       </Helmet>
 
+      {/* Sidebar Navigation */}
       <section id="sidebar">
         <a href="#" className="brand">
           <span className="text">STOREKEEPER</span>
@@ -300,22 +456,23 @@ const StorekeeperDashboard = () => {
         </ul>
       </section>
 
+      {/* Main Content */}
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
           <span className="head-title">Dashboard</span>
-          <form action="#">
-            <div className="form-input"></div>
-          </form>
+          <form action="#"><div className="form-input"></div></form>
+
           <div className="nav-right-container">
+
             <div className="notification-icon-container">
-              <i className="fas fa-bell bell-icon" onClick={toggleNotificationPanel}></i>
+              <i className="fas fa-bell bell-icon" onClick={toggleNotificationPanel} />
               {notifications.length > 0 && (
                 <span className="notification-badge">{notifications.length}</span>
               )}
             </div>
             <div className="username-container">
-              <i className="bx bxs-user-circle user-icon"></i>
+              <i className="bx bxs-user-circle user-icon" />
               <span className="username">{username}</span>
             </div>
           </div>
@@ -324,36 +481,14 @@ const StorekeeperDashboard = () => {
         <main className="main-content">
           {/* Hero Section */}
           <section className="hero-section">
-            <div className="hero-overlay"></div>
+            <div className="hero-overlay" />
             <div className="hero-content">
-              <h1>Welcome, {username}</h1>
+              <br></br>
+              <br></br>
               <p>Central Academy for State Forest Service - Asset Management System</p>
-              <div className="stats-container">
-                <div className="stat-card">
-                  <i className="bx bxs-shopping-bag-alt"></i>
-                  <h3>Total Assets</h3>
-                  <p>1,248</p>
-                </div>
-                <div className="stat-card">
-                  <i className="bx bxs-package"></i>
-                  <h3>Assets Issued</h3>
-                  <p>342</p>
-                </div>
-                <div className="stat-card">
-                  <i className="bx bxs-reply"></i>
-                  <h3>Assets Returned</h3>
-                  <p>189</p>
-                </div>
-                <div className="stat-card">
-                  <i className="bx bxs-wrench"></i>
-                  <h3>In Maintenance</h3>
-                  <p>56</p>
-                </div>
-              </div>
+           
             </div>
           </section>
-
-          {/* About Section */}
           <section id="about" className="content-section">
             <div className="section-container">
               <h2 className="section-title">About Us</h2>
@@ -365,14 +500,15 @@ const StorekeeperDashboard = () => {
                   <p>
                     Established on January 25, 1980, the Academy was created to meet the growing demand for trained forest officers, spurred by Social Forestry Projects during the IV and V Five-Year Plans. Previously, officers were trained at the Indian Forest College, Dehradun, and Burnihat. CASFOS Coimbatore continues to uphold excellence in forestry education.
                   </p>
-                  <p className="update-info"><b>Last updated: 05 Mar, 2025</b></p>
+                  <p className="update-info">
+                  </p>
                 </div>
                 <div className="about-image">
                   <img
                     src="/images/casfos_vana_vigyan.png"
                     alt="CASFOS Emblem"
                     className="section-image"
-                    onError={(e) => (e.target.src = "/images/fallback.jpg")}
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
                   />
                 </div>
               </div>
@@ -405,23 +541,24 @@ const StorekeeperDashboard = () => {
                     src="/images/casfos_coimbatore_img4.jpg"
                     alt="Historical Campus"
                     className="section-image"
-                    onError={(e) => (e.target.src = "/images/fallback.jpg")}
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
                   />
                   <img
                     src="/images/casfos_coimbatore_img5.jpg"
                     alt="Forest Campus"
                     className="section-image"
-                    onError={(e) => (e.target.src = "/images/fallback.jpg")}
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
                   />
                   <img
                     src="/images/casfos_coimbatore_img3.jpg"
                     alt="Training Facility"
                     className="section-image"
-                    onError={(e) => (e.target.src = "/images/fallback.jpg")}
+                    onError={(e) => (e.target.src = '/images/fallback.jpg')}
                   />
                 </div>
                 <div className="history-text-continued">
-                  <p className="update-info"><b>Last updated: 05 Mar, 2025</b></p>
+                  <p className="update-info">
+                  </p>
                 </div>
               </div>
             </div>
@@ -441,7 +578,15 @@ const StorekeeperDashboard = () => {
                   </p>
                 </div>
                 <div className="map-container">
-                  <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.2649732361087!2d76.93796778831465!3d11.018735325854964!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba858dde76380d3%3A0xbe08bb837838e990!2sCentral%20Academy%20for%20State%20Forest%20Service!5e0!3m2!1sen!2sin!4v1744637852810!5m2!1sen!2sin" width="600" height="450" style={{border:0}} allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                  <iframe
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3916.2649732361087!2d76.93796778831465!3d11.018735325854964!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba858dde76380d3%3A0xbe08bb837838e990!2sCentral%20Academy%20for%20State%20Forest%20Service!5e0!3m2!1sen!2sin!4v1744637852810!5m2!1sen!2sin"
+                    width="600"
+                    height="450"
+                    style={{ border: 0 }}
+                    allowFullScreen=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
                 </div>
               </div>
             </div>
@@ -461,32 +606,32 @@ const StorekeeperDashboard = () => {
                   </h3>
                   <div className="contact-info">
                     <div className="contact-item">
-                      <i className="bx bx-envelope"></i>
+                      <i className="bx bx-envelope" />
                       <p>
                         <strong>Email:</strong> casfos-coimbatore@gov.in | casfoscbe-trng@gov.in
                       </p>
                     </div>
                     <div className="contact-item">
-                      <i className="bx bx-phone"></i>
+                      <i className="bx bx-phone" />
                       <p>
                         <strong>Phone:</strong> 0422-2450313
                       </p>
                     </div>
                     <div className="contact-item">
-                      <i className="bx bx-map"></i>
+                      <i className="bx bx-map" />
                       <p>
                         <strong>Address:</strong> Forest Campus, R.S. Puram, Coimbatore - 641002, Tamil Nadu
                       </p>
                     </div>
                   </div>
                 </div>
-               
               </div>
             </div>
           </section>
         </main>
       </section>
 
+      {/* Notification Popup */}
       {showNotifications && (
         <div className="popup-overlay">
           <div className="notification-popup">
@@ -511,7 +656,7 @@ const StorekeeperDashboard = () => {
                   <div
                     key={notification._id}
                     className={`notification-banner ${
-                      notification.action.includes("approved") ? "approved" : "rejected"
+                      notification.action.includes('approved') ? 'approved' : 'rejected'
                     }`}
                   >
                     <div className="notification-summary">
@@ -526,7 +671,7 @@ const StorekeeperDashboard = () => {
                           className="expand-button"
                           onClick={() => toggleExpand(notification._id)}
                         >
-                          {expandedNotification === notification._id ? "▲" : "▼"}
+                          {expandedNotification === notification._id ? '▲' : '▼'}
                         </button>
                         <button
                           className="clear-button"

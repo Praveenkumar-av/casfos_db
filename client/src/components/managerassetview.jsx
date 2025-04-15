@@ -1,3 +1,50 @@
+
+/**
+ * Overview:
+ * This is a React component named `ManagerAssetView` designed for a asset manager dashboard in an asset management system.
+ * It provides a tabbed interface to view and filter asset-related data across different categories:
+ * Purchase, Store/Issue, Service/Return, Disposal, and Dead Stock Register.
+ * 
+ * Key Features:
+ * - Tab-based navigation for different asset views.
+ * - Dynamic filtering for each tab with customizable fields (e.g., asset type, category, dates).
+ * - Sorting functionality for table columns.
+ * - Data export to PDF and Excel formats using `jsPDF` and `XLSX` libraries.
+ * - Detailed pop-up view for individual asset records.
+ * - Support for building-specific data (maintenance and condemnation records).
+ * - Responsive UI with a sidebar for navigation.
+ * 
+ * Dependencies:
+ * - React, React Router (`useLocation` for query params).
+ * - Axios for API requests.
+ * - jsPDF and jspdf-autotable for PDF generation.
+ * - XLSX for Excel export.
+ * - External CSS files (`style.css`, `viewAsset.css`) for styling.
+ * - Boxicons for sidebar icons.
+ * 
+ * State Management:
+ * - Uses `useState` for managing filters, table data, active tab, and UI states (e.g., zoomed image, selected details).
+ * - Uses `useEffect` to fetch data based on active tab and filter changes.
+ * 
+ * API Integration:
+ * - Communicates with a backend server (assumed at `http://localhost:3001`) to fetch filtered data for each tab.
+ * 
+ * Styling:
+ * - Inline styles for dynamic elements (e.g., tables, pop-ups).
+ * - External CSS for consistent dashboard styling.
+ * 
+ * Limitations:
+ * - Assumes a specific backend API structure.
+ * - Hardcoded options for asset types, categories, and locations.
+ * - No pagination for large datasets.
+ * 
+ * Future Improvements:
+ * - Add pagination or infinite scrolling for large datasets.
+ * - Implement error boundaries for better error handling.
+ * - Modularize filter components for reusability.
+ * - Add loading states for API calls.
+ * - Support dynamic options fetched from the backend.
+ */
 import React, { act, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import "../styles/style.css";

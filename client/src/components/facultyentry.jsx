@@ -350,6 +350,8 @@ const FacultyManagement = () => {
     }
     if (!facultyData.name.trim()) {
       errors.push("Name is required.");
+    } else if (facultyData.name.length > 100) {
+      errors.push("Name must be under 100 characters.");
     }
     if (!facultyData.mobileNumber) {
       errors.push("Mobile Number is required.");
@@ -644,6 +646,7 @@ const FacultyManagement = () => {
         <section id="content">
           <nav>
             <i className="bx bx-menu" />
+            <span className="head-title">Dashboard</span>
             <form action="#">
               <div className="form-input"></div>
             </form>
@@ -705,7 +708,11 @@ const FacultyManagement = () => {
                           placeholder="Name"
                           value={facultyData.name}
                           onChange={handleInputChange}
+                          maxLength="100"
                         />
+                        <div style={{ fontSize: "12px", color: "#555" }}>
+                          {facultyData.name.length}/100 characters
+                        </div>
                         <label htmlFor="cadre">Cadre:</label>
                         <input
                           type="text"
@@ -911,7 +918,7 @@ const FacultyManagement = () => {
                         {(facultyData.educationDetails || []).map((education, index) => (
                           <div key={index}>
                             <h4>Education {index + 1} Details</h4>
-                            <label htmlFor={`degree-${index}`}>Degree:</label>
+                            <label Server HTMLFor={`degree-${index}`}>Degree:</label>
                             <input
                               type="text"
                               name="degree"
@@ -919,7 +926,7 @@ const FacultyManagement = () => {
                               value={education.degree}
                               onChange={(e) => handleInputChange(e, "educationDetails", index)}
                             />
-                            <label htmlFor={`specialization-${index}`}>Specialization:</label>
+                            <label Server HTMLFor={`specialization-${index}`}>Specialization:</label>
                             <input
                               type="text"
                               name="specialization"
@@ -927,7 +934,7 @@ const FacultyManagement = () => {
                               value={education.specialization}
                               onChange={(e) => handleInputChange(e, "educationDetails", index)}
                             />
-                            <label htmlFor={`institutionName-${index}`}>Institution Name:</label>
+                            <label Server HTMLFor={`institutionName-${index}`}>Institution Name:</label>
                             <input
                               type="text"
                               name="institutionName"
@@ -955,7 +962,7 @@ const FacultyManagement = () => {
                               <option value="Manuals">Manuals</option>
                               <option value="Others">Others</option>
                             </select>
-                            <label htmlFor="title">Title of Publication:</label>
+                            <label Server HTMLFor="title">Title of Publication:</label>
                             <input
                               type="text"
                               name="title"
@@ -963,7 +970,7 @@ const FacultyManagement = () => {
                               value={publication.title}
                               onChange={(e) => handleInputChange(e, "publications", index)}
                             />
-                            <label htmlFor="dateOfPublication">Date of Publication:</label>
+                            <label Server HTMLFor="dateOfPublication">Date of Publication:</label>
                             <input
                               type="date"
                               name="dateOfPublication"
@@ -972,7 +979,7 @@ const FacultyManagement = () => {
                             />
                             {publication.typeOfPublication === "Others" && (
                               <div>
-                                <label htmlFor={`additionalDetails-${index}`}>Additional Details:</label>
+                                <label Server HTMLFor={`additionalDetails-${index}`}>Additional Details:</label>
                                 <input
                                   type="text"
                                   id={`additionalDetails-${index}`}
@@ -992,7 +999,7 @@ const FacultyManagement = () => {
                         {(facultyData.coursesHandled || []).map((course, index) => (
                           <div key={index}>
                             <h4>Course {index + 1} Details</h4>
-                            <label htmlFor="courseType">Course Type:</label>
+                            <label Server HTMLFor="courseType">Course Type:</label>
                             <select
                               name="courseType"
                               value={course.courseType}
@@ -1009,7 +1016,7 @@ const FacultyManagement = () => {
                             </select>
                             {course.courseType === "Others" && (
                               <div>
-                                <label htmlFor={`otherCourseType-${index}`}>Specify Other Course Type:</label>
+                                <label Server HTMLFor={`otherCourseType-${index}`}>Specify Other Course Type:</label>
                                 <input
                                   type="text"
                                   name="otherCourseType"
@@ -1019,7 +1026,7 @@ const FacultyManagement = () => {
                                 />
                               </div>
                             )}
-                            <label htmlFor="batchno">Batch Number:</label>
+                            <label Server HTMLFor="batchno">Batch Number:</label>
                             <input
                               type="number"
                               name="batchno"
@@ -1027,7 +1034,7 @@ const FacultyManagement = () => {
                               value={course.batchno}
                               onChange={(e) => handleInputChange(e, "coursesHandled", index)}
                             />
-                            <label htmlFor="title">Title of the Course:</label>
+                            <label Server HTMLFor="title">Title of the Course:</label>
                             <input
                               type="text"
                               name="title"
@@ -1035,7 +1042,7 @@ const FacultyManagement = () => {
                               value={course.title}
                               onChange={(e) => handleInputChange(e, "coursesHandled", index)}
                             />
-                            <label htmlFor="feedbackRating">Feedback Rating:</label>
+                            <label Server HTMLFor="feedbackRating">Feedback Rating:</label>
                             <input
                               type="number"
                               name="feedbackRating"
@@ -1043,7 +1050,7 @@ const FacultyManagement = () => {
                               value={course.feedbackRating}
                               onChange={(e) => handleInputChange(e, "coursesHandled", index)}
                             />
-                            <label htmlFor="feedbackRatings">Ordinal Ratings:</label>
+                            <label Server HTMLFor="feedbackRatings">Ordinal Ratings:</label>
                             <select
                               name="feedbackRatings"
                               value={course.feedbackRatings}
@@ -1079,7 +1086,7 @@ const FacultyManagement = () => {
                         {(facultyData.otherResponsibilities || []).map((resp, index) => (
                           <div key={index}>
                             <h4>Responsibility {index + 1}</h4>
-                            <label htmlFor={`responsibility-${index}`}>Responsibility:</label>
+                            <label Server HTMLFor={`responsibility-${index}`}>Responsibility:</label>
                             <input
                               type="text"
                               name="responsibility"
@@ -1103,7 +1110,11 @@ const FacultyManagement = () => {
                           placeholder="Name of the Officer"
                           value={facultyData.name}
                           onChange={handleInputChange}
+                          maxLength="100"
                         />
+                        <div style={{ fontSize: "12px", color: "#555" }}>
+                          {facultyData.name.length}/100 characters
+                        </div>
                         <label htmlFor="cadre">Cadre:</label>
                         <input
                           type="text"
@@ -1345,7 +1356,11 @@ const FacultyManagement = () => {
                           placeholder="Name of the Officer"
                           value={facultyData.name}
                           onChange={handleInputChange}
+                          maxLength="100"
                         />
+                        <div style={{ fontSize: "12px", color: "#555" }}>
+                          {facultyData.name.length}/100 characters
+                        </div>
                         <label htmlFor="cadre">Cadre:</label>
                         <input
                           type="text"

@@ -38,7 +38,6 @@ exports.storeTempAsset = async (req, res) => {
       dateOfPossession, controllerOrCustody, details, approvedBuildingPlanUrl,
       kmzOrkmlFileUrl
     } = req.body;
-    console.log(plinthArea)
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Normalize to start of today
     const tomorrow = new Date(today);
@@ -323,7 +322,6 @@ exports.uploadFile = async (req, res) => {
 };
 
 exports.uploadInvoice = async (req, res) => {
-  console.log("entered");
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
   }
@@ -510,7 +508,6 @@ exports.updateDeadStockQuantities = async (req, res) => {
           "items.itemName": { $regex: new RegExp(`^${item.itemName}$`, "i") },
           "items.itemDescription": { $regex: new RegExp(`^${item.itemDescription}$`, "i") },
         });
-        console.log(permanentAssets);
         overallQuantity = permanentAssets.reduce((sum, asset) => {
           const matchingItems = asset.items.filter(
             (i) =>
@@ -767,7 +764,6 @@ exports.return = async (req, res) => {
         });
         await newReturned.save();
       }
-      console.log("savre")
     } else {
       // For Consumable, create a single ReturnedConsumable document with quantity
       const newReturned = new ReturnedModel({
@@ -891,7 +887,6 @@ exports.saveReturnedPermanentStatus = async (req, res) => {
 exports.getReturnedAssets = async (req, res) => {
   try {
     const { assetType, assetCategory, status } = req.body;
-    console.log("Fetching returned assets:", { assetType, assetCategory, status });
 
     if (!["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ message: "Invalid assetType. Must be 'Permanent' or 'Consumable'." });
@@ -909,7 +904,6 @@ exports.getReturnedAssets = async (req, res) => {
       return res.status(400).json({ message: "No returned assets found" });
     }
 
-    console.log("Returned assets found:", returnedAssets.length);
     res.status(200).json(returnedAssets);
   } catch (error) {
     console.error("Failed to fetch returned assets:", error);
@@ -972,7 +966,6 @@ exports.updateReturnCondition = async (req, res) => {
   const { id } = req.params; // Asset ID from URL
   const { condition, assetType } = req.body;
 
-  console.log("Received ID:", id, "Condition:", condition, "Asset Type:", assetType);
 
   try {
     // Validate inputs
@@ -1107,7 +1100,6 @@ exports.updateReturnConditiontemp = async (req, res) => {
   const { id } = req.params; // Asset ID from URL
   const { condition, assetType } = req.body;
 
-  // console.log("Received ID:", id, "Condition:", condition, "Asset Type:", assetType);
 
   try {
     // Validate inputs
@@ -1346,7 +1338,6 @@ exports.getPendingMaintenance = async (req, res) => {
 exports.getServicableItems = async (req, res) => {
   try {
     const { assetType, assetCategory, itemName, itemDescription } = req.body;
-    console.log("entered")
     // Fetch items from ReturnedPermanent where status is "service"
     const servicableItems = await ReturnedPermanent.find({
       assetType,
@@ -1579,7 +1570,6 @@ exports.getAvailableDisposableQuantity = async (req, res) => {
     itemDescription = itemDescription?.trim();
 
     // Log trimmed request body for debugging
-    console.log("Trimmed request body:", { assetType, assetCategory, itemName, subCategory, itemDescription });
 
     if (assetType === "Consumable") {
       // Fetch available quantity from ReturnedConsumable
@@ -1596,7 +1586,6 @@ exports.getAvailableDisposableQuantity = async (req, res) => {
       const availableQuantity = returnedItems.reduce((sum, item) => sum + (item.returnQuantity || 0), 0);
 
       // Log returned items count
-      console.log("ReturnedConsumable items found:", returnedItems.length);
 
       // Fetch unit price from Consumable collection using aggregation to trim fields
       const consumablePipeline = [
@@ -1622,7 +1611,6 @@ exports.getAvailableDisposableQuantity = async (req, res) => {
       const purchaseValue = consumableResult[0]?.unitPrice || 0;
 
       // Log aggregation result
-      console.log("Consumable aggregation result:", consumableResult);
 
       return res.status(200).json({
         availableQuantity,
@@ -1645,7 +1633,6 @@ exports.getAvailableDisposableQuantity = async (req, res) => {
       const itemIds = availableItems.map((item) => item.itemId);
 
       // Log returned items count
-      console.log("ReturnedPermanent items found:", availableItems.length);
 
       // Fetch unit price from Permanent collection using aggregation to trim fields
       const permanentPipeline = [
@@ -1671,7 +1658,6 @@ exports.getAvailableDisposableQuantity = async (req, res) => {
       const purchaseValue = permanentResult[0]?.unitPrice || 0;
 
       // Log aggregation result
-      console.log("Permanent aggregation result:", permanentResult);
 
       return res.status(200).json({
         availableQuantity,
@@ -2527,7 +2513,6 @@ exports.approveIssue = async (req, res) => {
 
 exports.rejectIssue = async (req, res) => {
   try {
-    console.log("enter");
     const { rejectionRemarks } = req.body;
     const tempIssue = await TempIssue.findById(req.params.id);
     if (!tempIssue || tempIssue.acknowledged !== "yes") {
@@ -2551,7 +2536,6 @@ exports.rejectIssue = async (req, res) => {
     tempIssue.rejected = "yes";
     tempIssue.rejectionRemarks = rejectionRemarks;
     await tempIssue.save();
-    console.log(tempIssue);
     const rejectedAsset = new RejectedAsset({
       assetType: tempIssue.assetType,
       assetCategory: tempIssue.assetCategory,
@@ -2567,7 +2551,6 @@ exports.rejectIssue = async (req, res) => {
       rejectionRemarks,
     });
     await rejectedAsset.save();
-    console.log(rejectedAsset);
     await TempIssue.findByIdAndDelete(req.params.id);
 
     const temp = {
@@ -3121,7 +3104,6 @@ exports.getExchangedForApproval = async (req, res) => {
 // Approve exchange
 exports.approveExchange = async (req, res) => {
   try {
-    console.log("entered");
     const exchange = await ExchangedConsumable.findById(req.params.id);
     if (!exchange) {
       return res.status(404).json({ message: "Exchange not found" });
@@ -3321,8 +3303,7 @@ exports.getAssetEntriesByMonth = async (req, res) => {
   exports.getAssetTypeByMonth = async (req, res) => {
     try {
       const { location, year } = req.query;
-      console.log(location);
-      console.log(year);
+
   
       let query = {};
       if (location) {
@@ -4495,7 +4476,6 @@ async function storeAssetNotification(data, action, actionTime) {
     const assetAction = new AssetNotification(actionData);
     await assetAction.save();
 
-    console.log(`Action "${action}" stored successfully`);
     return assetAction;
   } catch (error) {
     console.error("Error storing asset action:", error.message);

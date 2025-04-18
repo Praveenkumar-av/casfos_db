@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios"; // HTTP client for API requests
 import { useLocation } from "react-router-dom"; // For accessing URL query parameters
-
+import "../styles/Facultytable.css"
 // PrincipalFacultyView component: Allows Principal to view faculty records with filters
 const PrincipalFacultyView = () => {
   // State definitions for filters and faculty data
@@ -360,6 +360,7 @@ const PrincipalFacultyView = () => {
       <section id="content">
         <nav>
           <i className="bx bx-menu" />
+          <span className="head-title">Dashboard</span>
           <form action="#">
             <div className="form-input"></div>
           </form>

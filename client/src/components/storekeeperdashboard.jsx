@@ -251,7 +251,10 @@ const StorekeeperDashboard = () => {
         {action.includes("rejected") || action.includes("cancelled")? (
           <button
             className='update-button'
-            onClick={() => {
+            onClick={async () => {
+              // Delete the notification before redirecting
+              await handleClearNotification(_id);
+
               let tab = "";
               if (action.includes("building maintenance")) tab = "service";
               else if (action.includes("building upgrade")) tab = "building-upgrade";

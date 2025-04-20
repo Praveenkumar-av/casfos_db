@@ -28,6 +28,8 @@ const NOTIFICATION_TABS = {
   issue: 'assetissue',
   service: 'assetstore',
   updation: 'storekeeperassetupdation',
+  // No specific tabs for HOO actions as they are handled by HOO approval page
+  // 'return approved with HOO waiting' and 'return approved by HOO' are informational and don't redirect
 };
 
 const StorekeeperDashboard = () => {
@@ -147,15 +149,20 @@ const StorekeeperDashboard = () => {
         return `Asset Manager rejected building upgrade for ${itemName}`;
       case "building disposal cancelled":
         return `Asset Manager cancelled building disposal for ${itemName}`;
-        case "building maintenance approved":
-      return `Asset Manager approved maintenance for ${itemName}`;
-    case "building maintenance rejected":
-      return `Asset Manager rejected maintenance for ${itemName}`;
+      case "building maintenance approved":
+        return `Asset Manager approved maintenance for ${itemName}`;
+      case "building maintenance rejected":
+        return `Asset Manager rejected maintenance for ${itemName}`;
+      case "return approved with HOO waiting":
+        return `HOO is reviewing ${itemName} return for disposal`;
+      case "return approved by HOO":
+        return `HOO approved ${itemName} return for disposal`;
+      case "return rejected by HOO":
+        return `HOO rejected ${itemName} return for disposal`;
       default:
         return `${action} - ${assetCategory}`;
     }
   };
-
 
   /**
    * Renders detailed information for an expanded notification
@@ -246,13 +253,11 @@ const StorekeeperDashboard = () => {
             {rejectionRemarks && <p><strong>Remarks:</strong> {rejectionRemarks}</p>}
           </>
         )}
-  
 
-        {action.includes("rejected") || action.includes("cancelled")? (
+        {(action.includes("rejected") || action.includes("cancelled") || action.includes("rejected by HOO")) ? (
           <button
             className='update-button'
             onClick={async () => {
-              // Delete the notification before redirecting
               await handleClearNotification(_id);
 
               let tab = "";
@@ -260,19 +265,16 @@ const StorekeeperDashboard = () => {
               else if (action.includes("building upgrade")) tab = "building-upgrade";
               else if (action.includes("building disposal")) tab = "disposable";
               else if (action.includes("return")) tab = "returned";
-              else if (action.includes("issue")) 
-              {
+              else if (action.includes("issue")) {
                 window.location.href = `/assetissue?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
                 return;
               }
               else if (action.includes("service")) tab = "assetstore";
               else if (action.includes("updation")) {
-                // Redirect to EntryStaffAssetUpdation with rejectedId and assetType
                 window.location.href = `/entrystaffassetupdation?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&assetType=${assetType}`;
                 return;
               }              
 
-  
               window.location.href = `/assetstore?username=${encodeURIComponent(username)}&rejectedId=${rejectedAssetId || _id}&tab=${tab}`;
             }}
           >
@@ -356,7 +358,6 @@ const StorekeeperDashboard = () => {
           <form action="#"><div className="form-input"></div></form>
 
           <div className="nav-right-container">
-
             <div className="notification-icon-container">
               <i className="fas fa-bell bell-icon" onClick={toggleNotificationPanel} />
               {notifications.length > 0 && (
@@ -378,7 +379,6 @@ const StorekeeperDashboard = () => {
               <br></br>
               <br></br>
               <p>Central Academy for State Forest Service - Asset Management System</p>
-           
             </div>
           </section>
           <section id="about" className="content-section">

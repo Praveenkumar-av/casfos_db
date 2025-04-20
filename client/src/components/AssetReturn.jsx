@@ -416,7 +416,6 @@ const AssetReturn = () => {
         </ul>
       </section>
 
-      {/* Main content */}
       <section id="content">
         <nav>
           <i className="bx bx-menu" />

@@ -522,6 +522,12 @@ const renderPopupContent = (data) => {
             </a>
           </li>
           <li>
+            <a href={`/hooassetapproval?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-shopping-bag-alt" />
+              <span className="text">Asset Approval</span>
+            </a>
+          </li>
+          <li>
             <a href={`/hoofacultyapproval?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-package" />
               <span className="text">Faculty Approval</span>

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const returnedConsumableSchema = new mongoose.Schema({
   assetType: { type: String, required: true, enum: ["Consumable"] },
-  assetCategory: { type: String, required: true },
+  assetCategory: { type: String, required: false },
   itemName: { type: String, required: true },
   subCategory: String,
   itemDescription: String,
@@ -19,7 +19,7 @@ const returnedConsumableSchema = new mongoose.Schema({
     enum: ["yes", "no", null], 
     default: null,
     description: "Indicates if the item has a pending disposal entry in TempDispose"
-  },
+  },hooapproval: { type: String, enum: ["waiting", null], default: null },
   rejectedDisposal: { 
     type: String, 
     enum: ["yes", "no", null], 

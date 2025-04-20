@@ -44,7 +44,62 @@ function AssetUpdation() {
   const queryParams = new URLSearchParams(location.search);
   const username = queryParams.get("username") || "Guest";
   const serverBaseUrl = "http://localhost:3001";
-
+  const [showAddIdPopup, setShowAddIdPopup] = useState(false);
+  const [showRemoveIdPopup, setShowRemoveIdPopup] = useState(false);
+  const [currentItemIndex, setCurrentItemIndex] = useState(0);
+  const [newItemId, setNewItemId] = useState("");
+  const [selectedIdsToRemove, setSelectedIdsToRemove] = useState([]);
+  
+  // Add these handler functions
+  const handleAddIdClick = (index) => {
+    setCurrentItemIndex(index);
+    setShowAddIdPopup(true);
+    setNewItemId("");
+  };
+  
+  const handleRemoveIdClick = (index) => {
+    setCurrentItemIndex(index);
+    setSelectedIdsToRemove([]);
+    setShowRemoveIdPopup(true);
+  };
+  
+  const handleAddId = () => {
+    if (!newItemId.trim()) return;
+    
+    setEditedAsset(prev => {
+      const newItems = [...prev.items];
+      const currentIds = newItems[currentItemIndex].itemIds || [];
+      newItems[currentItemIndex] = {
+        ...newItems[currentItemIndex],
+        itemIds: [...currentIds, newItemId.trim()]
+      };
+      return { ...prev, items: newItems };
+    });
+    
+    setShowAddIdPopup(false);
+  };
+  
+  const handleRemoveIds = () => {
+    setEditedAsset(prev => {
+      const newItems = [...prev.items];
+      const currentIds = newItems[currentItemIndex].itemIds || [];
+      newItems[currentItemIndex] = {
+        ...newItems[currentItemIndex],
+        itemIds: currentIds.filter(id => !selectedIdsToRemove.includes(id))
+      };
+      return { ...prev, items: newItems };
+    });
+    
+    setShowRemoveIdPopup(false);
+  };
+  
+  const toggleIdSelection = (id) => {
+    setSelectedIdsToRemove(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id) 
+        : [...prev, id]
+    );
+  };
   // Fetch permanent assets when tab is active
   useEffect(() => {
     if (activeTab === "permanent") {
@@ -842,19 +897,31 @@ function AssetUpdation() {
                   </div>
                   {asset.assetType === "Permanent" && (
                     <div style={componentStyles.formGroup}>
-                      <label>Item IDs (comma separated):</label>
-                      <input
-                        type="text"
-                        value={item.itemIds?.join(", ") || ""}
-                        onChange={(e) =>
-                          handleItemChange(
-                            index,
-                            "itemIds",
-                            e.target.value.split(",").map((id) => id.trim())
-                          )
-                        }
-                        style={componentStyles.input}
-                      />
+                        <label>Item IDs:</label>
+  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+    <button 
+      type="button" 
+      onClick={() => handleAddIdClick(index)}
+      style={componentStyles.smallButton}
+    >
+      Add ID
+    </button>
+    <button 
+      type="button" 
+      onClick={() => handleRemoveIdClick(index)}
+      style={componentStyles.smallButton}
+      disabled={!item.itemIds || item.itemIds.length === 0}
+    >
+      Remove ID
+    </button>
+  </div>
+  <input
+    type="text"
+    value={item.itemIds?.join(", ") || ""}
+    readOnly
+    style={componentStyles.input}
+  />
+
                     </div>
                   )}
                 </div>
@@ -1188,6 +1255,80 @@ function AssetUpdation() {
           </div>
         </div>
       )}
+      {showAddIdPopup && (
+  <div style={componentStyles.popupOverlay}>
+    <div style={componentStyles.popupContent}>
+      <h3>Add New Item ID</h3>
+      <div style={{ margin: '20px 0' }}>
+        <input
+          type="text"
+          value={newItemId}
+          onChange={(e) => setNewItemId(e.target.value)}
+          placeholder="Enter new item ID"
+          style={componentStyles.input}
+          autoFocus
+        />
+      </div>
+      <div style={componentStyles.popupButtons}>
+        <button 
+          style={componentStyles.saveButton} 
+          onClick={handleAddId}
+          disabled={!newItemId.trim()}
+        >
+          Add ID
+        </button>
+        <button 
+          style={componentStyles.cancelButton} 
+          onClick={() => setShowAddIdPopup(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showRemoveIdPopup && (
+  <div style={componentStyles.popupOverlay}>
+    <div style={componentStyles.popupContent}>
+      <h3>Remove Item IDs</h3>
+      <div style={{ margin: '20px 0', maxHeight: '300px', overflowY: 'auto' }}>
+        {editedAsset.items[currentItemIndex]?.itemIds?.length > 0 ? (
+          editedAsset.items[currentItemIndex].itemIds.map(id => (
+            <div key={id} style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedIdsToRemove.includes(id)}
+                  onChange={() => toggleIdSelection(id)}
+                  style={{ marginRight: '10px' }}
+                />
+                {id}
+              </label>
+            </div>
+          ))
+        ) : (
+          <p>No item IDs available</p>
+        )}
+      </div>
+      <div style={componentStyles.popupButtons}>
+        <button 
+          style={componentStyles.saveButton} 
+          onClick={handleRemoveIds}
+          disabled={selectedIdsToRemove.length === 0}
+        >
+          Remove Selected
+        </button>
+        <button 
+          style={componentStyles.cancelButton} 
+          onClick={() => setShowRemoveIdPopup(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
@@ -1415,6 +1556,18 @@ const componentStyles = {
     gap: "10px",
     marginTop: "15px",
   },
+  smallButton: {
+  padding: '5px 10px',
+  backgroundColor: '#6c757d',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '14px',
+  ':hover': {
+    backgroundColor: '#5a6268'
+  },
+},
   saveButton: {
     padding: "10px 20px",
     backgroundColor: "#28a745",

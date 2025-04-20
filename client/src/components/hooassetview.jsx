@@ -1418,6 +1418,12 @@ const AssetView = () => {
               <span className="text">User Approval</span>
             </a>
           </li>
+          <li>
+            <a href={`/hooassetapproval?username=${encodeURIComponent(username)}`}>
+              <i className="bx bxs-shopping-bag-alt" />
+              <span className="text">Asset Approval</span>
+            </a>
+          </li>
           <li >
             <a href={`/hoofacultyapproval?username=${encodeURIComponent(username)}`}>
               <i className="bx bxs-package" />

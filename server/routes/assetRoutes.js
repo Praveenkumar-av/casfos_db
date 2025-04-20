@@ -54,6 +54,8 @@ router.post("/storeReturnedReceipt", AssetController.storeReturnedReceipt); // S
 router.post("/saveReturnedStatus", AssetController.saveReturnedStatus); // Save returned status
 router.post("/saveReturnedPermanentStatus", AssetController.saveReturnedPermanentStatus); // Save permanent asset return status
 router.post("/getReturnedAssets", AssetController.getReturnedAssets); // Fetch returned assets
+router.get("/getReturnedAssetsForHoo", AssetController.getReturnedAssetsForHoo);
+router.post("/getStoreItemsForReturn", AssetController.getStoreItemsForReturn);
 router.get("/getReturnedForApproval", AssetController.getReturnedForApproval); // Fetch returns pending approval
 router.get("/getReturnedForConditionChange", AssetController.getReturnedForConditionChange); // Fetch returns for condition change
 router.post("/updateReturnCondition/:id", AssetController.updateReturnCondition); // Update return condition
@@ -90,10 +92,6 @@ router.post("/getBuildingUpgrades", AssetController.getBuildingUpgrades); // Fet
 router.post("/addBuildingUpgrades", AssetController.addBuildingUpgrade); // Add a building upgrade
 router.get("/getTempBuildingUpgrades", AssetController.getTempBuildingUpgrades); // Fetch temporary building upgrades
 
-// -----------------------------------------
-// Approval and Rejection Routes
-// Routes for approving or rejecting various actions
-// -----------------------------------------
 
 // Asset Approval/Rejection
 router.post("/submitForApproval", AssetController.submitForApproval); // Submit asset for approval
@@ -115,9 +113,10 @@ router.post("/approveReturn/:id", AssetController.approveReturn); // Approve a r
 router.post("/rejectReturn/:id", AssetController.rejectReturn); // Reject a return
 
 // Service Approval/Rejection
-router.post("/approveService/:id", AssetController.approveService); // Approve a service
-router.post("/rejectService/:id", AssetController.rejectService); // Reject a service
-
+router.post("/approveService/:id", AssetController.approveService); 
+router.post("/rejectService/:id", AssetController.rejectService); 
+router.put("/approveReturnByHoo/:id", AssetController.approveReturnByHoo);
+router.put("/rejectReturnByHoo/:id",AssetController.rejectReturnByHoo)
 // Maintenance Approval/Rejection
 router.post("/approveOrRejectMaintenance", AssetController.approveOrRejectMaintenance); // Approve or reject maintenance
 

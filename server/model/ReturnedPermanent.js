@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const ReturnedPermanentSchema = new mongoose.Schema({
   assetType: { type: String, enum: ["Permanent"], default: "Permanent", required: true },
-  assetCategory: { type: String, required: true },
+  assetCategory: { type: String, required: false },
   itemName: { type: String },
   subCategory: { type: String },
   itemDescription: { type: String },
@@ -19,6 +19,7 @@ const ReturnedPermanentSchema = new mongoose.Schema({
     default: null,
     description: "Indicates if the item has a pending service entry in TempServiced"
   },
+  hooapproval: { type: String, enum: ["waiting", null], default: null },
   servicedRejection: { 
     type: String, 
     enum: ["yes", "no", null], 

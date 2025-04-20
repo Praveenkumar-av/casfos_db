@@ -40,7 +40,7 @@ import UpdateFacultyEntryHoo from "./components/updatefacultyentryhoo";
 import AddConduct from './components/addconduct';
 import AssetView from "./components/ViewerAssetview";
 import FacultyView from "./components/Viewerfacultyview";
-
+import HOOAssetApproval from "./components/hooassetapproval"
 function App() {
   return (
     <Router>
@@ -65,7 +65,7 @@ function App() {
         <Route path="/hoofacultyview" element={<AdminFacultyView/>} />
         <Route path="/facultyverifierfacultyview" element={<FacultyverifierFacultyView/>} />
         <Route path="/principalfacultyview" element={<PrincipalFacultyView/>} />
-
+        <Route path ="/hooassetapproval" element={<HOOAssetApproval/>}/>
         <Route path="/dataentrydashboard" element={<DataDashboard/>} />
         <Route path="/viewasset" element={<ViewAsset/>} />
         <Route path="/viewfaculty" element={<ViewFaculty/>} />

@@ -1,3 +1,4 @@
+
 /**
  * Overview:
  * This is a React component for a Storekeeper Asset Updation page in an asset management system.
@@ -69,7 +70,63 @@ const StorekeeperAssetUpdation = () => {
   const isPendingUpdate = (assetId) => {
     return pendingUpdates.some((update) => update.assetId.toString() === assetId.toString());
   };
-
+  const [showAddIdPopup, setShowAddIdPopup] = useState(false);
+  const [showRemoveIdPopup, setShowRemoveIdPopup] = useState(false);
+  const [currentItemIndex, setCurrentItemIndex] = useState(0);
+  const [newItemId, setNewItemId] = useState("");
+  const [selectedIdsToRemove, setSelectedIdsToRemove] = useState([]);
+  
+  // Add these handler functions
+  const handleAddIdClick = (index) => {
+    setCurrentItemIndex(index);
+    setShowAddIdPopup(true);
+    setNewItemId("");
+  };
+  
+  const handleRemoveIdClick = (index) => {
+    setCurrentItemIndex(index);
+    setSelectedIdsToRemove([]);
+    setShowRemoveIdPopup(true);
+  };
+  
+  const handleAddId = () => {
+    if (!newItemId.trim()) return;
+    
+    setEditedAsset(prev => {
+      const newItems = [...prev.items];
+      const currentIds = newItems[currentItemIndex].itemIds || [];
+      newItems[currentItemIndex] = {
+        ...newItems[currentItemIndex],
+        itemIds: [...currentIds, newItemId.trim()]
+      };
+      return { ...prev, items: newItems };
+    });
+    
+    setShowAddIdPopup(false);
+  };
+  
+  const handleRemoveIds = () => {
+    setEditedAsset(prev => {
+      const newItems = [...prev.items];
+      const currentIds = newItems[currentItemIndex].itemIds || [];
+      newItems[currentItemIndex] = {
+        ...newItems[currentItemIndex],
+        itemIds: currentIds.filter(id => !selectedIdsToRemove.includes(id))
+      };
+      return { ...prev, items: newItems };
+    });
+    
+    setShowRemoveIdPopup(false);
+  };
+  
+  const toggleIdSelection = (id) => {
+    setSelectedIdsToRemove(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id) 
+        : [...prev, id]
+    );
+  };
+  
   /**
    * Fetches assets and pending updates on component mount
    */
@@ -524,576 +581,589 @@ const StorekeeperAssetUpdation = () => {
   const renderAssetDetails = (asset) => {
     if (!asset) return null;
 
-    if (activeTab === 'conditionChange') {
-      return (
-        <div style={componentStyles.assetDetails}>
-          <h3>{asset.assetType} Returned Asset Details</h3>
-          <div style={componentStyles.section}>
-            <h4>General Information</h4>
-            <div style={componentStyles.detailRow}>
-              <div style={componentStyles.detailGroup}>
-                <p>
-                  <strong>Asset Type:</strong> {asset.assetType || 'N/A'}
-                </p>
-                <p>
-                  <strong>Category:</strong> {asset.assetCategory || 'N/A'}
-                </p>
-                <p>
-                  <strong>Item Name:</strong> {asset.itemName || 'N/A'}
-                </p>
-                <p>
-                  <strong>Sub Category:</strong> {asset.subCategory || 'N/A'}
-                </p>
-              </div>
-              <div style={componentStyles.detailGroup}>
-                <p>
-                  <strong>Description:</strong> {asset.itemDescription || 'N/A'}
-                </p>
-                <p>
-                  <strong>Location:</strong> {asset.location || 'N/A'}
-                </p>
-                {asset.assetType === 'Permanent' && (
-                  <p>
-                    <strong>Item ID:</strong> {asset.itemId || 'N/A'}
-                  </p>
-                )}
-                {asset.assetType === 'Consumable' && (
-                  <p>
-                    <strong>Return Quantity:</strong> {asset.returnQuantity || 'N/A'}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div style={componentStyles.detailRow}>
-              <div style={componentStyles.detailGroup}>
-                <p>
-                  <strong>Status:</strong> {CONDITION_DISPLAY_MAP[asset.status] || asset.status || 'N/A'}
-                </p>
-                <p>
-                  <strong>Remark:</strong> {asset.remark || 'N/A'}
-                </p>
-              </div>
-              <div style={componentStyles.detailGroup}>
-                {asset.pdfUrl && (
-                  <p>
-                    <strong>Receipt PDF:</strong>{' '}
-                    <a href={asset.pdfUrl} target="_blank" rel="noopener noreferrer">
-                      View
-                    </a>
-                  </p>
-                )}
-                {asset.signedPdfUrl && (
-                  <p>
-                    <strong>Signed PDF:</strong>{' '}
-                    <a href={asset.signedPdfUrl} target="_blank" rel="noopener noreferrer">
-                      View
-                    </a>
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return (
-      <div style={componentStyles.assetDetails}>
-        <h3>{asset.assetType} Asset Details</h3>
-        {editMode ? (
-          <div style={componentStyles.editForm}>
+      <div style={{ padding: '10px' }}>
+        <h3 style={{ marginBottom: '20px', fontSize: '24px', color: '#333' }}>
+          {asset.assetType} Asset Details
+        </h3>
+        {activeTab === 'conditionChange' ? (
+          <div style={{ ...componentStyles.assetDetails, padding: '20px', backgroundColor: '#fff', borderRadius: '5px' }}>
+            <h3 style={{ fontSize: '20px', marginBottom: '20px' }}>{asset.assetType} Returned Asset Details</h3>
             <div style={componentStyles.section}>
-              <h4>General Information</h4>
-              <div style={componentStyles.formRow}>
-                <div style={componentStyles.formGroup}>
-                  <label>Asset Type:</label>
-                  <input
-                    type="text"
-                    name="assetType"
-                    value={editedAsset.assetType || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                    disabled
-                  />
-                </div>
-                <div style={componentStyles.formGroup}>
-                  <label>Asset Category:</label>
-                  <input
-                    type="text"
-                    name="assetCategory"
-                    value={editedAsset.assetCategory || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  />
-                </div>
-              </div>
-              <div style={componentStyles.formRow}>
-                <div style={componentStyles.formGroup}>
-                  <label>Entry Date:</label>
-                  <input
-                    type="date"
-                    name="entryDate"
-                    value={
-                      editedAsset.entryDate
-                        ? new Date(editedAsset.entryDate).toISOString().split('T')[0]
-                        : ''
-                    }
-                    onChange={(e) => handleDateChange('entryDate', e.target.value)}
-                    style={componentStyles.input}
-                  />
-                </div>
-                <div style={componentStyles.formGroup}>
-                  <label>Purchase Date:</label>
-                  <input
-                    type="date"
-                    name="purchaseDate"
-                    value={
-                      editedAsset.purchaseDate
-                        ? new Date(editedAsset.purchaseDate).toISOString().split('T')[0]
-                        : ''
-                    }
-                    onChange={(e) => handleDateChange('purchaseDate', e.target.value)}
-                    style={componentStyles.input}
-                  />
-                </div>
-              </div>
-              <div style={componentStyles.formRow}>
-                <div style={componentStyles.formGroup}>
-                  <label>Source:</label>
-                  <select
-                    name="source"
-                    value={editedAsset.source || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  >
-                    <option value="GEM">GEM</option>
-                    <option value="Local">Local</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div style={componentStyles.formGroup}>
-                  <label>Mode of Purchase:</label>
-                  <select
-                    name="modeOfPurchase"
-                    value={editedAsset.modeOfPurchase || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  >
-                    <option value="Tender">Tender</option>
-                    <option value="Quotation">Quotation</option>
-                    <option value="Others">Others</option>
-                  </select>
-                </div>
-              </div>
-              <div style={componentStyles.formRow}>
-                <div style={componentStyles.formGroup}>
-                  <label>Supplier Name:</label>
-                  <input
-                    type="text"
-                    name="supplierName"
-                    value={editedAsset.supplierName || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  />
-                </div>
-                <div style={componentStyles.formGroup}>
-                  <label>Supplier Address:</label>
-                  <input
-                    type="text"
-                    name="supplierAddress"
-                    value={editedAsset.supplierAddress || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  />
-                </div>
-              </div>
-              <div style={componentStyles.formRow}>
-                <div style={componentStyles.formGroup}>
-                  <label>Bill No:</label>
-                  <input
-                    type="text"
-                    name="billNo"
-                    value={editedAsset.billNo || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  />
-                </div>
-                <div style={componentStyles.formGroup}>
-                  <label>Received By:</label>
-                  <input
-                    type="text"
-                    name="receivedBy"
-                    value={editedAsset.receivedBy || ''}
-                    onChange={handleInputChange}
-                    style={componentStyles.input}
-                  />
-                </div>
-              </div>
-              <div style={componentStyles.formGroup}>
-                <label>Bill Photo:</label>
-                <input
-                  type="file"
-                  onChange={(e) => e.target.files[0] && handleFileUpload(e.target.files[0], 'billPhoto', 0)}
-                  style={componentStyles.input}
-                />
-                {renderImagePreview(editedAsset.billPhotoUrl)}
-              </div>
-            </div>
-            <div style={componentStyles.section}>
-              <h4>Items</h4>
-              {editedAsset.items?.map((item, index) => (
-                <div key={index} style={componentStyles.itemEditContainer}>
-                  <div style={componentStyles.itemHeader}>
-                    <h5>Item {index + 1}</h5>
-                  </div>
-                  <div style={componentStyles.formRow}>
-                    <div style={componentStyles.formGroup}>
-                      <label>Item Name:</label>
-                      <input
-                        type="text"
-                        value={item.itemName || ''}
-                        onChange={(e) => handleItemChange(index, 'itemName', e.target.value)}
-                        style={componentStyles.input}
-                      />
-                    </div>
-                    <div style={componentStyles.formGroup}>
-                      <label>Sub Category:</label>
-                      <input
-                        type="text"
-                        value={item.subCategory || ''}
-                        onChange={(e) => handleItemChange(index, 'subCategory', e.target.value)}
-                        style={componentStyles.input}
-                      />
-                    </div>
-                  </div>
-                  <div style={componentStyles.formGroup}>
-                    <label>Item Description:</label>
-                    <textarea
-                      value={item.itemDescription || ''}
-                      onChange={(e) => handleItemChange(index, 'itemDescription', e.target.value)}
-                      style={componentStyles.textarea}
-                    />
-                  </div>
-                  <div style={componentStyles.formRow}>
-                    <div style={componentStyles.formGroup}>
-                      <label>Quantity Received:</label>
-                      <input
-                        type="number"
-                        value={item.quantityReceived || ''}
-                        onChange={(e) => handleItemChange(index, 'quantityReceived', e.target.value)}
-                        style={componentStyles.input}
-                      />
-                    </div>
-                    <div style={componentStyles.formGroup}>
-                      <label>Unit Price:</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.unitPrice || ''}
-                        onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
-                        style={componentStyles.input}
-                      />
-                    </div>
-                    <div style={componentStyles.formGroup}>
-                      <label>Total Price:</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.totalPrice || ''}
-                        onChange={(e) => handleItemChange(index, 'totalPrice', e.target.value)}
-                        style={componentStyles.input}
-                        disabled
-                      />
-                    </div>
-                  </div>
-                  <div style={componentStyles.subSection}>
-                    <h6>AMC Information</h6>
-                    <div style={componentStyles.formRow}>
-                      <div style={componentStyles.formGroup}>
-                        <label>AMC From Date:</label>
-                        <input
-                          type="date"
-                          value={
-                            item.amcFromDate
-                              ? new Date(item.amcFromDate).toISOString().split('T')[0]
-                              : ''
-                          }
-                          onChange={(e) => handleItemDateChange(index, 'amcFromDate', e.target.value)}
-                          style={componentStyles.input}
-                        />
-                      </div>
-                      <div style={componentStyles.formGroup}>
-                        <label>AMC To Date:</label>
-                        <input
-                          type="date"
-                          value={
-                            item.amcToDate
-                              ? new Date(item.amcToDate).toISOString().split('T')[0]
-                              : ''
-                          }
-                          onChange={(e) => handleItemDateChange(index, 'amcToDate', e.target.value)}
-                          style={componentStyles.input}
-                        />
-                      </div>
-                    </div>
-                    <div style={componentStyles.formRow}>
-                      <div style={componentStyles.formGroup}>
-                        <label>AMC Cost:</label>
-                        <input
-                          type="number"
-                          value={item.amcCost || ''}
-                          onChange={(e) => handleItemChange(index, 'amcCost', e.target.value)}
-                          style={componentStyles.input}
-                        />
-                      </div>
-                      <div style={componentStyles.formGroup}>
-                        <label>AMC Photo:</label>
-                        <input
-                          type="file"
-                          onChange={(e) =>
-                            e.target.files[0] && handleFileUpload(e.target.files[0], 'amcPhoto', index)
-                          }
-                          style={componentStyles.input}
-                        />
-                        {renderImagePreview(item.amcPhotoUrl)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={componentStyles.subSection}>
-                    <h6>Warranty Information</h6>
-                    <div style={componentStyles.formRow}>
-                      <div style={componentStyles.formGroup}>
-                        <label>Warranty Number:</label>
-                        <input
-                          type="text"
-                          value={item.warrantyNumber || ''}
-                          onChange={(e) => handleItemChange(index, 'warrantyNumber', e.target.value)}
-                          style={componentStyles.input}
-                        />
-                      </div>
-                      <div style={componentStyles.formGroup}>
-                        <label>Warranty Valid Until:</label>
-                        <input
-                          type="date"
-                          value={
-                            item.warrantyValidUpto
-                              ? new Date(item.warrantyValidUpto).toISOString().split('T')[0]
-                              : ''
-                          }
-                          onChange={(e) =>
-                            handleItemDateChange(index, 'warrantyValidUpto', e.target.value)
-                          }
-                          style={componentStyles.input}
-                        />
-                      </div>
-                    </div>
-                    <div style={componentStyles.formGroup}>
-                      <label>Warranty Photo:</label>
-                      <input
-                        type="file"
-                        onChange={(e) =>
-                          e.target.files[0] && handleFileUpload(e.target.files[0], 'warrantyPhoto', index)
-                        }
-                        style={componentStyles.input}
-                      />
-                      {renderImagePreview(item.warrantyPhotoUrl)}
-                    </div>
-                  </div>
-                  <div style={componentStyles.formGroup}>
-                    <label>Item Photo:</label>
-                    <input
-                      type="file"
-                      onChange={(e) =>
-                        e.target.files[0] && handleFileUpload(e.target.files[0], 'itemPhoto', index)
-                      }
-                      style={componentStyles.input}
-                    />
-                    {renderImagePreview(item.itemPhotoUrl)}
-                  </div>
-                  {asset.assetType === 'Permanent' && (
-                    <div style={componentStyles.formGroup}>
-                      <label>Item IDs (comma separated):</label>
-                      <input
-                        type="text"
-                        value={item.itemIds?.join(', ') || ''}
-                        onChange={(e) =>
-                          handleItemChange(
-                            index,
-                            'itemIds',
-                            e.target.value.split(',').map((id) => id.trim())
-                          )
-                        }
-                        style={componentStyles.input}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div style={componentStyles.viewDetails}>
-            <div style={componentStyles.section}>
-              <h4>General Information</h4>
+              <h4 style={{ fontSize: '18px', marginBottom: '15px' }}>General Information</h4>
               <div style={componentStyles.detailRow}>
                 <div style={componentStyles.detailGroup}>
                   <p>
                     <strong>Asset Type:</strong> {asset.assetType || 'N/A'}
                   </p>
                   <p>
-                    <strong>Asset Category:</strong> {asset.assetCategory || 'N/A'}
+                    <strong>Category:</strong> {asset.assetCategory || 'N/A'}
                   </p>
                   <p>
-                    <strong>Entry Date:</strong> {new Date(asset.entryDate).toLocaleDateString()}
+                    <strong>Item Name:</strong> {asset.itemName || 'N/A'}
                   </p>
                   <p>
-                    <strong>Purchase Date:</strong> {new Date(asset.purchaseDate).toLocaleDateString()}
+                    <strong>Sub Category:</strong> {asset.subCategory || 'N/A'}
                   </p>
                 </div>
                 <div style={componentStyles.detailGroup}>
                   <p>
-                    <strong>Source:</strong> {asset.source || 'N/A'}
+                    <strong>Description:</strong> {asset.itemDescription || 'N/A'}
                   </p>
                   <p>
-                    <strong>Mode of Purchase:</strong> {asset.modeOfPurchase || 'N/A'}
+                    <strong>Location:</strong> {asset.location || 'N/A'}
                   </p>
-                  <p>
-                    <strong>Bill No:</strong> {asset.billNo || 'N/A'}
-                  </p>
-                  <p>
-                    <strong>Received By:</strong> {asset.receivedBy || 'N/A'}
-                  </p>
+                  {asset.assetType === 'Permanent' && (
+                    <p>
+                      <strong>Item ID:</strong> {asset.itemId || 'N/A'}
+                    </p>
+                  )}
+                  {asset.assetType === 'Consumable' && (
+                    <p>
+                      <strong>Return Quantity:</strong> {asset.returnQuantity || 'N/A'}
+                    </p>
+                  )}
                 </div>
               </div>
               <div style={componentStyles.detailRow}>
                 <div style={componentStyles.detailGroup}>
                   <p>
-                    <strong>Supplier Name:</strong> {asset.supplierName || 'N/A'}
+                    <strong>Status:</strong> {CONDITION_DISPLAY_MAP[asset.status] || asset.status || 'N/A'}
                   </p>
                   <p>
-                    <strong>Supplier Address:</strong> {asset.supplierAddress || 'N/A'}
+                    <strong>Remark:</strong> {asset.remark || 'N/A'}
                   </p>
+                </div>
+                <div style={componentStyles.detailGroup}>
+                  {asset.pdfUrl && (
+                    <p>
+                      <strong>Receipt PDF:</strong>{' '}
+                      <a href={asset.pdfUrl} target="_blank" rel="noopener noreferrer">
+                        View
+                      </a>
+                    </p>
+                  )}
+                  {asset.signedPdfUrl && (
+                    <p>
+                      <strong>Signed PDF:</strong>{' '}
+                      <a href={asset.signedPdfUrl} target="_blank" rel="noopener noreferrer">
+                        View
+                      </a>
+                    </p>
+                  )}
                 </div>
               </div>
-              {asset.billPhotoUrl && (
-                <div style={componentStyles.detailGroup}>
-                  <p>
-                    <strong>Bill Photo:</strong>
-                  </p>
-                  {renderImagePreview(asset.billPhotoUrl)}
-                </div>
-              )}
             </div>
-            <div style={componentStyles.section}>
-              <h4>Items</h4>
-              {asset.items?.map((item, index) => (
-                <div key={index} style={componentStyles.itemViewContainer}>
-                  <div style={componentStyles.itemHeader}>
-                    <h5>Item {index + 1}</h5>
+          </div>
+        ) : (
+          <div style={componentStyles.assetDetails}>
+            {editMode ? (
+              <div style={{ ...componentStyles.editForm, backgroundColor: '#fff', padding: '20px', borderRadius: '5px' }}>
+                <div style={componentStyles.section}>
+                  <h4 style={{ fontSize: '18px', marginBottom: '15px' }}>General Information</h4>
+                  <div style={componentStyles.formRow}>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Asset Type:</label>
+                      <input
+                        type="text"
+                        name="assetType"
+                        value={editedAsset.assetType || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                        disabled
+                      />
+                    </div>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Asset Category:</label>
+                      <input
+                        type="text"
+                        name="assetCategory"
+                        value={editedAsset.assetCategory || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                  </div>
+                  <div style={componentStyles.formRow}>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Entry Date:</label>
+                      <input
+                        type="date"
+                        name="entryDate"
+                        value={
+                          editedAsset.entryDate
+                            ? new Date(editedAsset.entryDate).toISOString().split('T')[0]
+                            : ''
+                        }
+                        onChange={(e) => handleDateChange('entryDate', e.target.value)}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Purchase Date:</label>
+                      <input
+                        type="date"
+                        name="purchaseDate"
+                        value={
+                          editedAsset.purchaseDate
+                            ? new Date(editedAsset.purchaseDate).toISOString().split('T')[0]
+                            : ''
+                        }
+                        onChange={(e) => handleDateChange('purchaseDate', e.target.value)}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                  </div>
+                  <div style={componentStyles.formRow}>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Source:</label>
+                      <select
+                        name="source"
+                        value={editedAsset.source || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      >
+                        <option value="GEM">GEM</option>
+                        <option value="Local">Local</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Mode of Purchase:</label>
+                      <select
+                        name="modeOfPurchase"
+                        value={editedAsset.modeOfPurchase || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      >
+                        <option value="Tender">Tender</option>
+                        <option value="Quotation">Quotation</option>
+                        <option value="Others">Others</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={componentStyles.formRow}>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Supplier Name:</label>
+                      <input
+                        type="text"
+                        name="supplierName"
+                        value={editedAsset.supplierName || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Supplier Address:</label>
+                      <input
+                        type="text"
+                        name="supplierAddress"
+                        value={editedAsset.supplierAddress || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                  </div>
+                  <div style={componentStyles.formRow}>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Bill No:</label>
+                      <input
+                        type="text"
+                        name="billNo"
+                        value={editedAsset.billNo || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                    <div style={componentStyles.formGroup}>
+                      <label style={componentStyles.label}>Received By:</label>
+                      <input
+                        type="text"
+                        name="receivedBy"
+                        value={editedAsset.receivedBy || ''}
+                        onChange={handleInputChange}
+                        style={componentStyles.input}
+                      />
+                    </div>
+                  </div>
+                  <div style={componentStyles.formGroup}>
+                    <label style={componentStyles.label}>Bill Photo:</label>
+                    <input
+                      type="file"
+                      onChange={(e) => e.target.files[0] && handleFileUpload(e.target.files[0], 'billPhoto', 0)}
+                      style={componentStyles.input}
+                    />
+                    {renderImagePreview(editedAsset.billPhotoUrl)}
+                  </div>
+                </div>
+                <div style={componentStyles.section}>
+                  <h4 style={{ fontSize: '18px', marginBottom: '15px' }}>Items</h4>
+                  {editedAsset.items?.map((item, index) => (
+                    <div key={index} style={componentStyles.itemEditContainer}>
+                      <div style={{ ...componentStyles.itemHeader, fontSize: '16px', fontWeight: '600' }}>
+                        Item {index + 1}
+                      </div>
+                      <div style={componentStyles.formRow}>
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Item Name:</label>
+                          <input
+                            type="text"
+                            value={item.itemName || ''}
+                            onChange={(e) => handleItemChange(index, 'itemName', e.target.value)}
+                            style={componentStyles.input}
+                          />
+                        </div>
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Sub Category:</label>
+                          <input
+                            type="text"
+                            value={item.subCategory || ''}
+                            onChange={(e) => handleItemChange(index, 'subCategory', e.target.value)}
+                            style={componentStyles.input}
+                          />
+                        </div>
+                      </div>
+                      <div style={componentStyles.formGroup}>
+                        <label style={componentStyles.label}>Item Description:</label>
+                        <textarea
+                          value={item.itemDescription || ''}
+                          onChange={(e) => handleItemChange(index, 'itemDescription', e.target.value)}
+                          style={componentStyles.textarea}
+                        />
+                      </div>
+                      <div style={componentStyles.formRow}>
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Quantity Received:</label>
+                          <input
+                            type="number"
+                            value={item.quantityReceived || ''}
+                            onChange={(e) => handleItemChange(index, 'quantityReceived', e.target.value)}
+                            style={componentStyles.input}
+                          />
+                        </div>
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Unit Price:</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.unitPrice || ''}
+                            onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
+                            style={componentStyles.input}
+                          />
+                        </div>
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Total Price:</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.totalPrice || ''}
+                            onChange={(e) => handleItemChange(index, 'totalPrice', e.target.value)}
+                            style={componentStyles.input}
+                            disabled
+                          />
+                        </div>
+                      </div>
+                      <div style={componentStyles.subSection}>
+                        <h6 style={{ fontSize: '14px', marginBottom: '10px' }}>AMC Information</h6>
+                        <div style={componentStyles.formRow}>
+                          <div style={componentStyles.formGroup}>
+                            <label style={componentStyles.label}>AMC From Date:</label>
+                            <input
+                              type="date"
+                              value={
+                                item.amcFromDate
+                                  ? new Date(item.amcFromDate).toISOString().split('T')[0]
+                                  : ''
+                              }
+                              onChange={(e) => handleItemDateChange(index, 'amcFromDate', e.target.value)}
+                              style={componentStyles.input}
+                            />
+                          </div>
+                          <div style={componentStyles.formGroup}>
+                            <label style={componentStyles.label}>AMC To Date:</label>
+                            <input
+                              type="date"
+                              value={
+                                item.amcToDate
+                                  ? new Date(item.amcToDate).toISOString().split('T')[0]
+                                  : ''
+                              }
+                              onChange={(e) => handleItemDateChange(index, 'amcToDate', e.target.value)}
+                              style={componentStyles.input}
+                            />
+                          </div>
+                        </div>
+                        <div style={componentStyles.formRow}>
+                          <div style={componentStyles.formGroup}>
+                            <label style={componentStyles.label}>AMC Cost:</label>
+                            <input
+                              type="number"
+                              value={item.amcCost || ''}
+                              onChange={(e) => handleItemChange(index, 'amcCost', e.target.value)}
+                              style={componentStyles.input}
+                            />
+                          </div>
+                          <div style={componentStyles.formGroup}>
+                            <label style={componentStyles.label}>AMC Photo:</label>
+                            <input
+                              type="file"
+                              onChange={(e) =>
+                                e.target.files[0] && handleFileUpload(e.target.files[0], 'amcPhoto', index)
+                              }
+                              style={componentStyles.input}
+                            />
+                            {renderImagePreview(item.amcPhotoUrl)}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={componentStyles.subSection}>
+                        <h6 style={{ fontSize: '14px', marginBottom: '10px' }}>Warranty Information</h6>
+                        <div style={componentStyles.formRow}>
+                          <div style={componentStyles.formGroup}>
+                            <label style={componentStyles.label}>Warranty Number:</label>
+                            <input
+                              type="text"
+                              value={item.warrantyNumber || ''}
+                              onChange={(e) => handleItemChange(index, 'warrantyNumber', e.target.value)}
+                              style={componentStyles.input}
+                            />
+                          </div>
+                          <div style={componentStyles.formGroup}>
+                            <label style={componentStyles.label}>Warranty Valid Until:</label>
+                            <input
+                              type="date"
+                              value={
+                                item.warrantyValidUpto
+                                  ? new Date(item.warrantyValidUpto).toISOString().split('T')[0]
+                                  : ''
+                              }
+                              onChange={(e) =>
+                                handleItemDateChange(index, 'warrantyValidUpto', e.target.value)
+                              }
+                              style={componentStyles.input}
+                            />
+                          </div>
+                        </div>
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Warranty Photo:</label>
+                          <input
+                            type="file"
+                            onChange={(e) =>
+                              e.target.files[0] && handleFileUpload(e.target.files[0], 'warrantyPhoto', index)
+                            }
+                            style={componentStyles.input}
+                          />
+                          {renderImagePreview(item.warrantyPhotoUrl)}
+                        </div>
+                      </div>
+                      <div style={componentStyles.formGroup}>
+                        <label style={componentStyles.label}>Item Photo:</label>
+                        <input
+                          type="file"
+                          onChange={(e) =>
+                            e.target.files[0] && handleFileUpload(e.target.files[0], 'itemPhoto', index)
+                          }
+                          style={componentStyles.input}
+                        />
+                        {renderImagePreview(item.itemPhotoUrl)}
+                      </div>
+                      {asset.assetType === 'Permanent' && (
+                        <div style={componentStyles.formGroup}>
+                          <label style={componentStyles.label}>Item IDs:</label>
+                          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                            <button 
+                              type="button" 
+                              onClick={() => handleAddIdClick(index)}
+                              style={componentStyles.smallButton}
+                            >
+                              Add ID
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveIdClick(index)}
+                              style={componentStyles.smallButton}
+                              disabled={!item.itemIds || item.itemIds.length === 0}
+                            >
+                              Remove ID
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={item.itemIds?.join(", ") || ""}
+                            readOnly
+                            style={componentStyles.input}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{ ...componentStyles.viewDetails, padding: '20px', backgroundColor: '#fff', borderRadius: '5px' }}>
+                <div style={componentStyles.section}>
+                  <h4 style={{ fontSize: '18px', marginBottom: '15px' }}>General Information</h4>
+                  <div style={componentStyles.detailRow}>
+                    <div style={componentStyles.detailGroup}>
+                      <p>
+                        <strong>Asset Type:</strong> {asset.assetType || 'N/A'}
+                      </p>
+                      <p>
+                        <strong>Asset Category:</strong> {asset.assetCategory || 'N/A'}
+                      </p>
+                      <p>
+                        <strong>Entry Date:</strong> {new Date(asset.entryDate).toLocaleDateString()}
+                      </p>
+                      <p>
+                        <strong>Purchase Date:</strong> {new Date(asset.purchaseDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div style={componentStyles.detailGroup}>
+                      <p>
+                        <strong>Source:</strong> {asset.source || 'N/A'}
+                      </p>
+                      <p>
+                        <strong>Mode of Purchase:</strong> {asset.modeOfPurchase || 'N/A'}
+                      </p>
+                      <p>
+                        <strong>Bill No:</strong> {asset.billNo || 'N/A'}
+                      </p>
+                      <p>
+                        <strong>Received By:</strong> {asset.receivedBy || 'N/A'}
+                      </p>
+                    </div>
                   </div>
                   <div style={componentStyles.detailRow}>
                     <div style={componentStyles.detailGroup}>
                       <p>
-                        <strong>Name:</strong> {item.itemName || 'N/A'}
+                        <strong>Supplier Name:</strong> {asset.supplierName || 'N/A'}
                       </p>
                       <p>
-                        <strong>Sub Category:</strong> {item.subCategory || 'N/A'}
-                      </p>
-                      <p>
-                        <strong>Description:</strong> {item.itemDescription || 'N/A'}
-                      </p>
-                    </div>
-                    <div style={componentStyles.detailGroup}>
-                      <p>
-                        <strong>Quantity:</strong> {item.quantityReceived || 'N/A'}
-                      </p>
-                      <p>
-                        <strong>Unit Price:</strong> {item.unitPrice || 'N/A'}
-                      </p>
-                      <p>
-                        <strong>Total Price:</strong> {item.totalPrice || 'N/A'}
+                        <strong>Supplier Address:</strong> {asset.supplierAddress || 'N/A'}
                       </p>
                     </div>
                   </div>
-                  {(item.amcFromDate || item.amcToDate || item.amcCost) && (
-                    <div style={componentStyles.subSection}>
-                      <h6>AMC Information</h6>
-                      <div style={componentStyles.detailRow}>
-                        <div style={componentStyles.detailGroup}>
-                          {item.amcFromDate && (
-                            <p>
-                              <strong>From:</strong>{' '}
-                              {new Date(item.amcFromDate).toLocaleDateString()}
-                            </p>
-                          )}
-                          {item.amcToDate && (
-                            <p>
-                              <strong>To:</strong> {new Date(item.amcToDate).toLocaleDateString()}
-                            </p>
-                          )}
-                          {item.amcCost && (
-                            <p>
-                              <strong>Cost:</strong> {item.amcCost}
-                            </p>
-                          )}
-                        </div>
-                        {item.amcPhotoUrl && (
-                          <div style={componentStyles.detailGroup}>
-                            <p>
-                              <strong>AMC Photo:</strong>
-                            </p>
-                            {renderImagePreview(item.amcPhotoUrl)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {(item.warrantyNumber || item.warrantyValidUpto) && (
-                    <div style={componentStyles.subSection}>
-                      <h6>Warranty Information</h6>
-                      <div style={componentStyles.detailRow}>
-                        <div style={componentStyles.detailGroup}>
-                          {item.warrantyNumber && (
-                            <p>
-                              <strong>Number:</strong> {item.warrantyNumber}
-                            </p>
-                          )}
-                          {item.warrantyValidUpto && (
-                            <p>
-                              <strong>Valid Until:</strong>{' '}
-                              {new Date(item.warrantyValidUpto).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        {item.warrantyPhotoUrl && (
-                          <div style={componentStyles.detailGroup}>
-                            <p>
-                              <strong>Warranty Photo:</strong>
-                            </p>
-                            {renderImagePreview(item.warrantyPhotoUrl)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {item.itemPhotoUrl && (
+                  {asset.billPhotoUrl && (
                     <div style={componentStyles.detailGroup}>
                       <p>
-                        <strong>Item Photo:</strong>
+                        <strong>Bill Photo:</strong>
                       </p>
-                      {renderImagePreview(item.itemPhotoUrl)}
-                    </div>
-                  )}
-                  {asset.assetType === 'Permanent' && item.itemIds?.length > 0 && (
-                    <div style={componentStyles.detailGroup}>
-                      <p>
-                        <strong>Item IDs:</strong> {item.itemIds.join(', ')}
-                      </p>
+                      {renderImagePreview(asset.billPhotoUrl)}
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
+                <div style={componentStyles.section}>
+                  <h4 style={{ fontSize: '18px', marginBottom: '15px' }}>Items</h4>
+                  {asset.items?.map((item, index) => (
+                    <div key={index} style={componentStyles.itemViewContainer}>
+                      <div style={{ ...componentStyles.itemHeader, fontSize: '16px', fontWeight: '600' }}>
+                        Item {index + 1}
+                      </div>
+                      <div style={componentStyles.detailRow}>
+                        <div style={componentStyles.detailGroup}>
+                          <p>
+                            <strong>Name:</strong> {item.itemName || 'N/A'}
+                          </p>
+                          <p>
+                            <strong>Sub Category:</strong> {item.subCategory || 'N/A'}
+                          </p>
+                          <p>
+                            <strong>Description:</strong> {item.itemDescription || 'N/A'}
+                          </p>
+                        </div>
+                        <div style={componentStyles.detailGroup}>
+                          <p>
+                            <strong>Quantity:</strong> {item.quantityReceived || 'N/A'}
+                          </p>
+                          <p>
+                            <strong>Unit Price:</strong> {item.unitPrice || 'N/A'}
+                          </p>
+                          <p>
+                            <strong>Total Price:</strong> {item.totalPrice || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      {(item.amcFromDate || item.amcToDate || item.amcCost) && (
+                        <div style={componentStyles.subSection}>
+                          <h6 style={{ fontSize: '14px', marginBottom: '10px' }}>AMC Information</h6>
+                          <div style={componentStyles.detailRow}>
+                            <div style={componentStyles.detailGroup}>
+                              {item.amcFromDate && (
+                                <p>
+                                  <strong>From:</strong>{' '}
+                                  {new Date(item.amcFromDate).toLocaleDateString()}
+                                </p>
+                              )}
+                              {item.amcToDate && (
+                                <p>
+                                  <strong>To:</strong> {new Date(item.amcToDate).toLocaleDateString()}
+                                </p>
+                              )}
+                              {item.amcCost && (
+                                <p>
+                                  <strong>Cost:</strong> {item.amcCost}
+                                </p>
+                              )}
+                            </div>
+                            {item.amcPhotoUrl && (
+                              <div style={componentStyles.detailGroup}>
+                                <p>
+                                  <strong>AMC Photo:</strong>
+                                </p>
+                                {renderImagePreview(item.amcPhotoUrl)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {(item.warrantyNumber || item.warrantyValidUpto) && (
+                        <div style={componentStyles.subSection}>
+                          <h6 style={{ fontSize: '14px', marginBottom: '10px' }}>Warranty Information</h6>
+                          <div style={componentStyles.detailRow}>
+                            <div style={componentStyles.detailGroup}>
+                              {item.warrantyNumber && (
+                                <p>
+                                  <strong>Number:</strong> {item.warrantyNumber}
+                                </p>
+                              )}
+                              {item.warrantyValidUpto && (
+                                <p>
+                                  <strong>Valid Until:</strong>{' '}
+                                  {new Date(item.warrantyValidUpto).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                            {item.warrantyPhotoUrl && (
+                              <div style={componentStyles.detailGroup}>
+                                <p>
+                                  <strong>Warranty Photo:</strong>
+                                </p>
+                                {renderImagePreview(item.warrantyPhotoUrl)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {item.itemPhotoUrl && (
+                        <div style={componentStyles.detailGroup}>
+                          <p>
+                            <strong>Item Photo:</strong>
+                          </p>
+                          {renderImagePreview(item.itemPhotoUrl)}
+                        </div>
+                      )}
+                      {asset.assetType === 'Permanent' && item.itemIds?.length > 0 && (
+                        <div style={componentStyles.detailGroup}>
+                          <p>
+                            <strong>Item IDs:</strong> {item.itemIds.join(', ')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1268,7 +1338,6 @@ const StorekeeperAssetUpdation = () => {
       {popupData && (
         <div style={componentStyles.popupOverlay}>
           <div style={componentStyles.popupContent}>
-            <h3>{popupData.assetType} Asset Details</h3>
             <div style={componentStyles.popupScrollableContent}>{renderAssetDetails(popupData)}</div>
             <div style={componentStyles.popupButtons}>
               {editMode ? (
@@ -1289,11 +1358,85 @@ const StorekeeperAssetUpdation = () => {
           </div>
         </div>
       )}
+      {showAddIdPopup && (
+        <div style={componentStyles.popupOverlay}>
+          <div style={componentStyles.popupContent}>
+            <h3>Add New Item ID</h3>
+            <div style={{ margin: '20px 0' }}>
+              <input
+                type="text"
+                value={newItemId}
+                onChange={(e) => setNewItemId(e.target.value)}
+                placeholder="Enter new item ID"
+                style={componentStyles.input}
+                autoFocus
+              />
+            </div>
+            <div style={componentStyles.popupButtons}>
+              <button 
+                style={componentStyles.saveButton} 
+                onClick={handleAddId}
+                disabled={!newItemId.trim()}
+              >
+                Add ID
+              </button>
+              <button 
+                style={componentStyles.cancelButton} 
+                onClick={() => setShowAddIdPopup(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRemoveIdPopup && (
+        <div style={componentStyles.popupOverlay}>
+          <div style={componentStyles.popupContent}>
+            <h3>Remove Item IDs</h3>
+            <div style={{ margin: '20px 0', maxHeight: '300px', overflowY: 'auto' }}>
+              {editedAsset.items[currentItemIndex]?.itemIds?.length > 0 ? (
+                editedAsset.items[currentItemIndex].itemIds.map(id => (
+                  <div key={id} style={{ marginBottom: '10px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIdsToRemove.includes(id)}
+                        onChange={() => toggleIdSelection(id)}
+                        style={{ marginRight: '10px' }}
+                      />
+                      {id}
+                    </label>
+                  </div>
+                ))
+              ) : (
+                <p>No item IDs available</p>
+              )}
+            </div>
+            <div style={componentStyles.popupButtons}>
+              <button 
+                style={componentStyles.saveButton} 
+                onClick={handleRemoveIds}
+                disabled={selectedIdsToRemove.length === 0}
+              >
+                Remove Selected
+              </button>
+              <button 
+                style={componentStyles.cancelButton} 
+                onClick={() => setShowRemoveIdPopup(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Component styles (unchanged for brevity, but organized logically)
+// Component styles
 const componentStyles = {
   content: {},
   cardContainer: {
@@ -1366,16 +1509,19 @@ const componentStyles = {
     cursor: 'pointer',
   },
   imagePreviewContainer: {
-    marginTop: '5px',
+    marginTop: '10px',
     textAlign: 'center',
+    maxWidth: '300px',
   },
   imagePreview: {
-    width: '300px',
-    height: '150px',
+    width: '100%',
+    maxWidth: '250px',
+    height: 'auto',
+    maxHeight: '150px',
     objectFit: 'contain',
     border: '1px solid #ddd',
     borderRadius: '4px',
-    padding: '2px',
+    padding: '5px',
     backgroundColor: '#f5f5f5',
   },
   imageLink: {
@@ -1464,22 +1610,34 @@ const componentStyles = {
   },
   assetDetails: {
     padding: '20px',
+    margin: '10px 0',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '5px',
   },
   formGroup: {
-    marginBottom: '15px',
+    marginBottom: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px',
   },
   input: {
     width: '100%',
-    padding: '8px',
+    padding: '10px',
     borderRadius: '4px',
-    border: '1px solid #ddd',
+    border: '1px solid #ccc',
+    fontSize: '14px',
+    outline: 'none',
+    ':focus': { borderColor: '#007BFF', boxShadow: '0 0 5px rgba(0,123,255,0.3)' },
   },
   textarea: {
     width: '100%',
-    padding: '8px',
+    padding: '10px',
     borderRadius: '4px',
-    border: '1px solid #ddd',
-    minHeight: '80px',
+    border: '1px solid #ccc',
+    minHeight: '100px',
+    fontSize: '14px',
+    outline: 'none',
+    ':focus': { borderColor: '#007BFF', boxShadow: '0 0 5px rgba(0,123,255,0.3)' },
   },
   itemContainer: {
     border: '1px solid #eee',
@@ -1501,25 +1659,27 @@ const componentStyles = {
   },
   popupContent: {
     backgroundColor: '#fff',
-    padding: '20px',
+    padding: '30px',
     borderRadius: '8px',
-    width: '700px',
-    maxWidth: '90%',
-    maxHeight: '80vh',
+    width: '900px',
+    maxWidth: '95%',
+    maxHeight: '85vh',
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
   },
   popupScrollableContent: {
-    maxHeight: '60vh',
+    maxHeight: '70vh',
     overflowY: 'auto',
-    paddingRight: '10px',
+    padding: '0 15px',
   },
   popupButtons: {
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '15px',
+    gap: '15px',
+    marginTop: '20px',
+    paddingTop: '10px',
+    borderTop: '1px solid #eee',
   },
   saveButton: {
     padding: '10px 20px',
@@ -1546,39 +1706,47 @@ const componentStyles = {
     cursor: 'pointer',
   },
   section: {
-    marginBottom: '20px',
+    marginBottom: '30px',
+    paddingBottom: '20px',
+    borderBottom: '1px solid #eee',
   },
   detailRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
     gap: '20px',
   },
   detailGroup: {
-    flex: '1',
-    minWidth: '200px',
+    minWidth: '250px',
+    padding: '10px',
+    marginBottom: '10px',
   },
   itemEditContainer: {
-    border: '1px solid #eee',
-    padding: '15px',
+    border: '1px solid #ddd',
+    padding: '20px',
     borderRadius: '5px',
-    marginBottom: '15px',
+    marginBottom: '20px',
+    backgroundColor: '#fff',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
   },
   itemHeader: {
     marginBottom: '10px',
   },
   formRow: {
-    display: 'flex',
-    gap: '15px',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '20px',
     flexWrap: 'wrap',
   },
   subSection: {
     marginTop: '15px',
   },
   itemViewContainer: {
-    border: '1px solid #eee',
-    padding: '15px',
+    border: '1px solid #ddd',
+    padding: '20px',
     borderRadius: '5px',
-    marginBottom: '15px',
+    marginBottom: '20px',
+    backgroundColor: '#fff',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
   },
   editButton: {
     padding: '6px 12px',
@@ -1587,6 +1755,18 @@ const componentStyles = {
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
+  },
+  smallButton: {
+    padding: '5px 10px',
+    backgroundColor: '#007BFF',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    ':hover': {
+      backgroundColor: '#5a6268'
+    }
   },
   pendingBadge: {
     padding: '6px 12px',
@@ -1602,6 +1782,13 @@ const componentStyles = {
   },
   editForm: {},
   viewDetails: {},
+  label: {
+    fontWeight: '600',
+    fontSize: '14px',
+    color: '#333',
+    marginBottom: '5px',
+    display: 'block',
+  },
 };
 
 export default StorekeeperAssetUpdation;

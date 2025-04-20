@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const assetNotificationSchema = new mongoose.Schema({
   assetType: {
     type: String,
@@ -19,8 +18,8 @@ const assetNotificationSchema = new mongoose.Schema({
       'exchange approved', 'exchange rejected', 'asset disposal approved',
       'asset disposal cancelled', 'condition changed', 'asset updation approved',
       'asset updation rejected', 'building upgrade approved',
-      'building upgrade rejected', 'building disposal cancelled',"building maintenance approved", 
-      "building maintenance rejected",
+      'building upgrade rejected', 'building disposal cancelled', 'building maintenance approved',
+      'building maintenance rejected', 'return approved with HOO waiting', 'return approved by HOO',
     ],
   },
   actionTime: {

@@ -189,7 +189,20 @@ const AssetStore = () => {
     dateOfHandover: "", // Add this
   documentUrl: "",    // Add this
   });
-
+  const handleIdSelection = (index, id) => {
+    setReturnedAssets((prev) =>
+      prev.map((asset, i) =>
+        i === index && asset.source === "store" && asset.assetType === "Permanent"
+          ? {
+              ...asset,
+              selectedIds: asset.selectedIds.includes(id)
+                ? asset.selectedIds.filter((selectedId) => selectedId !== id)
+                : [...asset.selectedIds, id],
+            }
+          : asset
+      )
+    );
+  };
   const addUpgradeForm = () => {
     setUpgradeForms(prev => [
       ...prev,
@@ -588,39 +601,73 @@ const AssetStore = () => {
 
   useEffect(() => {
     if (activeTab === "returned" && assetType) {
-      const fetchReturnedAssets = async () => {
+      const fetchReturnedAndStoreAssets = async () => {
         try {
-          console.log("Fetching returned assets");
-          const payload = {
-            assetType,
-            status: "returned",
-          };
+          console.log("Fetching returned and store assets");
+          const payload = { assetType, status: "returned" };
           if (assetCategory) {
             payload.assetCategory = assetCategory;
           }
-          const response = await axios.post("http://localhost:3001/api/assets/getReturnedAssets", payload);
-          const formattedAssets = response.data.map((asset) => ({
+  
+          // Fetch from Returned collection
+          const returnedResponse = await axios.post(
+            `${serverBaseUrl}/api/assets/getReturnedAssets`,
+            payload
+          );
+          const returnedAssetsData = returnedResponse.data.map((asset) => ({
             _id: asset._id,
             assetType: asset.assetType,
             assetCategory: asset.assetCategory,
             itemName: asset.itemName,
             subCategory: asset.subCategory,
             itemDescription: asset.itemDescription,
-            returnedFromLocation: asset.location,
-            itemId: assetType === "Permanent" ? asset.itemId : null, // Only for Permanent
-            returnedQuantity: assetType === "Consumable" ? asset.returnQuantity : null, // Only for Consumable
-            condition: assetType === "Permanent" ? "To Be Serviced" : "To Be Exchanged", // Default condition based on type
+            location: asset.location,
+            itemId: assetType === "Permanent" ? asset.itemId : null,
+            returnedQuantity: assetType === "Consumable" ? asset.returnQuantity : null,
+            condition: asset.status === "service" ? "To Be Serviced" :
+                       asset.status === "dispose" ? "To Be Disposed" :
+                       asset.status === "exchange" ? "To Be Exchanged" : "Good",
+            pdfUrl: asset.pdfUrl || null,
+            signedPdfUrl: asset.signedPdfUrl || null,
+            isUploaded: !!asset.signedPdfUrl,
+            source: "returned",
+            selectedIds: [],
+            availableIds: [],
+          }));
+          console.log("hi")
+          // Fetch all items from Store collection
+          const storeResponse = await axios.post(
+            `${serverBaseUrl}/api/assets/getStoreItemsForReturn`,
+            { assetType, assetCategory }
+          );
+          const storeAssetsData = storeResponse.data.map((asset) => ({
+            _id: asset._id,
+            assetType: asset.assetType,
+            assetCategory: asset.assetCategory,
+            itemName: asset.itemName,
+            subCategory: asset.subCategory,
+            itemDescription: asset.itemDescription,
+            location: "Store",
+            itemId: null,
+            returnedQuantity: assetType === "Consumable" ? asset.inStock : null,
+            condition: assetType === "Permanent" ? "To Be Serviced" : "To Be Exchanged", // Default condition
             pdfUrl: null,
             signedPdfUrl: null,
             isUploaded: false,
+            source: "store",
+            selectedIds: [],
+            availableIds: assetType === "Permanent" ? asset.itemIds : [],
           }));
-          setReturnedAssets(formattedAssets);
+  
+          // Combine assets
+          const combinedAssets = [...returnedAssetsData, ...storeAssetsData];
+          setReturnedAssets(combinedAssets);
         } catch (error) {
-          console.error("Failed to fetch returned assets:", error);
+          console.error("Failed to fetch assets:", error);
           setReturnedAssets([]);
         }
       };
-      fetchReturnedAssets();
+      fetchReturnedAndStoreAssets();
     }
   }, [assetType, assetCategory, activeTab]);
   // Fetch disposable items
@@ -1166,76 +1213,68 @@ const resetStoreForm = () => {
       unit: "mm",
       format: "a4",
     });
-
-    // Colors
-    const primaryColor = "#FF5733"; // Orange (to differentiate from issue receipt)
-    const secondaryColor = "#FFC107"; // Yellow
-    const textColor = "#333333"; // Dark Gray
-
-    // Header
+  
+    const primaryColor = "#FF5733";
+    const secondaryColor = "#FFC107";
+    const textColor = "#333333";
+  
     doc.setFillColor(primaryColor);
-    doc.rect(0, 0, 210, 30, "F"); // Full-width header background
+    doc.rect(0, 0, 210, 30, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.setTextColor("#FFFFFF"); // White text
+    doc.setTextColor("#FFFFFF");
     doc.text("Returned Asset Receipt", 105, 15, { align: "center" });
     doc.setFontSize(10);
     doc.text("Generated on: " + new Date().toLocaleDateString(), 105, 25, { align: "center" });
-
-    // Reset text color and font for body
+  
     doc.setTextColor(textColor);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
-
-    // Organization Info (optional)
+  
     doc.setFont("helvetica", "italic");
     doc.text("CASFOS Asset Management System", 10, 40);
     doc.setFont("helvetica", "normal");
-
-    // Horizontal Line
+  
     doc.setDrawColor(secondaryColor);
     doc.setLineWidth(0.5);
-    doc.line(10, 45, 200, 45); // Line under header
-
-    // Returned Asset Details Section
+    doc.line(10, 45, 200, 45);
+  
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Returned Asset Details", 10, 55);
-
-    // Table-like structure for details
+  
     const details = [
       ["Asset Type", asset.assetType || "N/A"],
       ["Asset Category", asset.assetCategory || "N/A"],
       ["Item Name", asset.itemName || "N/A"],
       ["Sub Category", asset.subCategory || "N/A"],
       ["Item Description", asset.itemDescription || "N/A"],
-      ["Returned From", asset.returnedFromLocation || "N/A"],
+      ["Returned From", asset.location || "N/A"],
       ["Condition", asset.condition || "N/A"],
       ["Remark", remark || "N/A"],
     ];
-
+  
     if (asset.assetType === "Permanent") {
-      details.push(["Item ID", asset.itemId || "N/A"]);
+      const itemIds = asset.source === "store" ? asset.selectedIds : [asset.itemId];
+      details.push(["Item ID(s)", itemIds.join(", ") || "N/A"]);
     } else {
       details.push(["Returned Quantity", asset.returnedQuantity || "N/A"]);
     }
-
+  
     let yPos = 65;
     doc.setFontSize(11);
     details.forEach(([label, value]) => {
       doc.setFont("helvetica", "bold");
       doc.text(`${label}:`, 10, yPos);
       doc.setFont("helvetica", "normal");
-      const splitValue = doc.splitTextToSize(value, 170); // Wrap text if too long
+      const splitValue = doc.splitTextToSize(value, 170);
       doc.text(splitValue, 50, yPos);
-      yPos += splitValue.length * 5 + 2; // Adjust spacing based on lines
+      yPos += splitValue.length * 5 + 2;
     });
-
-    // Horizontal Line
+  
     doc.setDrawColor(secondaryColor);
     doc.line(10, yPos + 5, 200, yPos + 5);
-
-    // Signature Section
+  
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("Authorized Signature", 10, yPos + 20);
@@ -1243,21 +1282,65 @@ const resetStoreForm = () => {
     doc.text("Name: _____________________________", 10, yPos + 30);
     doc.text("Date: _____________________________", 10, yPos + 40);
     doc.text("Signature: ________________________", 140, yPos + 30, { align: "right" });
-
-    // Footer
+  
     doc.setFillColor(secondaryColor);
-    doc.rect(0, 280, 210, 10, "F"); // Footer background
+    doc.rect(0, 280, 210, 10, "F");
     doc.setTextColor("#FFFFFF");
     doc.setFontSize(10);
-    doc.text("Thank you for using CASFOS Asset Management System", 105, 285, { align: "center" });
-
+    doc.text("Thank you for using CASFOS Asset Management System", 105, 285, {
+      align: "center",
+    });
+  
     return doc.output("blob");
+  };
+  
+  const handleUploadSignedReceipt = async (index, file) => {
+    if (!file) return;
+  
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("assetId", returnedAssets[index]._id);
+    formData.append("assetType", returnedAssets[index].assetType);
+    if (
+      returnedAssets[index].source === "store" &&
+      returnedAssets[index].assetType === "Permanent"
+    ) {
+      formData.append("itemIds", JSON.stringify(returnedAssets[index].selectedIds));
+    }
+  
+    try {
+      const response = await axios.post(
+        `${serverBaseUrl}/api/assets/uploadSignedReturnedReceipt`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+      const signedPdfUrl = response.data.signedPdfUrl;
+      setReturnedAssets((prev) =>
+        prev.map((item, i) =>
+          i === index ? { ...item, signedPdfUrl, isUploaded: true } : item
+        )
+      );
+      Swal.fire({
+        icon: "success",
+        title: "Success!",
+        text: "Signed receipt uploaded!",
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Oops...",
+        text: "Failed to upload signed receipt!",
+      });
+      console.error(error);
+    }
   };
   const handleDownloadReceipt = async (index) => {
     const asset = returnedAssets[index];
     const remark = remarks[index] || "";
     const pdfBlob = generateReceiptPDF(asset, remark);
-
+  
     try {
       const base64Data = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1265,64 +1348,85 @@ const resetStoreForm = () => {
         reader.onerror = () => reject(new Error("Failed to read PDF blob"));
         reader.readAsDataURL(pdfBlob);
       });
-
-      const response = await axios.post(`${serverBaseUrl}/api/assets/storeReturnedReceipt`, {
+  
+      const payload = {
         assetId: asset._id,
         pdfBase64: base64Data,
         assetType: asset.assetType,
-      });
-
-      // Force download immediately after storing
-      const link = document.createElement('a');
+        source: asset.source,
+      };
+  
+      if (asset.source === "store") {
+        payload.assetCategory = asset.assetCategory;
+        payload.itemName = asset.itemName;
+        payload.subCategory = asset.subCategory;
+        payload.itemDescription = asset.itemDescription;
+        if (asset.assetType === "Permanent") {
+          payload.itemIds = asset.selectedIds;
+        } else {
+          payload.returnedQuantity = asset.returnedQuantity;
+        }
+      }
+  
+      const response = await axios.post(
+        `${serverBaseUrl}/api/assets/storeReturnedReceipt`,
+        payload
+      );
+  
+      const link = document.createElement("a");
       link.href = URL.createObjectURL(pdfBlob);
-      link.download = `receipt_${asset.itemId}.pdf`;
+      link.download = `receipt_${asset.source}_${asset.itemName || "asset"}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
-
-      // Update state with the stored URL
-      setReturnedAssets(prev => prev.map((item, i) => i === index ? { ...item, pdfUrl: response.data.pdfUrl } : item));
+  
+      setReturnedAssets((prev) =>
+        prev.map((item, i) =>
+          i === index
+            ? {
+                ...item,
+                pdfUrl: response.data.pdfUrl,
+                ...(asset.source === "store" && {
+                  _id: response.data.storeReturnId, // Update _id to StoreReturn ID
+                }),
+              }
+            : item
+        )
+      );
     } catch (error) {
       Swal.fire({ icon: "error", title: "Oops...", text: "Failed to generate receipt!" });
       console.error("Error in handleDownloadReceipt:", error);
     }
   };
-  const handleUploadSignedReceipt = async (index, file) => {
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("assetId", returnedAssets[index]._id);
-    formData.append("assetType", returnedAssets[index].assetType);
-
-    try {
-      const response = await axios.post(`${serverBaseUrl}/api/assets/uploadSignedReturnedReceipt`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const signedPdfUrl = response.data.signedPdfUrl;
-      setReturnedAssets(prev => prev.map((item, i) =>
-        i === index ? { ...item, signedPdfUrl, isUploaded: true } : item
-      ));
-      Swal.fire({ icon: "success", title: "Success!", text: "Signed receipt uploaded!" });
-    } catch (error) {
-      Swal.fire({ icon: "error", title: "Oops...", text: "Failed to upload signed receipt!" });
-      console.error(error);
-    }
-  };
-
+  
   const handleDoneReturnedAsset = async (index) => {
     const asset = returnedAssets[index];
     if (!asset.signedPdfUrl) {
-      Swal.fire({ icon: "warning", title: "Warning", text: "Please upload signed receipt first!" });
+      Swal.fire({
+        icon: "warning",
+        title: "Warning",
+        text: "Please upload signed receipt first!",
+      });
       return;
     }
-
-    if (!asset._id || !asset.assetType || (asset.assetType === "Consumable" && !asset.returnedQuantity)) {
-      Swal.fire({ icon: "error", title: "Error", text: "Missing required asset data!" });
+  
+    if (
+      !asset._id ||
+      !asset.assetType ||
+      (asset.assetType === "Consumable" && !asset.returnedQuantity) ||
+      (asset.source === "store" &&
+        asset.assetType === "Permanent" &&
+        asset.selectedIds.length === 0)
+    ) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Missing required asset data or selected item IDs!",
+      });
       return;
     }
-
+  
     try {
       const status =
         asset.assetType === "Permanent"
@@ -1330,26 +1434,47 @@ const resetStoreForm = () => {
             ? "service"
             : asset.condition === "To Be Disposed"
               ? "dispose"
-              : "Good" // Map "Good" to "returned" for Permanent
+              : "Good"
           : asset.condition === "To Be Exchanged"
             ? "exchange"
             : asset.condition === "To Be Disposed"
               ? "dispose"
-              : "Good"; // Map "Good" to "returned" for Consumable
-
-      await axios.post(`${serverBaseUrl}/api/assets/saveReturnedStatus`, {
+              : "Good";
+  
+      const response = await axios.post(`${serverBaseUrl}/api/assets/saveReturnedStatus`, {
         _id: asset._id,
         status,
         remark: remarks[index] || "",
         pdfUrl: asset.pdfUrl,
         signedPdfUrl: asset.signedPdfUrl,
         assetType: asset.assetType,
-        ...(asset.assetType === "Consumable" && { returnedQuantity: asset.returnedQuantity }),
+        ...(asset.assetType === "Consumable" && {
+          returnedQuantity: asset.returnedQuantity,
+        }),
+        ...(asset.source === "store" &&
+          asset.assetType === "Permanent" && { itemIds: asset.selectedIds }),
+        source: asset.source,
+        returnedFrom: asset.returnedFrom,
       });
-
-      Swal.fire({ icon: "success", title: "Submitted!", text: "Asset condition submitted for approval!" });
+  
+      setReturnedAssets((prev) => prev.filter((_, i) => i !== index));
+      setRemarks((prev) => {
+        const newRemarks = { ...prev };
+        delete newRemarks[index];
+        return newRemarks;
+      });
+  
+      Swal.fire({
+        icon: "success",
+        title: "Submitted!",
+        text: "Asset condition submitted for approval!",
+      });
     } catch (error) {
-      Swal.fire({ icon: "error", title: "Oops...", text: "Failed to save asset condition!" });
+      Swal.fire({
+        icon: "error",
+        title: "Oops...",
+        text: "Failed to save asset condition!",
+      });
       console.error(error);
     }
   };
@@ -2319,99 +2444,164 @@ const validateDisposableSubmit = () => {
               </div>
             )}
 
-            {activeTab === "returned" && (
-              <div style={styles.formContainer}>
-                <div style={styles.formRow}>
-                  <div style={styles.inputGroup}><label>Asset Type:</label><select value={assetType} onChange={(e) => setAssetType(e.target.value)} style={styles.input}><option value="Permanent">Permanent</option><option value="Consumable">Consumable</option></select></div>
-                  <div style={styles.inputGroup}><label>Asset Category:</label><select value={assetCategory} onChange={(e) => setAssetCategory(e.target.value)} style={styles.input}><option value="">Select Category</option>{(assetType === "Permanent" ? permanentAssetOptions : consumableAssetOptions).map((option) => (<option key={option} value={option}>{option}</option>))}</select></div>
-                </div>
-                <div style={styles.cardContainer}>
-                  {returnedAssets.map((asset, index) => (
-                    <div key={index} style={styles.card}>
-                      <div style={styles.cardHeader}>
-                        <h3>{asset.itemName || "Unnamed Item"}</h3>
-                        <span style={styles.assetTypeBadge}>{asset.assetType || "N/A"}</span>
-                      </div>
-                      <div style={styles.cardBody}>
-                        <p><strong>Category:</strong> {asset.assetCategory || "N/A"}</p>
-                        <p><strong>Sub Category:</strong> {asset.subCategory || "N/A"}</p>
-                        <p><strong>Description:</strong> {asset.itemDescription || "N/A"}</p>
-                        <p><strong>Returned From:</strong> {asset.returnedFromLocation || "N/A"}</p>
-                        {asset.assetType === "Permanent" ? (
-                          <p><strong>Item ID:</strong> {asset.itemId || "N/A"}</p>
-                        ) : (
-                          <p><strong>Returned Quantity:</strong> {asset.returnedQuantity || "N/A"}</p>
-                        )}
-                        <div style={styles.conditionSelect}>
-                          <label><strong>Condition:</strong></label>
-                          <select
-                            value={asset.condition}
-                            onChange={(e) => handleConditionChange(index, e.target.value)}
-                            style={styles.select}
-                          >
-                            {asset.assetType === "Permanent" ? (
-                              <>
-                                <option value="Good">Good</option>
-                                <option value="To Be Serviced">To Be Serviced</option>
-                                <option value="To Be Disposed">To Be Disposed</option>
-                              </>
-                            ) : (
-                              <>
-                                <option value="Good">Good</option>
-                                <option value="To Be Exchanged">To Be Exchanged</option>
-                                <option value="To Be Disposed">To Be Disposed</option>
-                              </>
-                            )}
-                          </select>
-                        </div>
-                        <div style={styles.inputGroup}>
-                          <label><strong>Remark:</strong></label>
-                          <input
-                            type="text"
-                            value={remarks[index] || ""}
-                            onChange={(e) => handleRemarkChange(index, e.target.value)}
-                            style={styles.input}
-                            placeholder="Enter remark"
-                          />
-                        </div>
-                        <div style={styles.actionGroup}>
-                          <button onClick={() => handleDownloadReceipt(index)} style={styles.button}>
-                            Download Receipt
-                          </button>
-                          <div style={styles.uploadGroup}>
-                            <label style={styles.uploadLabel}><strong>Signed Receipt:</strong></label>
-                            <input
-                              type="file"
-                              onChange={(e) => handleUploadSignedReceipt(index, e.target.files[0])}
-                              accept="application/pdf,image/jpeg,image/png"
-                              style={styles.fileInput}
-                            />
-                            {asset.signedPdfUrl && (
-                              <a href={asset.signedPdfUrl} target="_blank" rel="noopener noreferrer" style={styles.link}>View</a>
-                            )}
-                          </div>
-                        </div>
-                        <div style={styles.doneButtonContainer}>
-                          <button
-                            onClick={() => handleDoneReturnedAsset(index)}
-                            style={{
-                              ...styles.button,
-                              backgroundColor: asset.signedPdfUrl ? "#007BFF" : "#ccc",
-                              cursor: asset.signedPdfUrl ? "pointer" : "not-allowed",
-                              width: "100%",
-                            }}
-                            disabled={!asset.signedPdfUrl}
-                          >
-                            Done
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+{activeTab === "returned" && (
+  <div style={styles.formContainer}>
+    <div style={styles.formRow}>
+      <div style={styles.inputGroup}>
+        <label>Asset Type:</label>
+        <select
+          value={assetType}
+          onChange={(e) => setAssetType(e.target.value)}
+          style={styles.input}
+        >
+          <option value="Permanent">Permanent</option>
+          <option value="Consumable">Consumable</option>
+        </select>
+      </div>
+      <div style={styles.inputGroup}>
+        <label>Asset Category:</label>
+        <select
+          value={assetCategory}
+          onChange={(e) => setAssetCategory(e.target.value)}
+          style={styles.input}
+        >
+          <option value="">Select Category</option>
+          {(assetType === "Permanent" ? permanentAssetOptions : consumableAssetOptions).map(
+            (option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            )
+          )}
+        </select>
+      </div>
+    </div>
+    <div style={styles.cardContainer}>
+      {returnedAssets.map((asset, index) => (
+        <div key={index} style={styles.card}>
+          <div style={styles.cardHeader}>
+            <h3>{asset.itemName || "Unnamed Item"}</h3>
+            <span style={styles.assetTypeBadge}>
+              {asset.source === "returned" ? "Returned" : "Store"} - {asset.assetType}
+            </span>
+          </div>
+          <div style={styles.cardBody}>
+            <p><strong>Category:</strong> {asset.assetCategory || "N/A"}</p>
+            <p><strong>Sub Category:</strong> {asset.subCategory || "N/A"}</p>
+            <p><strong>Description:</strong> {asset.itemDescription || "N/A"}</p>
+            <p><strong>Returned From:</strong> {asset.location || "N/A"}</p>
+            {asset.assetType === "Permanent" && asset.source === "returned" && (
+              <p><strong>Item ID:</strong> {asset.itemId || "N/A"}</p>
+            )}
+            {asset.assetType === "Consumable" && (
+              <p><strong>Returned Quantity:</strong> {asset.returnedQuantity || "N/A"}</p>
+            )}
+            {asset.assetType === "Permanent" && asset.source === "store" && (
+              <div style={styles.inputGroup}>
+                <label><strong>Select Item IDs:</strong></label>
+                <div style={styles.checkboxContainer}>
+                  {asset.availableIds.map((id) => (
+                    <label key={id} style={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={asset.selectedIds.includes(id)}
+                        onChange={() => handleIdSelection(index, id)}
+                      />
+                      {id}
+                    </label>
                   ))}
                 </div>
               </div>
             )}
-
+            <div style={styles.conditionSelect}>
+              <label><strong>Condition:</strong></label>
+              <select
+                value={asset.condition}
+                onChange={(e) => handleConditionChange(index, e.target.value)}
+                style={styles.select}
+              >
+                {asset.assetType === "Permanent" ? (
+                  <>
+                    <option value="Good">Good</option>
+                    <option value="To Be Serviced">To Be Serviced</option>
+                    <option value="To Be Disposed">To Be Disposed</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Good">Good</option>
+                    <option value="To Be Exchanged">To Be Exchanged</option>
+                    <option value="To Be Disposed">To Be Disposed</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <div style={styles.inputGroup}>
+              <label><strong>Remark:</strong></label>
+              <input
+                type="text"
+                value={remarks[index] || ""}
+                onChange={(e) => handleRemarkChange(index, e.target.value)}
+                style={styles.input}
+                placeholder="Enter remark"
+              />
+            </div>
+            <div style={styles.actionGroup}>
+              <button
+                onClick={() => handleDownloadReceipt(index)}
+                style={styles.button}
+                disabled={
+                  asset.source === "store" &&
+                  asset.assetType === "Permanent" &&
+                  asset.selectedIds.length === 0
+                }
+              >
+                Download Receipt
+              </button>
+              <div style={styles.uploadGroup}>
+                <label style={styles.uploadLabel}><strong>Signed Receipt:</strong></label>
+                <input
+                  type="file"
+                  onChange={(e) => handleUploadSignedReceipt(index, e.target.files[0])}
+                  accept="application/pdf,image/jpeg,image/png"
+                  style={styles.fileInput}
+                />
+                {asset.signedPdfUrl && (
+                  <a
+                    href={asset.signedPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={styles.link}
+                  >
+                    View
+                  </a>
+                )}
+              </div>
+            </div>
+            <div style={styles.doneButtonContainer}>
+              <button
+                onClick={() => handleDoneReturnedAsset(index)}
+                style={{
+                  ...styles.button,
+                  backgroundColor: asset.signedPdfUrl ? "#007BFF" : "#ccc",
+                  cursor: asset.signedPdfUrl ? "pointer" : "not-allowed",
+                  width: "100%",
+                }}
+                disabled={
+                  !asset.signedPdfUrl ||
+                  (asset.source === "store" &&
+                    asset.assetType === "Permanent" &&
+                    asset.selectedIds.length === 0)
+                }
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
             {activeTab === "serviced" && (
               <div style={styles.formContainer}>
 

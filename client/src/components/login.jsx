@@ -22,7 +22,7 @@ import '../styles/main1.css';
 import '../fonts/font-awesome-4.7.0/css/font-awesome.min.css';
 import '../styles/util.css';
 
-// Define role options for selection
+// Define role options for the radio buttons
 const ROLE_OPTIONS = [
   { value: 'headofoffice', label: 'Head of Office' },
   { value: 'principal', label: 'Principal' },
@@ -35,36 +35,36 @@ const ROLE_OPTIONS = [
 
 const Login = () => {
   // State management for form inputs and UI
-  const [name, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('headofoffice');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
+  const [name, setUsername] = useState(''); // Stores username input
+  const [password, setPassword] = useState(''); // Stores password input
+  const [role, setRole] = useState('headofoffice'); // Stores selected role
+  const [loading, setLoading] = useState(false); // Loading state for login process
+  const [message, setMessage] = useState(''); // Stores error/success messages
+  const [showPassword, setShowPassword] = useState(false); // Toggles password visibility
+  const navigate = useNavigate(); // Navigation hook from react-router
 
   /**
-   * Handles login form submission
+   * Handles the login form submission
    * @param {Event} e - Form submission event
    */
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
+    e.preventDefault(); // Prevent default form behavior
+    setLoading(true); // Set loading state
+    setMessage(''); // Clear any previous messages
 
     try {
-      // Send login request to the backend
+      // Send login request to backend API
       const response = await axios.post('http://localhost:3001/api/users/login', {
         name,
         password,
         role,
       });
 
-      setLoading(false);
+      setLoading(false); // Reset loading state
 
       // Handle successful login
       if (response.data === 'success') {
-        // Navigate to the appropriate dashboard based on role
+        // Define routes for each role's dashboard
         const dashboardRoutes = {
           headofoffice: '/headofofficedashboard',
           principal: '/principaldashboard',
@@ -75,14 +75,16 @@ const Login = () => {
           viewer: '/viewerdashboard',
         };
 
+        // Get the route for the selected role
         const route = dashboardRoutes[role];
         if (route) {
+          // Navigate to dashboard with username as query parameter
           navigate(`${route}?username=${encodeURIComponent(name)}`);
         } else {
-          setMessage('Invalid role');
+          setMessage('Invalid role'); // Handle unknown role
         }
       } else {
-        setMessage(response.data);
+        setMessage(response.data); // Display server response message
       }
     } catch (error) {
       // Handle login errors
@@ -92,7 +94,7 @@ const Login = () => {
   };
 
   /**
-   * Toggles password visibility
+   * Toggles password visibility between text and password types
    */
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
@@ -102,20 +104,15 @@ const Login = () => {
     <div className="login-container">
       <div className="limiter">
         <div className="container-login100">
+          {/* Main login wrapper with fade-in animation */}
           <div className="wrap-login100 fade-in">
-            {/* Left Panel: Role Selection and Logo */}
+            {/* Left Panel - Now contains only the role selection */}
             <div className="login-left-panel">
-              <div className="login-image-container">
-                <img
-                  src="public/images/CASFOS-Coimbatore.ico"
-                  alt="CASFOS Logo"
-                  className="login-image"
-                />
-              </div>
-
+              {/* Role selection container */}
               <div className="role-selection-container">
                 <h3 className="role-selection-title">Select Your Role</h3>
                 <form className="role-selection-form">
+                  {/* Map through role options to create radio buttons */}
                   {ROLE_OPTIONS.map((option, index) => (
                     <label key={index} className="role-option">
                       <input
@@ -132,11 +129,23 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Right Panel: Login Form */}
+            {/* Right Panel - Contains logo and login form */}
             <div className="login-right-panel">
+              {/* Logo container moved to right panel */}
+              <div className="login-image-container">
+                <img
+                  src="public/images/CASFOS-Coimbatore.ico"
+                  alt="CASFOS Logo"
+                  className="login-image"
+                />
+              </div>
+
+              {/* Login form title */}
               <h1 className="login-title">Login</h1>
+              
+              {/* Login form */}
               <form onSubmit={handleLogin} className="login-form">
-                {/* Username Input */}
+                {/* Username input field */}
                 <div className="input-group">
                   <label htmlFor="username" className="input-label">
                     Username
@@ -155,7 +164,7 @@ const Login = () => {
                   </div>
                 </div>
 
-                {/* Password Input */}
+                {/* Password input field with visibility toggle */}
                 <div className="input-group">
                   <label htmlFor="password" className="input-label">
                     Password
@@ -171,6 +180,7 @@ const Login = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
+                    {/* Toggle password visibility icon */}
                     {showPassword ? (
                       <FaEyeSlash
                         className="password-toggle"
@@ -185,7 +195,7 @@ const Login = () => {
                   </div>
                 </div>
 
-                {/* Submit Button */}
+                {/* Login submit button */}
                 <button
                   className="login-button"
                   type="submit"
@@ -194,12 +204,11 @@ const Login = () => {
                   {loading ? 'Logging in...' : 'Login'}
                 </button>
 
-                {/* Error Message */}
+                {/* Display error/success messages */}
                 {message && <p className="error-message">{message}</p>}
 
-                {/* Additional Links */}
+                {/* Additional links (e.g., registration) */}
                 <div className="login-links">
-                
                   <Link to="/register" className="register-link">
                     Create your Account
                     <FaLongArrowAltRight />

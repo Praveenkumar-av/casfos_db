@@ -1,5 +1,6 @@
 const RejectedAsset = require("../model/RejectedAsset");
 const PurchasedPermanent = require("../model/PermanentAsset");
+const StoreReturn = require("../model/StoreReturn")
 const PurchasedConsumable = require("../model/ConsumableAsset");
 const StoreConsumable = require("../model/StoreConsumable");
 const StorePermanent = require("../model/StorePermanent");
@@ -331,10 +332,9 @@ exports.uploadInvoice = async (req, res) => {
 
   res.json({ imageUrl });
 };
-
-
 exports.uploadSignedReturnedReceipt = async (req, res) => {
-  const { assetId, assetType } = req.body;
+  const { assetId, assetType, itemIds } = req.body;
+  console.log("en")
   try {
     if (!req.file || !assetId || !assetType) {
       return res.status(400).json({ success: false, message: "Signed PDF, asset ID, and asset type are required" });
@@ -342,22 +342,43 @@ exports.uploadSignedReturnedReceipt = async (req, res) => {
 
     const serverBaseUrl = process.env.SERVER_BASE_URL || "http://localhost:3001";
     const signedPdfUrl = `${serverBaseUrl}/uploads/${req.file.filename}`;
+    console.log(assetId)
+    console.log(itemIds)
+    if (itemIds) {
+      const parsedItemIds = JSON.parse(itemIds);
+      const storeReturn = await StoreReturn.findOne({
+        itemIds: { $all: parsedItemIds },
+      });
+      if (!storeReturn) {
+        console.log("not")
+        return res.status(404).json({ success: false, message: "Store return entry not found" });
+      }
 
-    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
-    const asset = await Model.findByIdAndUpdate(assetId, { signedPdfUrl }, { new: true });
+      storeReturn.signedPdfUrl = signedPdfUrl;
+      await storeReturn.save();
+      console.log("saved")
+      res.status(200).json({ success: true, signedPdfUrl, storeReturnId: storeReturn._id });
+    } else {
+      // Handle returned-sourced or Consumable assets
+      const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+      const asset = await ReturnedModel.findByIdAndUpdate(
+        assetId,
+        { signedPdfUrl },
+        { new: true }
+      );
+      if (!asset) {
+        console.log("nottt")
+        return res.status(404).json({ success: false, message: "Asset not found" });
+      }
 
-    if (!asset) {
-      return res.status(404).json({ success: false, message: "Asset not found" });
+      res.status(200).json({ success: true, signedPdfUrl });
     }
-
-    res.status(200).json({ success: true, signedPdfUrl });
   } catch (error) {
+    console.log(error);
     console.error("Error uploading signed receipt:", error);
     res.status(500).json({ success: false, message: "Failed to upload signed receipt" });
   }
 };
-
-
 exports.getStoreItems = async (req, res) => {
   try {
     const { assetType, assetCategory } = req.body;
@@ -785,73 +806,257 @@ exports.return = async (req, res) => {
   }
 };
 
-
 exports.storeReturnedReceipt = async (req, res) => {
-  const { assetId, pdfBase64, assetType } = req.body;
+  const { assetId, pdfBase64, assetType, itemIds, assetCategory, itemName, subCategory, itemDescription, source, returnedQuantity } = req.body;
+
   try {
     if (!assetId || !pdfBase64 || !assetType) {
       return res.status(400).json({ success: false, message: "Asset ID, PDF data, and asset type are required" });
     }
 
     const filename = `returned-${Date.now()}-${Math.round(Math.random() * 1e9)}.pdf`;
-    const pdfPath = path.join(__dirname, "../uploads", filename);
+    const pdfPath = path.join(__dirname, "../Uploads", filename);
     await fs.mkdir(path.dirname(pdfPath), { recursive: true });
     await fs.writeFile(pdfPath, Buffer.from(pdfBase64, "base64"));
 
     const serverBaseUrl = process.env.SERVER_BASE_URL || "http://localhost:3001";
     const pdfUrl = `${serverBaseUrl}/uploads/${filename}`;
 
-    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
-    const asset = await Model.findByIdAndUpdate(assetId, { pdfUrl }, { new: true });
+    if (source === "store") {
+      let storeReturn;
 
-    if (!asset) {
-      return res.status(404).json({ success: false, message: "Asset not found" });
+      if (assetType === "Permanent" && itemIds) {
+        // Check for existing StoreReturn with any of the itemIds
+        storeReturn = await StoreReturn.findOne({
+          itemIds: { $in: itemIds },
+          assetType,
+          originalStoreId: assetId,
+        });
+
+        if (storeReturn) {
+          // Update existing StoreReturn
+          storeReturn.pdfUrl = pdfUrl;
+          storeReturn.signedPdfUrl = null; // Reset signedPdfUrl to require new upload
+          await storeReturn.save();
+        } else {
+          // Create new StoreReturn
+          storeReturn = new StoreReturn({
+            assetType,
+            assetCategory,
+            itemName,
+            subCategory,
+            itemDescription,
+            location: "Store",
+            itemIds,
+            pdfUrl,
+            source: "store",
+            originalStoreId: assetId,
+          });
+          await storeReturn.save();
+        }
+      } else if (assetType === "Consumable") {
+        // Check for existing StoreReturn with matching fields
+        storeReturn = await StoreReturn.findOne({
+          assetType,
+          assetCategory,
+          itemName,
+          subCategory,
+          itemDescription,
+          originalStoreId: assetId,
+        });
+
+        if (storeReturn) {
+          // Update existing StoreReturn
+          storeReturn.pdfUrl = pdfUrl;
+          storeReturn.signedPdfUrl = null; // Reset signedPdfUrl
+          storeReturn.returnedQuantity = returnedQuantity;
+          await storeReturn.save();
+        } else {
+          // Create new StoreReturn
+          storeReturn = new StoreReturn({
+            assetType,
+            assetCategory,
+            itemName,
+            subCategory,
+            itemDescription,
+            location: "Store",
+            returnedQuantity,
+            pdfUrl,
+            source: "store",
+            originalStoreId: assetId,
+          });
+          await storeReturn.save();
+        }
+      } else {
+        return res.status(400).json({ success: false, message: "Invalid data for store-sourced asset" });
+      }
+
+      res.status(201).json({ success: true, pdfUrl, storeReturnId: storeReturn._id });
+    } else {
+      // Handle returned-sourced assets
+      const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+      const asset = await ReturnedModel.findByIdAndUpdate(
+        assetId,
+        { pdfUrl },
+        { new: true }
+      );
+
+      if (!asset) {
+        return res.status(404).json({ success: false, message: "Asset not found" });
+      }
+
+      res.status(201).json({ success: true, pdfUrl });
     }
-
-    res.status(201).json({ success: true, pdfUrl });
   } catch (error) {
     console.error("Error storing receipt:", error);
     res.status(500).json({ success: false, message: "Failed to store receipt" });
   }
 };
-
-
-
 exports.saveReturnedStatus = async (req, res) => {
-  const { _id, status, remark, pdfUrl, signedPdfUrl, assetType, returnedQuantity } = req.body;
+  const {
+    _id,
+    status,
+    remark,
+    pdfUrl,
+    signedPdfUrl,
+    assetType,
+    returnedQuantity,
+    source,
+    returnedFrom,
+    itemIds,
+  } = req.body;
 
   try {
     if (!["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ message: "Invalid asset type" });
     }
 
-    const Model = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
 
-    const updatedAsset = await Model.findByIdAndUpdate(
-      _id,
-      {
-        status,
-        remark,
-        pdfUrl,
-        signedPdfUrl,
-        ...(assetType === "Consumable" && { returnQuantity: returnedQuantity }),
-        approved: null, // Keep pending approval
-      },
-      { new: true, runValidators: true }
-    );
+    if (source === "store") {
+      // Handle store-sourced assets
+      const storeReturn = await StoreReturn.findById(_id);
+      if (!storeReturn) {
+        return res.status(404).json({ message: "Store return entry not found" });
+      }
 
-    if (!updatedAsset) {
-      return res.status(404).json({ message: "Returned asset not found" });
+      const storeItem = await StoreModel.findById(storeReturn.originalStoreId);
+      if (!storeItem) {
+        return res.status(404).json({ message: "Store item not found" });
+      }
+
+      if (assetType === "Permanent" && itemIds) {
+        // Validate itemIds
+        const missingIds = itemIds.filter((id) => !storeItem.itemIds.includes(id));
+        if (missingIds.length > 0) {
+          return res.status(400).json({
+            message: `Item IDs not found in store: ${missingIds.join(", ")}`,
+          });
+        }
+
+        // Create ReturnedPermanent entries
+        const newReturnedEntries = await Promise.all(
+          itemIds.map(async (itemId) => {
+            const newEntry = new ReturnedModel({
+              assetType,
+              assetCategory: storeReturn.assetCategory,
+              itemName: storeReturn.itemName,
+              subCategory: storeReturn.subCategory,
+              itemDescription: storeReturn.itemDescription,
+              location: returnedFrom || "Store",
+              itemId,
+              status,
+              remark,
+              pdfUrl: storeReturn.pdfUrl,
+              signedPdfUrl: storeReturn.signedPdfUrl,
+              approved: null,
+              source: "store",
+            });
+            await newEntry.save();
+            return newEntry;
+          })
+        );
+
+        // Remove itemIds from Store
+        storeItem.itemIds = storeItem.itemIds.filter((id) => !itemIds.includes(id));
+        storeItem.inStock -= itemIds.length;
+        await storeItem.save();
+
+        // Delete StoreReturn entry
+        await StoreReturn.deleteOne({ _id });
+
+        res.status(200).json({
+          message: "Returned status submitted for approval",
+          assets: newReturnedEntries,
+        });
+      } else if (assetType === "Consumable") {
+        // Validate quantity
+        if (returnedQuantity > storeItem.inStock) {
+          return res.status(400).json({ message: "Returned quantity exceeds available stock" });
+        }
+
+        // Create ReturnedConsumable entry
+        const newReturned = new ReturnedModel({
+          assetType,
+          assetCategory: storeReturn.assetCategory,
+          itemName: storeReturn.itemName,
+          subCategory: storeReturn.subCategory,
+          itemDescription: storeReturn.itemDescription,
+          location: returnedFrom || "Store",
+          status,
+          remark,
+          pdfUrl: storeReturn.pdfUrl,
+          signedPdfUrl: storeReturn.signedPdfUrl,
+          returnQuantity: returnedQuantity,
+          approved: null,
+          source: "store",
+        });
+        await newReturned.save();
+
+        // Update Store stock
+        storeItem.inStock -= returnedQuantity;
+        await storeItem.save();
+
+        // Delete StoreReturn entry
+        await StoreReturn.deleteOne({ _id });
+
+        res.status(200).json({
+          message: "Returned status submitted for approval",
+          asset: newReturned,
+        });
+      } else {
+        return res.status(400).json({ message: "Invalid data for store-sourced asset" });
+      }
+    } else {
+      // Handle non-store sourced returns
+      const updatedAsset = await ReturnedModel.findByIdAndUpdate(
+        _id,
+        {
+          status,
+          remark,
+          pdfUrl,
+          signedPdfUrl,
+          ...(assetType === "Consumable" && { returnQuantity: returnedQuantity }),
+          approved: null,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedAsset) {
+        return res.status(404).json({ message: "Returned asset not found" });
+      }
+
+      res.status(200).json({
+        message: "Returned status submitted for approval",
+        asset: updatedAsset,
+      });
     }
-
-    res.status(200).json({ message: "Returned status submitted for approval", asset: updatedAsset });
   } catch (error) {
-    console.warn("Failed to save returned status:", error);
+    console.error("Failed to save returned status:", error);
     res.status(500).json({ message: "Failed to save returned status", error: error.message });
   }
 };
-
-
 
 exports.saveReturnedPermanentStatus = async (req, res) => {
   try {
@@ -887,7 +1092,7 @@ exports.saveReturnedPermanentStatus = async (req, res) => {
 exports.getReturnedAssets = async (req, res) => {
   try {
     const { assetType, assetCategory, status } = req.body;
-
+    console.log(assetType,assetCategory,status)
     if (!["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ message: "Invalid assetType. Must be 'Permanent' or 'Consumable'." });
     }
@@ -899,10 +1104,7 @@ exports.getReturnedAssets = async (req, res) => {
     }
 
     const returnedAssets = await Model.find(query);
-
-    if (!returnedAssets || returnedAssets.length === 0) {
-      return res.status(400).json({ message: "No returned assets found" });
-    }
+    console.log(returnedAssets)
 
     res.status(200).json(returnedAssets);
   } catch (error) {
@@ -911,6 +1113,42 @@ exports.getReturnedAssets = async (req, res) => {
   }
 };
 
+exports.getStoreItemsForReturn = async (req, res) => {
+  try {
+    const { assetType, assetCategory } = req.body;
+    console.log("asbh")
+    if (!["Permanent", "Consumable"].includes(assetType)) {
+      return res.status(400).json({
+        message: "Invalid assetType. Must be 'Permanent' or 'Consumable'.",
+      });
+    }
+
+    const Model = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const query = {};
+    if (assetCategory) {
+      query.assetCategory = assetCategory;
+    }
+
+    const storeItems = await Model.find(query);
+
+    res.status(200).json(
+      storeItems.map((item) => ({
+        _id: item._id,
+        assetType,
+        assetCategory: item.assetCategory,
+        itemName: item.itemName,
+        subCategory: item.subCategory,
+        itemDescription: item.itemDescription,
+        inStock: item.inStock,
+        itemIds: item.itemIds || [],
+        location: item.location || "Store",
+      }))
+    );
+  } catch (error) {
+    console.error("Failed to fetch store items:", error);
+    res.status(500).json({ message: "Failed to fetch store items" });
+  }
+};
 
 
 exports.getReturnedForApproval = async (req, res) => {
@@ -2566,33 +2804,27 @@ exports.rejectIssue = async (req, res) => {
   }
 };
 
-
 exports.approveReturn = async (req, res) => {
   const { id } = req.params;
   const { condition, assetType, returnedQuantity } = req.body;
 
   try {
-    // Validate asset type
     if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
       return res.status(400).json({ success: false, message: "Valid asset type is required" });
     }
 
-    // Validate condition
     if (!condition || !["Good", "service", "dispose", "exchange"].includes(condition)) {
       return res.status(400).json({ success: false, message: "Valid condition (Good, service, dispose, or exchange) is required" });
     }
 
-    // Select appropriate models
     const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
     const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
 
-    // Find the returned asset
     const asset = await ReturnedModel.findById(id);
     if (!asset) {
       return res.status(404).json({ success: false, message: "Asset not found" });
     }
 
-    // Handle "Good" condition (add to stock)
     if (condition === "Good") {
       const storeQuery = {
         assetCategory: asset.assetCategory,
@@ -2617,41 +2849,22 @@ exports.approveReturn = async (req, res) => {
         storeItem.itemIds = [...new Set([...storeItem.itemIds, asset.itemId])];
       }
       await storeItem.save();
-      await ReturnedModel.deleteOne({ _id: id }); // Remove from Returned after adding to stock
+      await ReturnedModel.deleteOne({ _id: id });
       storeAssetNotification(asset, "return approved", new Date());
       return res.status(200).json({ success: true, message: "Return approved and added to stock" });
     }
 
-    // Handle "dispose" condition for Consumables
-    if (assetType === "Consumable" && condition === "dispose") {
-      // Create a new entry in DisposedAsset
-      const disposedAsset = new DisposedAsset({
-        assetType: "Consumable",
-        assetCategory: asset.assetCategory,
-        itemName: asset.itemName,
-        subCategory: asset.subCategory,
-        itemDescription: asset.itemDescription,
-        quantity: returnedQuantity || asset.quantity,
-        remark: asset.remark || "Disposed from returned consumable",
-        condemnationDate: new Date(), // Set current date as condemnation date
-      });
-      await disposedAsset.save();
-
-      // Remove from ReturnedConsumable
-      await ReturnedModel.deleteOne({ _id: id });
-
-      // Store notification
-      storeAssetNotification(asset, "return approved", new Date());
-
-      return res.status(200).json({ success: true, message: "Return approved and moved to disposed assets" });
+    if (condition === "dispose") {
+      asset.hooapproval = "waiting";
+      await asset.save();
+      storeAssetNotification(asset, "return approved with HOO waiting", new Date());
+      return res.status(200).json({ success: true, message: "Return marked for HOO approval" });
     }
 
-    // Handle other conditions (service, dispose for Permanent, exchange)
     asset.approved = "yes";
     asset.status = condition;
     await asset.save();
 
-    // Handle "exchange" for Consumables
     if (assetType === "Consumable" && condition === "exchange") {
       const exchangedConsumable = new ExchangedConsumable({
         assetCategory: asset.assetCategory,
@@ -2663,31 +2876,32 @@ exports.approveReturn = async (req, res) => {
         pdfUrl: asset.pdfUrl,
         signedPdfUrl: asset.signedPdfUrl,
         originalReturnedAssetId: asset._id,
-        approved: "no", // Set approved to "no" for new exchange
+        approved: "no",
       });
       await exchangedConsumable.save();
     }
 
-    // Store notification for other conditions
-    storeAssetNotification(asset, `return approved`, new Date());
-
+    storeAssetNotification(asset, "return approved", new Date());
     res.status(200).json({ success: true, message: "Return approved" });
   } catch (error) {
     console.error("Error approving return:", error);
     res.status(500).json({ success: false, message: "Failed to approve return" });
   }
 };
-
 exports.rejectReturn = async (req, res) => {
   const { id } = req.params;
   const { rejectionRemarks, assetType } = req.body;
 
   try {
     if (!assetType || !["Permanent", "Consumable"].includes(assetType)) {
-      return res.status(400).json({ success: false, message: "Valid asset type is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Valid asset type is required",
+      });
     }
 
     const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
     const IssuedModel = assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
 
     const asset = await ReturnedModel.findById(id);
@@ -2695,41 +2909,73 @@ exports.rejectReturn = async (req, res) => {
       return res.status(404).json({ success: false, message: "Asset not found" });
     }
 
-    // Move back to Issued collection
-    const issuedQuery = {
-      assetCategory: asset.assetCategory,
-      itemName: asset.itemName,
-      itemDescription: asset.itemDescription,
-    };
-    if (assetType === "Permanent") {
-      issuedQuery.subCategory = asset.subCategory;
-    }
-    let issuedItem = await IssuedModel.findOne(issuedQuery);
-    if (!issuedItem) {
-      issuedItem = new IssuedModel({
+    asset.hooapproval = null;
+    await asset.save();
+
+    if (asset.location === "Store") {
+      const storeQuery = {
         assetCategory: asset.assetCategory,
         itemName: asset.itemName,
         itemDescription: asset.itemDescription,
-        issues: [],
-        ...(assetType === "Permanent" ? { subCategory: asset.subCategory } : {}),
-      });
-    }
-    const issueIndex = issuedItem.issues.findIndex(issue => issue.issuedTo === asset.location);
-    if (issueIndex === -1) {
-      issuedItem.issues.push({
-        issuedTo: asset.location,
-        quantity: assetType === "Permanent" ? 1 : asset.returnQuantity,
-        ...(assetType === "Permanent" ? { issuedIds: [asset.itemId] } : {}),
-      });
-    } else {
-      issuedItem.issues[issueIndex].quantity += assetType === "Permanent" ? 1 : asset.returnQuantity;
+      };
       if (assetType === "Permanent") {
-        issuedItem.issues[issueIndex].issuedIds.push(asset.itemId);
+        storeQuery.subCategory = asset.subCategory;
       }
+      let storeItem = await StoreModel.findOne(storeQuery);
+      if (!storeItem) {
+        storeItem = new StoreModel({
+          assetCategory: asset.assetCategory,
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          inStock: 0,
+          ...(assetType === "Permanent" ? { subCategory: asset.subCategory, itemIds: [] } : {}),
+        });
+      }
+      if (assetType === "Permanent") {
+        storeItem.inStock += 1;
+        storeItem.itemIds.push(asset.itemId);
+      } else {
+        storeItem.inStock += asset.returnQuantity;
+      }
+      await storeItem.save();
+    } else {
+      const issuedQuery = {
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        itemDescription: asset.itemDescription,
+      };
+      if (assetType === "Permanent") {
+        issuedQuery.subCategory = asset.subCategory;
+      }
+      let issuedItem = await IssuedModel.findOne(issuedQuery);
+      if (!issuedItem) {
+        issuedItem = new IssuedModel({
+          assetCategory: asset.assetCategory,
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          issues: [],
+          ...(assetType === "Permanent" ? { subCategory: asset.subCategory } : {}),
+        });
+      }
+      const issueIndex = issuedItem.issues.findIndex(
+        (issue) => issue.issuedTo === asset.location
+      );
+      if (issueIndex === -1) {
+        issuedItem.issues.push({
+          issuedTo: asset.location,
+          quantity: assetType === "Permanent" ? 1 : asset.returnQuantity,
+          ...(assetType === "Permanent" ? { issuedIds: [asset.itemId] } : {}),
+        });
+      } else {
+        issuedItem.issues[issueIndex].quantity +=
+          assetType === "Permanent" ? 1 : asset.returnQuantity;
+        if (assetType === "Permanent") {
+          issuedItem.issues[issueIndex].issuedIds.push(asset.itemId);
+        }
+      }
+      await issuedItem.save();
     }
-    await issuedItem.save();
 
-    // Save to RejectedAsset
     const rejectedAsset = new RejectedAsset({
       assetType: asset.assetType,
       assetCategory: asset.assetCategory,
@@ -2738,9 +2984,9 @@ exports.rejectReturn = async (req, res) => {
       itemDescription: asset.itemDescription,
       location: asset.location,
       status: asset.status,
-      returnQuantity: asset.returnQuantity, // For Consumable
-      itemId: asset.itemId, // For Permanent (single ID)
-      returnIds: assetType === "Permanent" ? [asset.itemId] : undefined, // Use returnIds for consistency
+      returnQuantity: asset.returnQuantity,
+      itemId: asset.itemId,
+      returnIds: assetType === "Permanent" ? [asset.itemId] : undefined,
       pdfUrl: asset.pdfUrl,
       signedPdfUrl: asset.signedPdfUrl,
       rejectionRemarks,
@@ -2748,13 +2994,11 @@ exports.rejectReturn = async (req, res) => {
     });
     await rejectedAsset.save();
 
-    // Update and remove from Returned
     asset.approved = "no";
     asset.rejectionRemarks = rejectionRemarks;
     await asset.save();
     await ReturnedModel.deleteOne({ _id: id });
 
-    // Notification with rejectedAssetId
     const temp = {
       ...asset.toObject(),
       rejectionRemarks,
@@ -2762,14 +3006,15 @@ exports.rejectReturn = async (req, res) => {
     };
     await storeAssetNotification(temp, "return rejected", new Date());
 
-    res.status(200).json({ success: true, message: "Return rejected and sent back to issued location" });
+    res.status(200).json({
+      success: true,
+      message: "Return rejected and sent back to appropriate collection",
+    });
   } catch (error) {
     console.error("Error rejecting return:", error);
     res.status(500).json({ success: false, message: "Failed to reject return" });
   }
 };
-
-
 
 exports.approveService = async (req, res) => {
   try {
@@ -2907,6 +3152,147 @@ exports.rejectService = async (req, res) => {
   } catch (error) {
     console.error("Failed to reject service:", error);
     res.status(500).json({ message: "Failed to reject service" });
+  }
+};
+
+exports.approveReturnByHoo = async (req, res) => {
+  const { id } = req.params;
+  console.log("hfbid");
+  const { assetType } = req.body;
+
+  try {
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+
+    const asset = await ReturnedModel.findById(id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+
+    if (asset.hooapproval !== "waiting") {
+      return res.status(400).json({ success: false, message: "Asset not awaiting HOO approval" });
+    }
+
+    // For Consumables, move to DisposedAsset
+    if (assetType === "Consumable") {
+      const disposedAsset = new DisposedAsset({
+        assetType: "Consumable",
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        subCategory: asset.subCategory,
+        itemDescription: asset.itemDescription,
+        quantity: asset.returnQuantity,
+        remark: asset.remark || "Disposed from returned consumable",
+        condemnationDate: new Date(),
+      });
+      await disposedAsset.save();
+    }
+
+    // For Permanent, set approved status (further processing can be added if needed)
+    asset.approved = "yes";
+    asset.hooapproval = null;
+    await asset.save();
+
+    storeAssetNotification(asset, "return approved by HOO", new Date());
+    res.status(200).json({ success: true, message: "Return approved by HOO" });
+  } catch (error) {
+    console.error("Error approving return by HOO:", error);
+    res.status(500).json({ success: false, message: "Failed to approve return by HOO" });
+  }
+};
+
+exports.rejectReturnByHoo = async (req, res) => {
+  const { id } = req.params;
+  const { rejectionRemarks, assetType } = req.body;
+
+  try {
+    const ReturnedModel = assetType === "Permanent" ? ReturnedPermanent : ReturnedConsumable;
+    const StoreModel = assetType === "Permanent" ? StorePermanent : StoreConsumable;
+    const IssuedModel = assetType === "Permanent" ? IssuedPermanent : IssuedConsumable;
+
+    const asset = await ReturnedModel.findById(id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: "Asset not found" });
+    }
+
+    if (asset.hooapproval !== "waiting") {
+      return res.status(400).json({ success: false, message: "Asset not awaiting HOO approval" });
+    }
+
+    // Reset hooapproval
+    asset.hooapproval = null;
+    await asset.save();
+
+    if (asset.location === "Store") {
+      const storeQuery = {
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        itemDescription: asset.itemDescription,
+      };
+      if (assetType === "Permanent") {
+        storeQuery.subCategory = asset.subCategory;
+      }
+      let storeItem = await StoreModel.findOne(storeQuery);
+      if (!storeItem) {
+        storeItem = new StoreModel({
+          assetCategory: asset.assetCategory,
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          inStock: 0,
+          ...(assetType === "Permanent" ? { subCategory: asset.subCategory, itemIds: [] } : {}),
+        });
+      }
+      if (assetType === "Permanent") {
+        storeItem.inStock += 1;
+        storeItem.itemIds.push(asset.itemId);
+      } else {
+        storeItem.inStock += asset.returnQuantity;
+      }
+      await storeItem.save();
+    } else {
+      const issuedQuery = {
+        assetCategory: asset.assetCategory,
+        itemName: asset.itemName,
+        itemDescription: asset.itemDescription,
+      };
+      if (assetType === "Permanent") {
+        issuedQuery.subCategory = asset.subCategory;
+      }
+      let issuedItem = await IssuedModel.findOne(issuedQuery);
+      if (!issuedItem) {
+        issuedItem = new IssuedModel({
+          assetCategory: asset.assetCategory,
+          itemName: asset.itemName,
+          itemDescription: asset.itemDescription,
+          issues: [],
+          ...(assetType === "Permanent" ? { subCategory: asset.subCategory } : {}),
+        });
+      }
+      const issueIndex = issuedItem.issues.findIndex(
+        (issue) => issue.issuedTo === asset.location
+      );
+      if (issueIndex === -1) {
+        issuedItem.issues.push({
+          issuedTo: asset.location,
+          quantity: assetType === "Permanent" ? 1 : asset.returnQuantity,
+          ...(assetType === "Permanent" ? { issuedIds: [asset.itemId] } : {}),
+        });
+      } else {
+        issuedItem.issues[issueIndex].quantity +=
+          assetType === "Permanent" ? 1 : asset.returnQuantity;
+        if (assetType === "Permanent") {
+          issuedItem.issues[issueIndex].issuedIds.push(asset.itemId);
+        }
+      }
+      await issuedItem.save();
+    }
+
+    await ReturnedModel.deleteOne({ _id: id });
+
+    storeAssetNotification(asset, "return rejected by HOO", new Date(), { rejectionRemarks });
+    res.status(200).json({ success: true, message: "Return rejected by HOO" });
+  } catch (error) {
+    console.error("Error rejecting return by HOO:", error);
+    res.status(500).json({ success: false, message: "Failed to reject return by HOO" });
   }
 };
 
@@ -3198,7 +3584,26 @@ exports.getRejectedAsset = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to fetch rejected asset", error: error.message });
   }
 };
+exports.getReturnedAssetsForHoo = async (req, res) => {
+  try {
+    // Fetch assets from both Permanent and Consumable collections with hooapproval: "waiting"
+    const [permanentAssets, consumableAssets] = await Promise.all([
+      ReturnedPermanent.find({ hooapproval: "waiting" }).lean(),
+      ReturnedConsumable.find({ hooapproval: "waiting" }).lean(),
+    ]);
 
+    // Combine and format the results
+    const allAssets = [
+      ...permanentAssets.map(asset => ({ ...asset, assetType: "Permanent" })),
+      ...consumableAssets.map(asset => ({ ...asset, assetType: "Consumable" })),
+    ];
+
+    res.status(200).json({ success: true, data: allAssets });
+  } catch (error) {
+    console.error("Error fetching assets for HOO approval:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch assets for HOO approval" });
+  }
+};
 
 
 // Delete rejected asset
@@ -4214,7 +4619,6 @@ exports.getIssuedPermanentAssets = async (req, res) => {
   
       const assets = await DisposedAsset.find(query);
   
-      // Separate building and non-building assets
       const disposalData = assets.filter((asset) => asset.assetCategory !== "Building");
       const buildingCondemnationData = assets.filter((asset) => asset.assetCategory === "Building");
   
@@ -4389,18 +4793,20 @@ async function storeAssetNotification(data, action, actionTime) {
         });
         break;
 
-      case "return approved":
-      case "return rejected":
-        Object.assign(actionData, {
-          subCategory: data.subCategory,
-          location: data.location,
-          condition: data.status,
-        });
-        if (action === "return rejected") {
-          actionData.rejectionRemarks = data.rejectionRemarks;
-          actionData.rejectedAssetId = data.rejectedAssetId;
-        }
-        break;
+        case "return approved":
+          case "return rejected":
+          case "return approved with HOO waiting":
+          case "return approved by HOO":
+            Object.assign(actionData, {
+              subCategory: data.subCategory,
+              location: data.location,
+              condition: data.status,
+            });
+            if (action === "return rejected" || action === "return approved by HOO") {
+              actionData.rejectionRemarks = data.rejectionRemarks || data.rejectionRemarks;
+              actionData.rejectedAssetId = data.rejectedAssetId || data._id;
+            }
+            break;
 
       case "asset disposal approved":
       case "asset disposal cancelled":

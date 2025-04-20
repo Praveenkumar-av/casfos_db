@@ -868,7 +868,7 @@ const AssetStore = () => {
       amcFromDate: "",  // Add this
       amcToDate: "",    // Add this
       amcCost: 0,       // Add this
-      amcPhoto: null,   // Add this
+      amcPhoto: null,   
       warrantyNumber: "",
       warrantyValidUpto: "",
       warrantyPhoto: null,
@@ -884,10 +884,21 @@ const AssetStore = () => {
   };
 
   const handleItemChange = (index, field, value) => {
+    if (field === "itemName" || field === "customItemName") {
+      if (value.length > 100) {
+        Swal.fire({
+          icon: "warning",
+          title: "Character Limit Exceeded",
+          text: "Item Name cannot exceed 100 characters.",
+        });
+        return;
+      }
+    }
+  
     const updatedItems = items.map((item, i) => {
       if (i === index) {
         let updatedItem = { ...item };
-
+  
         if (field === "subCategory" && assetType === "Permanent") {
           updatedItem = {
             ...updatedItem,

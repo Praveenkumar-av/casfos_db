@@ -623,7 +623,6 @@ const AssetIssue = () => {
         </ul>
       </section>
 
-      {/* Main Content */}
       <section id="content">
         {/* Navigation Bar */}
         <nav>

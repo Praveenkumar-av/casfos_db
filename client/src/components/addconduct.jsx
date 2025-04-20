@@ -189,7 +189,7 @@ const AddConduct = () => {
         </ul>
         <ul className="side-menu">
           <li>
-            <a href="/" className="logout">
+            <a href="/login" className="logout">
               <i className="bx bxs-log-out-circle" />
               <span className="text">Logout</span>
             </a>

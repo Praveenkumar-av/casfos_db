@@ -320,7 +320,7 @@ const Register = () => {
 
                 {/* Additional Links */}
                 <div className="login-links">
-                  <Link to="/" className="register-link">
+                  <Link to="/login" className="register-link">
                     Already have an account? Login
                     <FaLongArrowAltRight />
                   </Link>

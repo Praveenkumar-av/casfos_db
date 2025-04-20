@@ -74,7 +74,7 @@ function ui() {
                   <span className="link-name">Analytics</span>
                 </a></li>
               <ul className="logout-mode">
-                <li><a href="/">
+                <li><a href="/login">
                     <i className="uil uil-signout" />
                     <span className="link-name">Logout</span>
                   </a></li>

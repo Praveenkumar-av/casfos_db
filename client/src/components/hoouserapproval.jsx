@@ -78,42 +78,10 @@ function Approval() {
   const approveAction = async (id) => {
     const selectedUser = registrations.find(reg => reg._id === id);
 
-    // For assetmanager or facultyentrystaff, prompt for specific role
-    let specificRole = selectedUser.role;
-    if (selectedUser.role === 'assetmanager') {
-      const { value } = await Swal.fire({
-        title: 'Select Specific Role',
-        input: 'radio',
-        inputOptions: {
-          'assetmanager': 'Asset Manager',
-          'storekeeper': 'Storekeeper',
-        },
-        inputValidator: (value) => !value && 'You must select a role!',
-        confirmButtonText: 'Submit',
-        showCancelButton: true,
-      });
-      if (!value) return;
-      specificRole = value;
-    } else if (selectedUser.role === 'facultyentrystaff') {
-      const { value } = await Swal.fire({
-        title: 'Select Specific Role',
-        input: 'radio',
-        inputOptions: {
-          'facultyentrystaff': 'Faculty Entry Staff',
-          'facultyverifier': 'Faculty Verifier',
-        },
-        inputValidator: (value) => !value && 'You must select a role!',
-        confirmButtonText: 'Submit',
-        showCancelButton: true,
-      });
-      if (!value) return;
-      specificRole = value;
-    }
-
     try {
       await axios.post(`http://localhost:3001/api/users/approve/${id}`, {
-        access: specificRole === 'headofoffice' || specificRole === 'principal' ? ['all'] : [],
-        specificRole,
+        access: selectedUser.role === 'headofoffice' || selectedUser.role === 'principal' ? ['all'] : [],
+        specificRole: selectedUser.role, // Use the role directly from registration data
       });
       setRegistrations(registrations.filter(reg => reg._id !== id));
       Swal.fire('Approved!', 'The user has been approved.', 'success');
@@ -180,7 +148,7 @@ function Approval() {
         </ul>
         <ul className="side-menu">
           <li>
-            <a href="/" className="logout">
+            <a href="/login" className="logout">
               <i className="bx bxs-log-out-circle" />
               <span className="text">Logout</span>
             </a>

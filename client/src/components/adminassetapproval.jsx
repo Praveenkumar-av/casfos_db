@@ -1208,7 +1208,7 @@ function AssetApproval() {
           <li><a href={`/managerassetview?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset View</span></a></li>
         </ul>
         <ul className="side-menu">
-          <li><Link to="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></Link></li>
+          <li><Link to="/login" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></Link></li>
         </ul>
       </section>
 

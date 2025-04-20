@@ -40,12 +40,13 @@ import UpdateFacultyEntryHoo from "./components/updatefacultyentryhoo";
 import AddConduct from './components/addconduct';
 import AssetView from "./components/ViewerAssetview";
 import FacultyView from "./components/Viewerfacultyview";
+import Mainpage from "./components/mainpage";
 import HOOAssetApproval from "./components/hooassetapproval"
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/admindashboard" element={<Dashboard/>} />
         <Route path="/hoouserapproval" element={<UserApproval/>} />
@@ -54,7 +55,7 @@ function App() {
         <Route path="/principalassetview" element={<PrincipalAssetView/>} />
         <Route path="/viewerassetview" element={< AssetView/>}/>
         <Route path="/viewerfacultyview" element={< FacultyView/>}/>
-
+        <Route path="/" element ={<Mainpage/>} />
         <Route path="/managerassetview" element={<ManagerAssetView/>} />
         <Route path="/facultyverify" element={<FacultyVerify/>} />
         <Route path="/principaldashboard" element={<PrincipalDashboard/>} />

@@ -1163,7 +1163,8 @@ exports.getReturnedForApproval = async (req, res) => {
       status: {
         $ne: "returned",
         $not: /^returned$/i // Additional check for case insensitivity or typos
-      }
+      },
+      hooapproval: { $ne: "waiting" } // Exclude assets with hooapproval set to "waiting"
     });
 
     res.status(200).json(assets);
@@ -4797,6 +4798,8 @@ async function storeAssetNotification(data, action, actionTime) {
           case "return rejected":
           case "return approved with HOO waiting":
           case "return approved by HOO":
+          case "return rejected by HOO": // Add this case
+            
             Object.assign(actionData, {
               subCategory: data.subCategory,
               location: data.location,

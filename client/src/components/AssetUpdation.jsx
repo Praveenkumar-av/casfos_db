@@ -1115,7 +1115,7 @@ function AssetUpdation() {
         </ul>
         <ul className="side-menu">
           <li>
-            <Link to="/" className="logout">
+            <Link to="/login" className="logout">
               <i className="bx bxs-log-out-circle" />
               <span className="text">Logout</span>
             </Link>

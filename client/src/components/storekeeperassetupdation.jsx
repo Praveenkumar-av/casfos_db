@@ -1222,7 +1222,7 @@ const StorekeeperAssetUpdation = () => {
         </ul>
         <ul className="side-menu">
           <li>
-            <a href="/" className="logout">
+            <a href="/login" className="logout">
               <i className="bx bxs-log-out-circle" />
               <span className="text">Logout</span>
             </a>
@@ -1254,12 +1254,7 @@ const StorekeeperAssetUpdation = () => {
           >
             Consumable Assets
           </button>
-          <button
-            style={activeTab === 'conditionChange' ? componentStyles.activeTab : componentStyles.tab}
-            onClick={() => setActiveTab('conditionChange')}
-          >
-            Condition Change
-          </button>
+         
         </div>
 
         <div style={componentStyles.container}>

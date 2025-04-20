@@ -761,7 +761,7 @@ function PrincipalAssetUpdation() {
             <li><a href={`/principalfacultyview?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Faculty View</span></a></li>
           </ul>
         <ul className="side-menu">
-          <li><Link to="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></Link></li>
+          <li><Link to="/login" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></Link></li>
         </ul>
       </section>
 

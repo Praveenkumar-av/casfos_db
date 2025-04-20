@@ -1374,36 +1374,35 @@ const AssetView = () => {
   
     if (activeTab === "purchase") {
       purchaseCost = tableData.reduce((sum, row) => {
-        // Only include costOfConstruction if "Building" is explicitly selected
         if (purchaseFilters.assetCategory === "Building" && row.assetCategory === "Building") {
           return sum + (parseFloat(row.costOfConstruction) || 0);
-        }
-        // Include totalPrice for Land if "Land" is selected
-        else if (purchaseFilters.assetCategory === "Land" && row.assetCategory === "Land") {
+        } else if (purchaseFilters.assetCategory === "Land" && row.assetCategory === "Land") {
           return sum + (parseFloat(row.items?.[0]?.totalPrice) || 0);
-        }
-        // Include totalPrice for other categories only if not Building or Land, or if no specific category is filtered
-        else if (
-          purchaseFilters.assetCategory !== "Building" && 
-          purchaseFilters.assetCategory !== "Land" && 
-          row.assetCategory !== "Building" && 
+        } else if (
+          purchaseFilters.assetCategory !== "Building" &&
+          purchaseFilters.assetCategory !== "Land" &&
+          row.assetCategory !== "Building" &&
           row.assetCategory !== "Land"
         ) {
           return sum + (parseFloat(row.totalPrice) || 0);
         }
-        return sum; // If none of the conditions match, don't add anything
+        return sum;
       }, 0);
-    }else if (activeTab === "serviceReturn") {
+    } else if (activeTab === "serviceReturn") {
       if (serviceReturnFilters.condition !== "InService" && serviceReturnFilters.condition !== "Exchanged") {
         serviceCost = tableData.reduce((sum, row) => sum + (parseFloat(row.serviceAmount) || 0), 0);
       }
-      if (serviceReturnFilters.assetCategory === "Building") {
-        maintenanceCost = buildingMaintenanceData.reduce((sum, row) => sum + (parseFloat(row.cost) || 0), 0);
+      if (serviceReturnFilters.assetCategory === "Building" && buildingMaintenanceData?.length > 0) {
+        maintenanceCost = buildingMaintenanceData.reduce((sum, row) => {
+          return sum + (parseFloat(row.cost) || 0);
+        }, 0);
       }
     } else if (activeTab === "disposal") {
       disposalValue = tableData.reduce((sum, row) => sum + (parseFloat(row.disposalValue) || 0), 0);
-      if (disposalFilters.assetCategory === "Building") {
-        demolitionEstimate = buildingCondemnationData.reduce((sum, row) => sum + (parseFloat(row.demolitionEstimate) || 0), 0);
+      if (disposalFilters.assetCategory === "Building" && buildingCondemnationData?.length > 0) {
+        demolitionEstimate = buildingCondemnationData.reduce((sum, row) => {
+          return sum + (parseFloat(row.demolitionEstimate) || 0);
+        }, 0);
       }
     } else if (activeTab === "storeIssue" && storeIssueFilters.location !== "store") {
       storeIssueValue = tableData.reduce((sum, row) => {
@@ -1414,29 +1413,29 @@ const AssetView = () => {
     }
   
     return {
-      purchaseCost: purchaseCost > 0 ? purchaseCost.toLocaleString("en-IN", { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      purchaseCost: purchaseCost > 0 ? purchaseCost.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }) : null,
-      serviceCost: serviceCost > 0 ? serviceCost.toLocaleString("en-IN", { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      serviceCost: serviceCost > 0 ? serviceCost.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }) : null,
-      maintenanceCost: maintenanceCost > 0 ? maintenanceCost.toLocaleString("en-IN", { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      maintenanceCost: maintenanceCost > 0 ? maintenanceCost.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }) : null,
-      demolitionEstimate: demolitionEstimate > 0 ? demolitionEstimate.toLocaleString("en-IN", { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      demolitionEstimate: demolitionEstimate > 0 ? demolitionEstimate.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }) : null,
-      disposalValue: disposalValue > 0 ? disposalValue.toLocaleString("en-IN", { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      disposalValue: disposalValue > 0 ? disposalValue.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }) : null,
-      storeIssueValue: storeIssueValue > 0 ? storeIssueValue.toLocaleString("en-IN", { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
+      storeIssueValue: storeIssueValue > 0 ? storeIssueValue.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }) : null,
     };
   };
@@ -1460,7 +1459,7 @@ const AssetView = () => {
             <li className="active"><a href={`/viewasset?username=${encodeURIComponent(username)}`}><i className="bx bxs-doughnut-chart" /><span className="text">Asset View</span></a></li>
           </ul>
           <ul className="side-menu">
-            <li><a href="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
+            <li><a href="/login" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
           </ul>
         </section>
 
@@ -2261,11 +2260,11 @@ const AssetView = () => {
                 <button onClick={generateExcel} style={styles.exportButton}>
                   Export to Excel
                 </button>
-                {(totalCost.purchaseCost || 
-  (activeTab === "serviceReturn" && totalCost.serviceCost) || 
-  (activeTab === "serviceReturn" && totalCost.maintenanceCost) || 
-  (activeTab === "disposal" && totalCost.demolitionEstimate) || 
-  (activeTab === "disposal" && totalCost.disposalValue) || 
+                {(totalCost.purchaseCost ||
+  (activeTab === "serviceReturn" && totalCost.serviceCost) ||
+  (activeTab === "serviceReturn" && totalCost.maintenanceCost) ||
+  (activeTab === "disposal" && totalCost.demolitionEstimate) ||
+  (activeTab === "disposal" && totalCost.disposalValue) ||
   totalCost.storeIssueValue) && (
   <div style={styles.totalCostContainer}>
     {totalCost.purchaseCost && activeTab === "purchase" && purchaseFilters.assetCategory !== "Building" && (
@@ -2286,7 +2285,7 @@ const AssetView = () => {
         <span style={styles.totalCostValue}>₹{totalCost.serviceCost}</span>
       </div>
     )}
-    {totalCost.maintenanceCost && activeTab === "serviceReturn" && serviceReturnFilters.assetCategory ==="Building" (
+    {totalCost.maintenanceCost && activeTab === "serviceReturn" && serviceReturnFilters.assetCategory === "Building" && (
       <div style={{ marginBottom: "10px" }}>
         <span style={styles.totalCostLabel}>Total Maintenance Cost:</span>
         <span style={styles.totalCostValue}>₹{totalCost.maintenanceCost}</span>

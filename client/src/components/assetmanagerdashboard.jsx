@@ -396,7 +396,7 @@ const AssetManagerDashboard = () => {
             <li><a href={`/managerassetview?username=${encodeURIComponent(username)}`}><i className="bx bxs-reply" /><span className="text">Asset View</span></a></li>
           </ul>
           <ul className="side-menu">
-            <li><a href="/" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
+            <li><a href="/login" className="logout"><i className="bx bxs-log-out-circle" /><span className="text">Logout</span></a></li>
           </ul>
         </section>
 

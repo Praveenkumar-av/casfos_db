@@ -52,6 +52,13 @@ const Login = () => {
     setLoading(true); // Set loading state
     setMessage(''); // Clear any previous messages
 
+    // Check if username or password is empty
+    if (!name.trim() || !password.trim()) {
+      setLoading(false);
+      setMessage('Enter username and password');
+      return;
+    }
+
     try {
       // Send login request to backend API
       const response = await axios.post('http://localhost:3001/api/users/login', {
@@ -84,12 +91,18 @@ const Login = () => {
           setMessage('Invalid role'); // Handle unknown role
         }
       } else {
-        setMessage(response.data); // Display server response message
+        setMessage('Invalid login credentials');
       }
     } catch (error) {
       // Handle login errors
       setLoading(false);
-      setMessage(error.response?.data?.message || 'Something went wrong');
+      // Handle specific error messages from backend
+      const errorMessage = error.response?.data?.message;
+      if (errorMessage === 'User not found' || errorMessage === 'Wrong password') {
+        setMessage('Invalid login credentials');
+      } else {
+        setMessage(errorMessage || 'Something went wrong');
+      }
     }
   };
 
@@ -134,7 +147,7 @@ const Login = () => {
               {/* Logo container moved to right panel */}
               <div className="login-image-container">
                 <img
-                  src="public/images/CASFOS-Coimbatore.ico"
+                  src="/images/CASFOS-Coimbatore.ico"
                   alt="CASFOS Logo"
                   className="login-image"
                 />
@@ -142,7 +155,7 @@ const Login = () => {
 
               {/* Login form title */}
               <h1 className="login-title">Login</h1>
-              
+
               {/* Login form */}
               <form onSubmit={handleLogin} className="login-form">
                 {/* Username input field */}

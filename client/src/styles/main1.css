@@ -5,20 +5,34 @@
 [ VARIABLES ]*/
 :root {
   /* Color Variables */
-  --primary-color: #5b99f6;       /* Main brand blue */
-  --secondary-color: #3f37c9;     /* Darker blue */
-  --accent-color: #4cc9f0;        /* Light blue accent */
-  --light-color: #f8f9fa;         /* Light background */
-  --dark-color: #212529;          /* Dark text */
-  --success-color: #4bb543;       /* Success green */
-  --error-color: #ff3333;         /* Error red */
-  --text-color: #495057;          /* Main text */
-  --text-light: #6c757d;          /* Lighter text */
-  
+  --primary-color: #5b99f6;
+  /* Main brand blue */
+  --secondary-color: #3f37c9;
+  /* Darker blue */
+  --accent-color: #4cc9f0;
+  /* Light blue accent */
+  --light-color: #f8f9fa;
+  /* Light background */
+  --dark-color: #212529;
+  /* Dark text */
+  --success-color: #4bb543;
+  /* Success green */
+  --error-color: #ff3333;
+  /* Error red */
+  --pending-color: #e0a800;
+  /* Pending amber */
+  --text-color: #495057;
+  /* Main text */
+  --text-light: #6c757d;
+  /* Lighter text */
+
   /* Effect Variables */
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);  /* Default shadow */
-  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Smooth transitions */
-  --gradient: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%); /* Button gradient */
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  /* Default shadow */
+  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  /* Smooth transitions */
+  --gradient: linear-gradient(135deg, #4361ee 0%, #4cc9f0 100%);
+  /* Button gradient */
 }
 
 /*//////////////////////////////////////////////////////////////////
@@ -29,7 +43,8 @@
   box-sizing: border-box;
 }
 
-body, html {
+body,
+html {
   height: 100%;
   font-family: 'Poppins', sans-serif;
   background: var(--light-color);
@@ -99,7 +114,8 @@ body, html {
   color: white;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Align to top */
+  justify-content: flex-start;
+  /* Align to top */
   position: relative;
   overflow: hidden;
 }
@@ -112,13 +128,18 @@ body, html {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 70%);
   animation: pulse 8s infinite linear;
 }
 
 @keyframes pulse {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Role selection container */
@@ -312,7 +333,7 @@ body, html {
   box-shadow: 0 5px 15px rgba(67, 97, 238, 0.1);
 }
 
-.input-wrapper input:focus + .input-icon {
+.input-wrapper input:focus+.input-icon {
   color: var(--primary-color);
 }
 
@@ -369,7 +390,7 @@ body, html {
   box-shadow: none;
 }
 
-/* Error message styling */
+/* Message styling */
 .error-message {
   font-family: 'Poppins', sans-serif;
   font-size: 14px;
@@ -382,10 +403,35 @@ body, html {
   animation: shake 0.5s ease-in-out;
 }
 
+.pending-message {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  color: var(--pending-color);
+  text-align: center;
+  margin-top: 20px;
+  padding: 10px;
+  background: rgba(224, 168, 0, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(224, 168, 0, 0.3);
+  animation: fadeIn 0.8s ease-in-out;
+}
+
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-5px); }
-  40%, 80% { transform: translateX(5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
 }
 
 /* Additional links */
@@ -436,93 +482,102 @@ body, html {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /*//////////////////////////////////////////////////////////////////
 [ RESPONSIVE DESIGN ]*/
 @media (max-width: 992px) {
+
   /* Stack panels vertically on tablets */
-  .login-left-panel, 
+  .login-left-panel,
   .login-right-panel {
     width: 100%;
     padding: 30px 25px;
   }
-  
+
   /* Reverse order on mobile - form first */
   .login-left-panel {
     order: 2;
   }
-  
+
   .login-right-panel {
     order: 1;
   }
-  
+
   .login-image {
     max-height: 80px;
   }
-  
+
   .role-selection-title {
     font-size: 22px;
   }
 }
 
 @media (max-width: 768px) {
+
   /* Adjustments for smaller tablets */
-  .login-left-panel, 
+  .login-left-panel,
   .login-right-panel {
     padding: 25px 20px;
   }
-  
+
   .login-title {
     font-size: 22px;
     margin-bottom: 30px;
   }
-  
+
   .role-selection-title {
     font-size: 18px;
     margin-bottom: 25px;
   }
-  
+
   .input-wrapper input {
     height: 50px;
     padding: 0 20px 0 50px;
   }
-  
+
   .login-button {
     height: 50px;
   }
 }
 
 @media (max-width: 576px) {
+
   /* Mobile phone adjustments */
-  .login-left-panel, 
+  .login-left-panel,
   .login-right-panel {
     padding: 20px 15px;
   }
-  
+
   .login-title {
     font-size: 24px;
   }
-  
+
   .login-image {
     max-height: 70px;
   }
-  
+
   .role-option {
     padding: 12px 20px;
   }
-  
+
   .input-wrapper input {
     border-radius: 8px;
     height: 45px;
   }
-  
+
   .login-button {
     border-radius: 8px;
     font-size: 14px;
     height: 45px;
-
   }
 }

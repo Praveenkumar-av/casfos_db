@@ -281,6 +281,5 @@ module.exports = {
   loginUser,
   approveUser,
   rejectUser,
-  checkUser,
   getTemporaryUsers,
 };

@@ -315,7 +315,7 @@ const Register = () => {
 
                 {/* Additional Links */}
                 <div className="login-links">
-                  <Link to="/login" className="register-link">
+                  <Link to="/" className="register-link">
                     Already have an account? Login
                     <FaLongArrowAltRight />
                   </Link>
